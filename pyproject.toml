@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=64", "wheel", "setuptools_scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "typed-lisa-toolkit"
+authors = [
+    {name = "Sen-wen Deng", email = "deng@apc.in2p3.fr"},
+]
+description = "Fully typed interfaces for LISA data analysis"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy >= 1.20",
+]
+dynamic = ["version"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"typed_lisa_toolkit" = ["py.typed"]
+
+[tool.setuptools_scm]
+version_file = "_version.py"
+
+[tool.flit.module]
+name = "typed_lisa_toolkit"
+
+[tool.ruff.lint]
+select = ["D"]
+ignore = ["D100", "D104"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]

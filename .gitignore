@@ -1,0 +1,13 @@
+__pycache__
+.vscode
+.astropy
+.cache
+.config
+.ipython
+.ipynb_checkpoints
+.local
+*.DS_Store
+_version.py
+*.egg-info
+sandbox
+.pytest_cache
