@@ -40,7 +40,7 @@ class TestDataContainers(unittest.TestCase):
         self.assertTrue(np.array_equal(self.tsdata.get_frequencies(), expected_frequencies))
 
     def test_tsdata_get_subset(self):
-        subset = self.tsdata.get_subset(duration=(2, 4))
+        subset = self.tsdata.get_subset(interval=(2, 4))
         expected_times = self.times[20:40]
         self.assertTrue(np.array_equal(subset.times, expected_times))
 
@@ -65,7 +65,7 @@ class TestDataContainers(unittest.TestCase):
         self.assertTrue(np.array_equal(conj_data["channel1"].signal, expected_signal))
 
     def test_fsdata_get_subset(self):
-        subset = self.fsdata.get_subset(frequencies=(0.1, 0.5))
+        subset = self.fsdata.get_subset(interval=(0.1, 0.5))
         mask = (self.frequencies >= 0.1) & (self.frequencies <= 0.5)
         expected_frequencies = self.frequencies[mask]
         self.assertTrue(np.array_equal(subset.frequencies, expected_frequencies))
