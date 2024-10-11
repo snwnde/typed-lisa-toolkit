@@ -1,65 +1,73 @@
 """Module for modes."""
 
 import logging
-from typing import NamedTuple, Protocol, Self, runtime_checkable, Any
+from typing import NamedTuple, Self
 
 log = logging.getLogger(__name__)
 
 PosInt = int  # Positive integer
 
 
-@runtime_checkable
-class Mode(Protocol):
-    """A mode."""
-
-    def __getitem__(self, index: int) -> Any: ...  # noqa: D105
-    def __len__(self) -> int: ...  # noqa: D105
-    @property
-    def degree(self) -> PosInt: ...  # noqa: D102
-
-    @property
-    def order(self) -> PosInt: ...  # noqa: D102
-
-    @classmethod
-    def cast(cls, mode: tuple[PosInt, ...] | Self) -> Self: ...  # noqa: D102
-
-
 class Harmonic(NamedTuple):
     """A harmonic mode."""
 
     l: PosInt  # noqa: E741
+    """The degree of the mode."""
+
     m: PosInt
+    """The order of the mode."""
 
     @property
-    def degree(self) -> PosInt:  # noqa: D102
+    def degree(self) -> PosInt:
+        """Return the attribute :attr:`l`."""
         return self.l
 
     @property
-    def order(self) -> PosInt:  # noqa: D102
+    def order(self) -> PosInt:
+        """Return the attribute :attr:`m`."""
         return self.m
 
     @classmethod
-    def cast(cls, mode: tuple[PosInt, ...] | Self) -> Self:  # noqa: D102
+    def cast(cls, mode: tuple[PosInt, PosInt] | Self) -> Self:
+        """Cast a tuple to :class:`Harmonic`."""
         return cls(*mode)
 
 
-class QNM(Harmonic):
+class QNM(NamedTuple):
     """A quasinormal mode."""
 
-    n: PosInt
+    l: PosInt  # noqa: E741
+    """The degree of the mode."""
 
-    def __new__(cls, l: PosInt, m: PosInt, n: PosInt):  # noqa: D102, E741
-        obj = super().__new__(cls, l, m)
-        obj.n = n
-        return obj
+    m: PosInt
+    """The order of the mode."""
+
+    n: PosInt
+    """The overtone of the mode."""
 
     @property
-    def overtone(self) -> PosInt:  # noqa: D102
+    def degree(self) -> PosInt:
+        """Return the attribute :attr:`l`."""
+        return self.l
+
+    @property
+    def order(self) -> PosInt:
+        """Return the attribute :attr:`m`."""
+        return self.m
+
+    @property
+    def overtone(self) -> PosInt:
+        """Return the attribute :attr:`n`."""
         return self.n
 
+    @classmethod
+    def cast(cls, mode: tuple[PosInt, PosInt, PosInt] | Self) -> Self:
+        """Cast a tuple to :class:`QNM`."""
+        return cls(*mode)
 
-def cast_mode(mode: tuple[PosInt, ...]):
-    """Cast a mode to a Mode."""
+
+def cast_mode(mode: tuple[PosInt, ...]) -> Harmonic | QNM:
+    """Cast a tuple of positive integers to :class:`Harmonic` or :class:`QNM`."""
     if len(mode) == 2:
         return Harmonic.cast(mode)
     elif len(mode) == 3:
