@@ -1,0 +1,38 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  SPHINX_VERSION: "8.0.2"
+  NUMPY_VERSION: "2.1.1"
+  INSIPID_VERSION: "0.4.2"
+  NBSPHINX_VERSION: "0.9.5"
+  SAT_VERSION: "2.5.0"
+  ST_VERSION: "3.8.0"
+
+make_html:
+  stage: build
+  image: ghcr.io/sphinx-doc/sphinx:$SPHINX_VERSION
+  script:
+    - apt-get update
+    - apt-get -y --no-install-recommends install git gcc libc-dev
+    - pip install --upgrade pip
+    - pip install numpy==$NUMPY_VERSION
+    - pip install insipid-sphinx-theme==$INSIPID_VERSION
+    - pip install nbsphinx==$NBSPHINX_VERSION
+    - pip install sphinx-autodoc-typehints==$SAT_VERSION
+    - pip install sphinx-toolbox==$ST_VERSION
+    - pip install .
+    - cd docs
+    - make html
+  artifacts:
+    paths:
+      - docs/_build/html
+
+pages:
+  stage: deploy
+  script:
+    - mv docs/_build/html public
+  artifacts:
+    paths:
+      - public
