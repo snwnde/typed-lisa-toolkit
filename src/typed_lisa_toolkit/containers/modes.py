@@ -29,7 +29,7 @@ class Harmonic(NamedTuple):
 
     @classmethod
     def cast(cls, mode: tuple[PosInt, PosInt] | Self) -> Self:
-        """Cast a tuple to :class:`Harmonic`."""
+        """Cast a tuple to :class:`.Harmonic`."""
         return cls(*mode)
 
 
@@ -62,12 +62,12 @@ class QNM(NamedTuple):
 
     @classmethod
     def cast(cls, mode: tuple[PosInt, PosInt, PosInt] | Self) -> Self:
-        """Cast a tuple to :class:`QNM`."""
+        """Cast a tuple to :class:`.QNM`."""
         return cls(*mode)
 
 
 def cast_mode(mode: tuple[PosInt, ...]) -> Harmonic | QNM:
-    """Cast a tuple of positive integers to :class:`Harmonic` or :class:`QNM`."""
+    """Cast a tuple of positive integers to :class:`.Harmonic` or :class:`.QNM`."""
     if len(mode) == 2:
         return Harmonic.cast(mode)
     elif len(mode) == 3:

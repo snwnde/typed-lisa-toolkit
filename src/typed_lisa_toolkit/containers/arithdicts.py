@@ -1,19 +1,36 @@
-"""Module for arithmetic dictionaries."""
+"""Module for arithmetic dictionaries.
+
+Arithmetic dictionaries are dictionaries that support arithmetic operations
+between them and with numeric values or arrays. For example, a dictionary
+that maps gravitational wave modes to their waveforms can be multiplied by a
+dictionary that maps these modes to some scaling factors. To this end, we use
+have :class:`.ModeDict`. In LISA data analysis, we can multiply a dictionary
+that maps channels to simplified responses to strain waveforms to get TDI
+waveforms. For this, we have :class:`.ChannelDict`.
+"""
 
 from __future__ import annotations
 from collections import UserDict
 from collections.abc import Mapping, Sequence
 import logging
-from typing import TypeVar, Protocol, Self, Generic, Callable, Union, cast, Type
+from typing import TypeVar, Protocol, Self, Generic, Callable, Union, cast
 
 
 log = logging.getLogger(__name__)
 
-KT = TypeVar("KT")  # Key type
+KT = TypeVar("KT")
+"""Key type."""
+
 ArithT = TypeVar("ArithT", bound=Union["SupportsArithmetic", "ArithDict"])
+"""Arithmetic type."""
+
 ArithTb = TypeVar("ArithTb", bound=Union["SupportsArithmetic", "ArithDict"])
-ChnName = str  # Channel name
-ModeT = TypeVar("ModeT", bound=tuple[int, ...])  # Mode type
+"""Arithmetic type (bis)."""
+
+ModeT = TypeVar("ModeT", bound=tuple[int, ...])
+"""Mode type."""
+
+ChnName = str
 
 
 class SupportsArithmetic(Protocol):
@@ -72,11 +89,11 @@ class ArithDict(UserDict[KT, ArithT]):
             raise TypeError(f"Cannot multiply {type(self)} by {type(other)}.") from e
 
     def __rmul__(self, value: ArithTb):
-        """Multiply a ArithDict by a value."""
+        """Multiply an arithmetic dictionary by an object of its value type."""
         return self.__mul_value__(value)
 
     def __truediv__(self, other: ArithTb):
-        """Divide a ArithDict by another ArithDict or a value."""
+        """Divide an arithmetic dictionary by another arithmetic dictionary or an object of its value type."""
         try:
             return self.create_new({k: self[k] / other for k in self.keys()})
         except TypeError:
@@ -85,15 +102,15 @@ class ArithDict(UserDict[KT, ArithT]):
         raise TypeError(f"Cannot divide {type(self)} by {type(other)}")
 
     def __rtruediv__(self, value: ArithTb):
-        """Divide a ArithDict by a value."""
+        """Divide an arithmetic dictionary by an object of its value type."""
         return self.create_new({k: value / self[k] for k in self.keys()})
 
     def __add_arithdict__(self, other: ArithDict[KT, ArithTb]):
-        """Add two ArithDicts."""
+        """Add two arithmetic dictionaries."""
         return self.create_new({k: self[k] + other[k] for k in self.keys()})
 
     def __add_value__(self, value: ArithTb):
-        """Add a ArithDict by a value."""
+        """Add an arithmetic dictionary by an object of its value type."""
         return self.create_new({k: self[k] + value for k in self.keys()})
 
     def __add__(self, other: ArithTb):  # noqa: D105
@@ -108,15 +125,25 @@ class ArithDict(UserDict[KT, ArithT]):
             raise TypeError(f"Cannot add {type(self)} by {type(other)}.") from e
 
     def __neg__(self):
-        """Negate a ArithDict."""
+        """Negate an arithmetic dictionary."""
         return self.create_new({k: -self[k] for k in self.keys()})
 
     def __sub__(self, other: ArithTb):
-        """Subtract two ArithDicts."""
+        """Subtract two arithmetic dictionaries."""
         return self + (-other)
 
     def pass_through(self, func: Callable[[ArithT], ArithTb]):
-        """Pass the dictionary through a function."""
+        """Pass the dictionary through a function.
+
+        Essentially, this is a map operation on the values of the dictionary,
+        returning a new dictionary with the same keys, like:
+
+        .. code-block:: python
+
+            self.create_new({k: func(v) for k, v in self.items()})
+
+        In case `v` is itself a :class:`.ArithDict`, the function is applied recursively.
+        """
 
         def _func(v: ArithT) -> ArithTb:
             if isinstance(v, ArithDict):
@@ -131,33 +158,23 @@ class ArithDict(UserDict[KT, ArithT]):
         raise NotImplementedError("This method should be implemented in child classes.")
 
     def pick(self, keys: KT | Sequence[KT]) -> Self:
-        """Pick only the given keys.
+        """Return a new instance with only the given keys.
 
         Parameters
         ----------
-        keys : KT | Sequence[KT]
-            The keys to keep.
-
-        Returns
-        -------
-        Self
-            The new dictionary with only the given keys.
+        keys :
+            The keys to keep. Either a single key or a sequence of keys.
         """
         keys = self.listify(keys)
         return self.create_new({key: self[key] for key in keys})
 
     def drop(self, keys: KT | Sequence[KT]) -> Self:
-        """Drop the given keys.
+        """Return a new instance dropping the given keys.
 
         Parameters
         ----------
-        keys : KT | Sequence[KT]
-            The keys to drop.
-
-        Returns
-        -------
-        Self
-            The new dictionary without the given keys.
+        keys :
+            The keys to drop. Either a single key or a sequence of keys.
         """
         keys = self.listify(keys)
         return self.create_new(
@@ -169,7 +186,7 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
     """A dictionary of modes."""
 
     @property
-    def modes(self):
+    def modes(self) -> tuple[ModeT,...]:
         """Return the modes."""
         return tuple(self.keys())
 
@@ -183,8 +200,8 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
         keys = cast(Sequence[ModeT], keys)
         return list(keys)
 
-    def sum(self):
-        """Sum all the modes."""
+    def sum(self) -> ArithT:
+        """Return the sum of all the values in the dictionary."""
         _sum = sum(self.values(), self._get_null_value())
         return _sum
 
@@ -193,7 +210,7 @@ class ChannelDict(ArithDict[ChnName, ArithT], Generic[ArithT]):
     """A dictionary of channels."""
 
     @property
-    def channel_names(self):
+    def channel_names(self) -> tuple[ChnName,...]:
         """Return the channel names."""
         return tuple(self.keys())
 

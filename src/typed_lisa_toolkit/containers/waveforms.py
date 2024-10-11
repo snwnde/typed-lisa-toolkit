@@ -21,12 +21,12 @@ log = logging.getLogger(__name__)
 ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
 WaveformInMode = TypeVar(
     "WaveformInMode",
-    series.FrequencySeries[np.complexfloating],
-    series.TimeSeries[np.complexfloating],
+    "series.FrequencySeries[np.complexfloating]",
+    "series.TimeSeries[np.complexfloating]",
     "PhasorSequence",
 )
 """Invariant type variable for either :class:`.series.FrequencySeries`,
-:class:`.series.TimeSeries`, or :class:`PhasorSequence`. Instances of
+:class:`.series.TimeSeries`, or :class:`.PhasorSequence`. Instances of
 this type are used to represent the signal of a waveform in a specific
 mode."""
 
@@ -42,14 +42,25 @@ def _format_waveform_in_channel(wf: WaveformInChannel[WaveformInMode]):
 
 
 def format(wf: Waveform[WaveformInMode]) -> FormattedWaveform:
-    """Format a waveform to a ChennlDict of ModeDict."""
+    """Format a waveform.
+
+    This function converts :class:`.Waveform` to :class:`.arithdicts.ChannelDict`
+    of :class:`.arithdicts.ModeDict`.
+    """
     return arithdicts.ChannelDict(
         {k: _format_waveform_in_channel(v) for k, v in wf.items()}
     )
 
 
-def to_fsdata(wf: Waveform[series.FrequencySeries[np.complexfloating]]) -> data.FSData[np.complexfloating]:
-    """Convert a waveform to a FrequencySeries data."""
+def to_fsdata(
+    wf: Waveform[series.FrequencySeries[np.complexfloating]],
+) -> data.FSData[np.complexfloating]:
+    """Convert :class:`.Waveform` to :class:`.data.FSData`.
+
+    This function accepts an instance of :class:`.Waveform` with
+    signal represented as :class:`.series.FrequencySeries` and
+    returns an instance of :class:`.data.FSData`.
+    """
 
     def _sum_modes(wf: WaveformInChannel[WaveformInMode]):
         # Sum the contributions of all modes in each channel
@@ -66,6 +77,9 @@ class PhasorSequence:
     can be used to represent a waveform. This representation is useful for
     interpolating waveforms generated on a sparse grid of frequencies to a dense
     grid of frequencies.
+
+    This class also follows :class:`.arithdicts.SupportsArithmetic` so that it is
+    a valid value for :class:`.arithdicts.ModeDict`.
     """
 
     def __init__(
@@ -132,7 +146,7 @@ class PhasorSequence:
     def from_freq_series(
         cls, freq_series: series.FrequencySeries[np.complexfloating]
     ) -> PhasorSequence:
-        """Create a PhasorSequence from a FrequencySeries."""
+        """Create a :class:`.PhasorSequence` from a :class:`.series.FrequencySeries`."""
         amplitudes, phases = cls.cplx_to_phasor(freq_series.signal)
         return cls(freq_series.grid, amplitudes, phases)
 

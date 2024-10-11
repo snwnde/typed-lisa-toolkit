@@ -1,14 +1,24 @@
 """
-Module for series of numbers on a grid.
+Module for series.
 
-The classes are designed to be immutable and to support arithmetic operations
-between series and numbers or other series.
+We model a series as a pair of numpy arrays, one for the grid
+and one for the signal loaded on the grid. We implement
+:class:`.Series` and its subclasses (:class:`.FrequencySeries` and
+:class:`.TimeSeries`) to be immutable and to support arithmetic
+operations between two series or between a series and a numeric
+value or array.
+
+:class:`.Series` and its subclasses are generic classes that
+accept a certain :class:`numpy.dtype` as type parameter. This
+allows us to specify and keep track of the data type of the
+signal in the series.
 """
 
 from __future__ import annotations
 import logging
+from collections.abc import Callable
 import dataclasses as dc
-from typing import Callable, TypeVar, Generic, Self
+from typing import TypeVar, Generic, Self
 
 
 import numpy as np
@@ -18,37 +28,40 @@ log = logging.getLogger(__name__)
 
 PyNum = int | float | complex  # Union[int, float, complex]
 Numeric = PyNum | np.number | npt.NDArray[np.number]
-PyNumT = TypeVar("PyNumT", int, float, complex)  # Python number type
-NPNumT_co = TypeVar("NPNumT_co", bound=np.number, covariant=True)  # Numpy number type
-NPNumTb_co = TypeVar(
-    "NPNumTb_co", bound=np.number, covariant=True
-)  # Numpy number type bis
+
+NPDT_co = TypeVar("NPDT_co", bound=np.number, covariant=True)
+"""Covariant numpy data type."""
+
+NPDTb_co = TypeVar("NPDTb_co", bound=np.number, covariant=True)  # Numpy number type bis
+"""Covariant numpy data type (bis)."""
+
 TaperT = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
 
 
 @dc.dataclass(slots=True, frozen=True)
-class Series(Generic[NPNumT_co]):
+class Series(Generic[NPDT_co]):
     """A series of numbers on a grid."""
 
     grid: npt.NDArray[np.floating]
     """ The grid of the series. """
 
-    signal: npt.NDArray[NPNumT_co]
+    signal: npt.NDArray[NPDT_co]
     """ The signal of the series. """
 
     @property
-    def is_consistent(self):
+    def is_consistent(self) -> bool:
         """Check if the grid and signal have the same length."""
         return len(self.grid) == len(self.signal)
 
     @property
-    def has_even_spacing(self):
+    def has_even_spacing(self) -> bool:
         """Check if the grid has even spacing."""
         return np.allclose(np.diff(self.grid), self.grid[1] - self.grid[0])
 
-    def create_like(self, signal: npt.NDArray[NPNumTb_co]):
+    def create_like(self, signal: npt.NDArray[NPDTb_co]):
         """Create a new series with the same grid as the current one."""
-        # We need to ignore the type check below because we might change the type of the signal.
+        # We ignore the type check below since we know that the new signal
+        # could have a different data type than the current signal.
         return type(self)(grid=self.grid, signal=signal)  # type: ignore
 
     def __mul_series__(self, other: Series[np.number]):
@@ -101,21 +114,22 @@ class Series(Generic[NPNumT_co]):
 
 
 @dc.dataclass(slots=True, frozen=True)
-class FrequencySeries(Series[NPNumT_co], Generic[NPNumT_co]):
+class FrequencySeries(Series[NPDT_co], Generic[NPDT_co]):
     """A series of numbers on a frequency grid."""
 
     @property
-    def frequencies(self):
+    def frequencies(self) -> npt.NDArray[np.floating]:
         """The frequencies of the series."""
         return self.grid
 
     @property
-    def df(self):
+    def df(self) -> float:
         """The frequency spacing.
 
         Note
         ----
-        This returns just the difference between the first two frequencies.
+        No check is performed to ensure that the frequencies are evenly spaced.
+        Just return the difference between the first two frequencies.
         """
         return self.grid[1] - self.grid[0]
 
@@ -130,14 +144,6 @@ class FrequencySeries(Series[NPNumT_co], Generic[NPNumT_co]):
     def abs(self):
         """Return the absolute value of the series."""
         return self.create_like(np.abs(self.signal))
-
-    def exp(self):
-        """Return the exponential of the series."""
-        return self.create_like(np.exp(self.signal))
-
-    def sqrt(self):
-        """Return the square root of the series."""
-        return self.create_like(np.sqrt(self.signal))
 
     def real(self):
         """Return the real part of the series."""
@@ -169,21 +175,22 @@ class FrequencySeries(Series[NPNumT_co], Generic[NPNumT_co]):
 
 
 @dc.dataclass(slots=True, frozen=True)
-class TimeSeries(Series[NPNumT_co], Generic[NPNumT_co]):
+class TimeSeries(Series[NPDT_co], Generic[NPDT_co]):
     """A series of numbers on a time grid."""
 
     @property
-    def times(self):
+    def times(self) -> npt.NDArray[np.floating]:
         """The times of the series."""
         return self.grid
 
     @property
-    def dt(self):
+    def dt(self) -> float:
         """The time step.
 
         Note
         ----
-        This returns just the difference between the first two times.
+        No check is performed to ensure that the times are evenly spaced.
+        Just return the difference between the first two times.
         """
         return self.grid[1] - self.grid[0]
 

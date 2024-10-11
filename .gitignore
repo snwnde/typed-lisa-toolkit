@@ -11,3 +11,4 @@ _version.py
 *.egg-info
 sandbox
 .pytest_cache
+_build

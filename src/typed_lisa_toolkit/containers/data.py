@@ -1,4 +1,10 @@
-"""Module for data containers."""
+"""Module for data containers.
+
+We model data containers as :class:`.arithdicts.ChannelDict` instances that encapsulate
+data (for now, :class:`.series.TimeSeries` and :class:`.series.FrequencySeries`). In this
+model, data are recorded instead of being generated, and for that reason we do not
+distinguish different modes in data containers.
+"""
 
 from __future__ import annotations
 from collections.abc import Mapping
@@ -17,9 +23,17 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 ValueT = TypeVar("ValueT", bound=series.Series)
-# In the future, we can add Time-Frequency matrices to the bound
-floatingT = TypeVar("floatingT", bound=np.floating)
-numberT = TypeVar("numberT", bound=np.number)
+"""Value type in the data container.
+
+The value type is bound to :class:`.series.Series`.
+In the future, we can add Time-Frequency matrices to the bound.
+"""
+
+NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
+"""Numpy floating dtype."""
+
+NPNumberT = TypeVar("NPNumberT", bound=np.number)
+"""Numpy dtype."""
 
 
 def get_subset_slice(
@@ -35,11 +49,11 @@ class Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
     """Dictionary data container."""
 
     @property
-    def grid(self):
+    def grid(self) -> npt.NDArray[np.floating]:
         """Return the grid."""
         return next(iter(self.values())).grid
 
-    def get_subset(self, *, interval: tuple[float, float] | None = None):
+    def get_subset(self, *, interval: tuple[float, float] | None = None) -> Self:
         """Return the subset as a new instance."""
         if interval is None:
             return self
@@ -62,7 +76,10 @@ class Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
         interval: tuple[float, float] | None = None,
         **kwargs,
     ):
-        """Plot the TSData instance in its domain or plot its comparison with another TSData instance."""
+        """Plot the data.
+
+        If `compare_to` is not `None`, the method draws both the data and the data in `compare_to`.
+        """
         plotter = self._get_plotter()
 
         if compare_to is None:
@@ -72,27 +89,33 @@ class Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
         )
 
 
-class TSData(Data[series.TimeSeries[floatingT]]):
+class TSData(Data[series.TimeSeries[NPFloatingT]]):
     """Dictionary data container of time series data."""
 
     @property
-    def times(self):
+    def times(self) -> npt.NDArray[np.floating]:
         """Return the times."""
         return next(iter(self.values())).times
 
     @property
-    def dt(self):
+    def dt(self) -> float:
         """Return the time step."""
         return next(iter(self.values())).dt
 
-    def get_frequencies(self):
+    def get_frequencies(self) -> npt.NDArray[np.floating]:
         """Return the frequencies grid matching the time grid."""
         return np.fft.rfftfreq(len(self.times), d=self.dt)
 
     def get_fsdata(
         self, *, keep_times: bool = True, tapering: series.TaperT | None = None
     ):
-        """Return the frequency series data."""
+        """Return the frequency series data.
+
+        Returns
+        -------
+        :class:`.FSData` | :class:`.TimedFSData`
+            The frequency series data. If `keep_times` is `True`, the time grid is kept.
+        """
         fsdict = {chnname: chn.rfft(tapering=tapering) for chnname, chn in self.items()}
         if keep_times:
             return TimedFSData(fsdict, times=self.times)
@@ -100,7 +123,7 @@ class TSData(Data[series.TimeSeries[floatingT]]):
 
     def get_zero_padded(
         self, pad_time: tuple[float, float], tapering: series.TaperT | None = None
-    ):
+    ) -> Self:
         """Return the zero-padded data."""
         pad_width = tuple(int(np.rint(time / self.dt)) for time in pad_time)
         time_end_values = (
@@ -126,16 +149,16 @@ class TSData(Data[series.TimeSeries[floatingT]]):
         return data_plotter.TimeSeriesPlotter
 
 
-class FSData(Data[series.FrequencySeries[numberT]]):
+class FSData(Data[series.FrequencySeries[NPNumberT]]):
     """Dictionary data container of frequency series data."""
 
     @property
-    def frequencies(self):
+    def frequencies(self) -> npt.NDArray[np.floating]:
         """Return the frequencies."""
         return next(iter(self.values())).frequencies
 
     @property
-    def df(self):
+    def df(self) -> float:
         """Return the frequency step."""
         return next(iter(self.values())).df
 
@@ -163,15 +186,15 @@ class FSData(Data[series.FrequencySeries[numberT]]):
         """Return the imaginary part of the data."""
         return self.create_new({chnname: chn.imag() for chnname, chn in self.items()})
 
-    def set_times(self, times: npt.NDArray[floatingT]):
+    def set_times(self, times: npt.NDArray[NPFloatingT]):
         """Set the time grid."""
         return TimedFSData(self, times)
 
     def get_tsdata(
-        self, times: npt.NDArray[floatingT], *, tapering: series.TaperT | None
+        self, times: npt.NDArray[NPFloatingT], *, tapering: series.TaperT | None
     ):
         """Return the time series data."""
-        dt: floatingT = times[1] - times[0]
+        dt: NPFloatingT = times[1] - times[0]
         nyquist_dt = 1 / (2 * self.frequencies[-1])
         if dt < nyquist_dt and not np.isclose(dt, nyquist_dt):
             warnings.warn("The time grid is too coarse.")
@@ -187,12 +210,12 @@ class FSData(Data[series.FrequencySeries[numberT]]):
         return data_plotter.FrequencySeriesPlotter
 
 
-class TimedFSData(FSData[numberT], Generic[numberT]):
+class TimedFSData(FSData[NPNumberT], Generic[NPNumberT]):
     """Dictionary data container for frequency series data with time information."""
 
     def __init__(
         self,
-        data: Mapping[str, series.FrequencySeries[numberT]],
+        data: Mapping[str, series.FrequencySeries[NPNumberT]],
         times: npt.NDArray[np.floating],
     ):
         super().__init__(data)
@@ -206,7 +229,7 @@ class TimedFSData(FSData[numberT], Generic[numberT]):
         self.times = times
         return self
 
-    def create_new(self, data: Mapping[str, series.FrequencySeries[numberT]]):  # type: ignore # noqa: D102
+    def create_new(self, data: Mapping[str, series.FrequencySeries[NPNumberT]]):  # type: ignore # noqa: D102
         # Unless series.FrequencySeries is wrongly implemented so that it does not follow
         # the SupportsArithmetic protocol, there is no reason to think the type hint is wrong.
         # It is unlcear to me why mypy thinks it is wrong.
