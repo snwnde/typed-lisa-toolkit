@@ -4,6 +4,48 @@ We model data containers as :class:`.arithdicts.ChannelDict` instances that enca
 data (for now, :class:`.series.TimeSeries` and :class:`.series.FrequencySeries`). In this
 model, data are recorded instead of being generated, and for that reason we do not
 distinguish different modes in data containers.
+
+.. currentmodule:: typed_lisa_toolkit.containers.data
+
+Types
+-----
+.. autoclass:: ValueT
+.. autoclass:: NPFloatingT
+.. autoclass:: NPNumberT
+
+Entities
+--------
+.. autoclass:: Data
+   :members:
+   :member-order: groupwise
+   :exclude-members: listify
+   :undoc-members:
+   :inherited-members: UserDict
+   :show-inheritance:
+
+.. autoclass:: TSData
+   :members:
+   :member-order: groupwise
+   :exclude-members: listify
+   :undoc-members:
+   :inherited-members: UserDict
+   :show-inheritance:
+
+.. autoclass:: FSData
+   :members:
+   :member-order: groupwise
+   :exclude-members: listify
+   :undoc-members:
+   :inherited-members: UserDict
+   :show-inheritance:
+
+.. autoclass:: TimedFSData
+   :members:
+   :member-order: groupwise
+   :exclude-members: listify
+   :undoc-members:
+   :inherited-members: UserDict
+   :show-inheritance:
 """
 
 from __future__ import annotations

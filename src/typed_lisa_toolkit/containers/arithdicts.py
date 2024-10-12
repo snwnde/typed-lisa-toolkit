@@ -7,6 +7,36 @@ dictionary that maps these modes to some scaling factors. To this end, we use
 have :class:`.ModeDict`. In LISA data analysis, we can multiply a dictionary
 that maps channels to simplified responses to strain waveforms to get TDI
 waveforms. For this, we have :class:`.ChannelDict`.
+
+.. currentmodule:: typed_lisa_toolkit.containers.arithdicts
+
+Types
+-----
+.. autoclass:: ArithT
+.. autoclass:: ArithTb
+.. autoclass:: ModeT
+.. autoprotocol:: SupportsArithmetic
+.. autoclass:: ChnName
+
+Entities
+--------
+.. autoclass:: ArithDict
+   :members:
+   :member-order: groupwise
+   :exclude-members: listify
+   :special-members: __mul__, __rmul__, __add__, __sub__, __truediv__, __rtruediv__, __neg__
+
+.. autoclass:: ModeDict
+   :members:
+   :member-order: groupwise
+   :show-inheritance:
+   :inherited-members: UserDict
+
+.. autoclass:: ChannelDict
+   :members:
+   :member-order: groupwise
+   :show-inheritance:
+   :inherited-members: UserDict
 """
 
 from __future__ import annotations

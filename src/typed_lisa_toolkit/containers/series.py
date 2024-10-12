@@ -12,6 +12,37 @@ value or array.
 accept a certain :class:`numpy.dtype` as type parameter. This
 allows us to specify and keep track of the data type of the
 signal in the series.
+
+.. currentmodule:: typed_lisa_toolkit.containers.series
+
+Types
+-----
+.. autoclass:: NPDT_co
+.. autoclass:: NPDTb_co
+
+Entities
+--------
+.. autoclass:: Series
+   :members:
+   :member-order: groupwise
+   :exclude-members: exp, sqrt
+   :undoc-members:
+   :inherited-members:
+   :special-members: __mul__, __rmul__, __add__, __sub__, __truediv__, __rtruediv__, __neg__
+
+.. autoclass:: TimeSeries
+   :members:
+   :member-order: groupwise
+   :undoc-members:
+   :inherited-members:
+   :show-inheritance:
+
+.. autoclass:: FrequencySeries
+   :members:
+   :member-order: groupwise
+   :undoc-members:
+   :inherited-members:
+   :show-inheritance:
 """
 
 from __future__ import annotations

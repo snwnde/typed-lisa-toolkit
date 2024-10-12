@@ -4,6 +4,30 @@ We model LISA (TDI) waveforms as an encapsulation of :class:`.series.FrequencySe
 or :class:`PhasorSequence`
 (in the future we can extend this to time-frequency matrices) in :class:`.arithdicts.ModeDict`
 wrapped in :class:`.arithdicts.ChannelDict`.
+
+.. currentmodule:: typed_lisa_toolkit.containers.waveforms
+
+Types
+-----
+
+.. autoclass:: ArrayFunc
+.. autoclass:: WaveformInMode
+.. autoclass:: WaveformInChannel
+.. autoclass:: Waveform
+.. autoclass:: FormattedWaveform
+
+
+Functions
+---------
+
+.. autofunction:: format
+.. autofunction:: to_fsdata
+
+Entities
+--------
+
+.. autoclass:: PhasorSequence
+   :members:
 """
 
 from __future__ import annotations
