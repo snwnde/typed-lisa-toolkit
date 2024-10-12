@@ -220,13 +220,15 @@ class FSData(Data[series.FrequencySeries[NPNumberT]]):
         """Return the exponential of the data."""
         return self.create_new({chnname: chn.exp() for chnname, chn in self.items()})
 
+    @property
     def real(self):
         """Return the real part of the data."""
-        return self.create_new({chnname: chn.real() for chnname, chn in self.items()})
+        return self.create_new({chnname: chn.real for chnname, chn in self.items()})
 
+    @property
     def imag(self):
         """Return the imaginary part of the data."""
-        return self.create_new({chnname: chn.imag() for chnname, chn in self.items()})
+        return self.create_new({chnname: chn.imag for chnname, chn in self.items()})
 
     def set_times(self, times: npt.NDArray[NPFloatingT]):
         """Set the time grid."""

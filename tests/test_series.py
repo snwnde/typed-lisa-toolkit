@@ -77,10 +77,10 @@ class TestSeries(unittest.TestCase):
         result = self.freq_series.abs()
         self.assertTrue(np.array_equal(result.signal, np.abs(self.freq_signal)))
 
-        result = self.freq_series.real()
+        result = self.freq_series.real
         self.assertTrue(np.array_equal(result.signal, np.real(self.freq_signal)))
 
-        result = self.freq_series.imag()
+        result = self.freq_series.imag
         self.assertTrue(np.array_equal(result.signal, np.imag(self.freq_signal)))
 
     def test_fft_methods(self):

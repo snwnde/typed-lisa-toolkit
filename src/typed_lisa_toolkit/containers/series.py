@@ -135,12 +135,12 @@ class Series(Generic[NPDT_co]):
         """Negate a series."""
         return self.create_like(-self.signal)
 
-    def exp(self):
-        """Exponential of the series."""
+    def exp(self) -> Self:
+        """Return the exponential of the series."""
         return self.create_like(np.exp(self.signal))
 
-    def sqrt(self):
-        """Square root of the series."""
+    def sqrt(self) -> Self:
+        """Return the square root of the series."""
         return self.create_like(np.sqrt(self.signal))
 
 
@@ -164,7 +164,7 @@ class FrequencySeries(Series[NPDT_co], Generic[NPDT_co]):
         """
         return self.grid[1] - self.grid[0]
 
-    def conj(self):
+    def conj(self) -> Self:
         """Return the complex conjugate of the series."""
         return self.create_like(self.signal.conj())
 
@@ -176,10 +176,12 @@ class FrequencySeries(Series[NPDT_co], Generic[NPDT_co]):
         """Return the absolute value of the series."""
         return self.create_like(np.abs(self.signal))
 
+    @property
     def real(self):
         """Return the real part of the series."""
         return self.create_like(np.real(self.signal))
 
+    @property
     def imag(self):
         """Return the imaginary part of the series."""
         return self.create_like(np.imag(self.signal))
