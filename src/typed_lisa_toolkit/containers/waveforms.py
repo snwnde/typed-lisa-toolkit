@@ -5,6 +5,8 @@
 Types
 -----
 
+.. autoclass:: NPFloatingT
+.. autoclass:: NPNumberT
 .. autoclass:: WaveformInMode
 .. autoclass:: WaveformInChannel
 .. autoclass:: Waveform

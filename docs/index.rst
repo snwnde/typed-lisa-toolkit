@@ -17,7 +17,7 @@ also provides implementations for some common high-level operations.
    :caption: Documentation:
    :hidden:
 
-   api/containers/series
+   api/containers/representations
    api/containers/modes
    api/containers/arithdicts
    api/containers/waveforms

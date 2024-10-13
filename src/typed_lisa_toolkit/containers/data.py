@@ -15,13 +15,6 @@ Types
 
 Entities
 --------
-.. autoclass:: Data
-   :members:
-   :member-order: groupwise
-   :exclude-members: listify
-   :undoc-members:
-   :inherited-members: UserDict
-   :show-inheritance:
 
 .. autoclass:: TSData
    :members:
@@ -29,7 +22,6 @@ Entities
    :exclude-members: listify
    :undoc-members:
    :inherited-members: UserDict
-   :show-inheritance:
 
 .. autoclass:: FSData
    :members:
@@ -37,7 +29,6 @@ Entities
    :exclude-members: listify
    :undoc-members:
    :inherited-members: UserDict
-   :show-inheritance:
 
 .. autoclass:: TimedFSData
    :members:
