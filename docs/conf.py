@@ -47,6 +47,7 @@ autoclass_content = "class"
 autodoc_type_aliases = {
     "ChnName": "ChnName",
     "ArrayFunc": "ArrayFunc",
+    "TaperT": "TaperT",
     "WaveformInChannel": "WaveformInChannel",
     "Waveform": "Waveform",
     "FormattedWaveform": "FormattedWaveform",

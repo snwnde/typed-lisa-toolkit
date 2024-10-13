@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from typed_lisa_toolkit.containers.series import TimeSeries, FrequencySeries
+from typed_lisa_toolkit.containers.representations import TimeSeries, FrequencySeries
 
 from typed_lisa_toolkit.containers.data import (
     get_subset_slice,
@@ -13,13 +13,13 @@ class TestDataContainers(unittest.TestCase):
 
     def setUp(self):
         self.times = np.linspace(0, 10, 100)
-        self.signal = np.sin(self.times)
-        self.time_series = TimeSeries(grid=self.times, signal=self.signal)
+        self.entries = np.sin(self.times)
+        self.time_series = TimeSeries(grid=self.times, entries=self.entries)
         self.tsdata = TSData({"channel1": self.time_series})
 
         self.frequencies = np.fft.rfftfreq(len(self.times), d=self.times[1] - self.times[0])
-        self.frequency_signal = np.fft.rfft(self.signal)
-        self.frequency_series = FrequencySeries(grid=self.frequencies, signal=self.frequency_signal)
+        self.frequency_entries = np.fft.rfft(self.entries)
+        self.frequency_series = FrequencySeries(grid=self.frequencies, entries=self.frequency_entries)
         self.fsdata = FSData({"channel1": self.frequency_series})
 
     def test_get_subset_slice(self):
@@ -45,7 +45,7 @@ class TestDataContainers(unittest.TestCase):
         self.assertTrue(np.array_equal(subset.times, expected_times))
 
     def test_tsdata_get_fsdata(self):
-        fsdata = self.tsdata.get_fsdata()
+        fsdata = self.tsdata.to_fsdata()
         self.assertTrue(np.array_equal(fsdata.frequencies, self.frequencies))
 
     def test_tsdata_get_zero_padded(self):
@@ -61,8 +61,8 @@ class TestDataContainers(unittest.TestCase):
 
     def test_fsdata_conj(self):
         conj_data = self.fsdata.conj()
-        expected_signal = np.conj(self.frequency_signal)
-        self.assertTrue(np.array_equal(conj_data["channel1"].signal, expected_signal))
+        expected_entries = np.conj(self.frequency_entries)
+        self.assertTrue(np.array_equal(conj_data["channel1"].entries, expected_entries))
 
     def test_fsdata_get_subset(self):
         subset = self.fsdata.get_subset(interval=(0.1, 0.5))
@@ -83,7 +83,7 @@ class TestDataContainers(unittest.TestCase):
 
     def test_timedfsdata_get_tsdata(self):
         timed_fsdata = TimedFSData({"channel1": self.frequency_series}, self.times)
-        tsdata = timed_fsdata.get_tsdata()
+        tsdata = timed_fsdata.to_tsdata()
         self.assertTrue(np.array_equal(tsdata.times, self.times))
 
 if __name__ == '__main__':

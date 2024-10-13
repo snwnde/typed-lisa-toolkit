@@ -99,7 +99,7 @@ class DataPlotter:
 
     number_of_subplots: int
 
-    def __init__(self, data: ldcdata.Data) -> None:
+    def __init__(self, data: ldcdata._SeriesData) -> None:
         self.data = copy.deepcopy(data)
 
     @classmethod
@@ -148,7 +148,7 @@ class DataPlotter:
 
     def compare(
         self,
-        other: ldcdata.Data,
+        other: ldcdata._SeriesData,
         savefig=None,
         figsize=None,
         sharex: bool | Literal["none", "all", "row", "col"] = "all",

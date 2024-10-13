@@ -57,26 +57,26 @@ import warnings
 import numpy as np
 import numpy.typing as npt
 
-from . import arithdicts, series
+from . import arithdicts, representations
 
 if TYPE_CHECKING:
     from ..viz import data as data_plotter
 
 log = logging.getLogger(__name__)
 
-ValueT = TypeVar("ValueT", bound=series.Series)
-"""Value type in the data container.
-
-The value type is bound to :class:`.series.Series`.
-In the future, we can add Time-Frequency matrices to the bound.
-"""
-
 NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
 """Numpy floating dtype."""
+
+NPFloatingTb = TypeVar("NPFloatingTb", bound=np.floating)
+"""Numpy floating dtype (bis)."""
 
 NPNumberT = TypeVar("NPNumberT", bound=np.number)
 """Numpy dtype."""
 
+ValueT = TypeVar("ValueT", bound=representations.Representation)
+"""Value type in the data container."""
+
+_SeriesT = TypeVar("_SeriesT", bound=representations._Series)
 
 def get_subset_slice(
     increasing_array: npt.NDArray[np.floating], min: float, max: float
@@ -87,11 +87,11 @@ def get_subset_slice(
     return slice(start_idx, end_idx)
 
 
-class Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
+class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
     """Dictionary data container."""
 
     @property
-    def grid(self) -> npt.NDArray[np.floating]:
+    def grid(self) -> npt.NDArray[NPFloatingT]:
         """Return the grid."""
         return next(iter(self.values())).grid
 
@@ -102,7 +102,7 @@ class Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
         mask = get_subset_slice(self.grid, interval[0], interval[1])
         value_type = type(next(iter(self.values())))
         series_dict = {
-            chnname: value_type(grid=self.grid[mask], signal=chn.signal[mask])
+            chnname: value_type(grid=self.grid[mask], entries=chn.entries[mask])
             for chnname, chn in self.items()
         }
         return self.create_new(series_dict)
@@ -131,25 +131,25 @@ class Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
         )
 
 
-class TSData(Data[series.TimeSeries[NPFloatingT]]):
+class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]]):
     """Dictionary data container of time series data."""
 
     @property
-    def times(self) -> npt.NDArray[np.floating]:
+    def times(self) -> npt.NDArray[NPFloatingT]:
         """Return the times."""
         return next(iter(self.values())).times
 
     @property
-    def dt(self) -> float:
+    def dt(self) -> NPFloatingT:
         """Return the time step."""
         return next(iter(self.values())).dt
 
-    def get_frequencies(self) -> npt.NDArray[np.floating]:
+    def get_frequencies(self) -> npt.NDArray[NPFloatingT]:
         """Return the frequencies grid matching the time grid."""
         return np.fft.rfftfreq(len(self.times), d=self.dt)
 
-    def get_fsdata(
-        self, *, keep_times: bool = True, tapering: series.TaperT | None = None
+    def to_fsdata(
+        self, *, keep_times: bool = True, tapering: representations.TaperT | None = None
     ):
         """Return the frequency series data.
 
@@ -164,7 +164,7 @@ class TSData(Data[series.TimeSeries[NPFloatingT]]):
         return FSData(fsdict)
 
     def get_zero_padded(
-        self, pad_time: tuple[float, float], tapering: series.TaperT | None = None
+        self, pad_time: tuple[float, float], tapering: representations.TaperT | None = None
     ) -> Self:
         """Return the zero-padded data."""
         pad_width = tuple(int(np.rint(time / self.dt)) for time in pad_time)
@@ -177,10 +177,10 @@ class TSData(Data[series.TimeSeries[NPFloatingT]]):
         )
         tapering_window = tapering(self.times) if tapering is not None else 1
 
-        def get_padded_ts(chn: series.TimeSeries):
-            signal = chn.signal * tapering_window
+        def get_padded_ts(chn: representations.TimeSeries):
+            signal = chn.entries * tapering_window
             padded_signal = np.pad(signal, pad_width, mode="constant")
-            return series.TimeSeries(grid=padded_time, signal=padded_signal)
+            return representations.TimeSeries(grid=padded_time, entries=padded_signal)
 
         tsdict = {chnname: get_padded_ts(chn) for chnname, chn in self.items()}
         return self.create_new(tsdict)
@@ -191,16 +191,16 @@ class TSData(Data[series.TimeSeries[NPFloatingT]]):
         return data_plotter.TimeSeriesPlotter
 
 
-class FSData(Data[series.FrequencySeries[NPNumberT]]):
+class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]]):
     """Dictionary data container of frequency series data."""
 
     @property
-    def frequencies(self) -> npt.NDArray[np.floating]:
+    def frequencies(self) -> npt.NDArray[NPFloatingT]:
         """Return the frequencies."""
         return next(iter(self.values())).frequencies
 
     @property
-    def df(self) -> float:
+    def df(self) -> NPFloatingT:
         """Return the frequency step."""
         return next(iter(self.values())).df
 
@@ -230,12 +230,12 @@ class FSData(Data[series.FrequencySeries[NPNumberT]]):
         """Return the imaginary part of the data."""
         return self.create_new({chnname: chn.imag for chnname, chn in self.items()})
 
-    def set_times(self, times: npt.NDArray[NPFloatingT]):
+    def set_times(self, times: npt.NDArray[np.floating]):
         """Set the time grid."""
         return TimedFSData(self, times)
 
-    def get_tsdata(
-        self, times: npt.NDArray[NPFloatingT], *, tapering: series.TaperT | None
+    def to_tsdata(
+        self, times: npt.NDArray[np.floating], *, tapering: representations.TaperT | None
     ):
         """Return the time series data."""
         dt: NPFloatingT = times[1] - times[0]
@@ -254,12 +254,12 @@ class FSData(Data[series.FrequencySeries[NPNumberT]]):
         return data_plotter.FrequencySeriesPlotter
 
 
-class TimedFSData(FSData[NPNumberT], Generic[NPNumberT]):
+class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT]):
     """Dictionary data container for frequency series data with time information."""
 
     def __init__(
         self,
-        data: Mapping[str, series.FrequencySeries[NPNumberT]],
+        data: Mapping[str, representations.FrequencySeries[NPFloatingT, NPNumberT]],
         times: npt.NDArray[np.floating],
     ):
         super().__init__(data)
@@ -273,7 +273,7 @@ class TimedFSData(FSData[NPNumberT], Generic[NPNumberT]):
         self.times = times
         return self
 
-    def create_new(self, data: Mapping[str, series.FrequencySeries[NPNumberT]]):  # type: ignore # noqa: D102
+    def create_new(self, data: Mapping[str, representations.FrequencySeries[NPNumberT]]):  # type: ignore # noqa: D102
         # Unless series.FrequencySeries is wrongly implemented so that it does not follow
         # the SupportsArithmetic protocol, there is no reason to think the type hint is wrong.
         # It is unlcear to me why mypy thinks it is wrong.
@@ -284,8 +284,8 @@ class TimedFSData(FSData[NPNumberT], Generic[NPNumberT]):
         """Drop the time grid."""
         return FSData(self.data)
 
-    def get_tsdata(self, *, tapering: series.TaperT | None = None):  # type: ignore
+    def to_tsdata(self, *, tapering: representations.TaperT | None = None):  # type: ignore
         # Indeed the signature of this subclass method is different from the superclass method.
         # This is intentional, as the subclass method is more specific. Ignoring the error.
         """Return the time series data."""
-        return super().get_tsdata(self.times, tapering=tapering)
+        return super().to_tsdata(self.times, tapering=tapering)
