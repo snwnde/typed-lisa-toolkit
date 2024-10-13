@@ -94,7 +94,7 @@ TaperT = ArrayFunc
 @dc.dataclass(slots=True, frozen=True)
 class Representation(Generic[NPFloatingT, NPNumberT_co]):
     """A format in which detector data are displayed.
-    
+
     This is the base class for all representations.
     """
 
@@ -151,7 +151,9 @@ class Representation(Generic[NPFloatingT, NPNumberT_co]):
 
 
 @dc.dataclass(slots=True, frozen=True)
-class _Series(Representation, Generic[NPFloatingT, NPNumberT_co]):
+class _Series(
+    Representation[NPFloatingT, NPNumberT_co], Generic[NPFloatingT, NPNumberT_co]
+):
     """A series of numbers on a grid."""
 
     @property
@@ -203,6 +205,30 @@ class FrequencySeries(
 ):
     """A series of numbers on a frequency grid."""
 
+    @staticmethod
+    def _abs(
+        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
+    ) -> npt.NDArray[np.floating[NPTBitT]]:
+        return np.abs(complex_numbers)
+
+    @staticmethod
+    def _angle(
+        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
+    ) -> npt.NDArray[np.floating[NPTBitT]]:
+        return np.angle(complex_numbers)
+
+    @staticmethod
+    def _real(
+        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
+    ) -> npt.NDArray[np.floating[NPTBitT]]:
+        return np.real(complex_numbers)
+
+    @staticmethod
+    def _imag(
+        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
+    ) -> npt.NDArray[np.floating[NPTBitT]]:
+        return np.imag(complex_numbers)
+
     @property
     def frequencies(self) -> npt.NDArray[NPFloatingT]:
         """The frequencies of the series."""
@@ -219,21 +245,21 @@ class FrequencySeries(
 
     def angle(self):
         """Return the angle of the series."""
-        return self.create_like(np.angle(self.entries))
+        return self.create_like(self._angle(self.entries))
 
     def abs(self):
         """Return the absolute value of the series."""
-        return self.create_like(np.abs(self.entries))
+        return self.create_like(self._abs(self.entries))
 
     @property
     def real(self):
         """Return the real part of the series."""
-        return self.create_like(np.real(self.entries))
+        return self.create_like(self._real(self.entries))
 
     @property
     def imag(self):
         """Return the imaginary part of the series."""
-        return self.create_like(np.imag(self.entries))
+        return self.create_like(self._imag(self.entries))
 
     def irfft(
         self, time_grid: npt.NDArray[np.floating], tapering: TaperT | None = None
@@ -297,13 +323,14 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
     @classmethod
     def make(
         cls,
-        frequencies: npt.NDArray[np.floating],
+        frequencies: npt.NDArray[NPFloatingT],
         amplitudes: npt.NDArray[np.floating],
         phases: npt.NDArray[np.floating],
     ) -> Self:
         """Create a phasor sequence."""
         cplx = cls.phasor_to_cplx(amplitudes, phases)
-        return cls(frequencies, cplx)
+        return cls(frequencies, cplx) # type: ignore
+        # The returned type depends on the type of the input arrays.
 
     @staticmethod
     def reim_to_cplx(
@@ -318,7 +345,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
         complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
     ) -> tuple[npt.NDArray[np.floating[NPTBitT]], npt.NDArray[np.floating[NPTBitT]]]:
         """Convert complex numbers to phasors."""
-        return np.abs(complex_numbers), np.angle(complex_numbers)
+        return Phasor._abs(complex_numbers), Phasor._angle(complex_numbers)
 
     @staticmethod
     def phasor_to_cplx(
@@ -337,14 +364,14 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
         return Phasor.cplx_to_phasor(Phasor.reim_to_cplx(real_parts, imag_parts))
 
     @property
-    def amplitudes(self) -> npt.NDArray[np.floating]:
+    def amplitudes(self):
         """The amplitudes of the phasors."""
-        return np.abs(self.entries)
+        return self._abs(self.entries)
 
     @property
-    def phases(self) -> npt.NDArray[np.floating]:
+    def phases(self):
         """The phases of the phasors."""
-        return np.angle(self.entries)
+        return self._angle(self.entries)
 
     def __repr__(self) -> str:
         """Return the string representation of the phasor."""
@@ -352,7 +379,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
 
     def get_interpolated(
         self,
-        frequencies: npt.NDArray[np.floating],
+        frequencies: npt.NDArray[NPFloatingT],
         interpolator: Callable[..., ArrayFunc],
     ) -> Self:
         """Get the phasors interpolated to the given frequencies."""
@@ -360,7 +387,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
         phases = interpolator(self.frequencies, self.phases)(frequencies)
         return self.make(frequencies, amplitudes, phases)
 
-    def to_freq_series(self) -> FrequencySeries[NPFloatingT, NPNumberT_co]:
+    def to_freq_series(self) -> FrequencySeries[NPFloatingT, np.complexfloating]:
         """Get the :class:`.FrequencySeries` representation of the waveform."""
         return FrequencySeries(
             self.frequencies,
