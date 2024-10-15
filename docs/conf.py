@@ -48,6 +48,7 @@ autodoc_type_aliases = {
     "ChnName": "ChnName",
     "Numeric": "Numeric",
     "ArrayFunc": "ArrayFunc",
+    "Interpolator": "Interpolator",
     "TaperT": "TaperT",
     "WaveformInChannel": "WaveformInChannel",
     "Waveform": "Waveform",

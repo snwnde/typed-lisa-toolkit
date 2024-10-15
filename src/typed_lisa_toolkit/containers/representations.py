@@ -32,8 +32,8 @@ Types
 .. autoclass:: NPNumberT_co
 .. autoclass:: NPFloatingT
 .. autoclass:: NPTBitT
-.. autoclass:: ArrayFunc
 .. autoclass:: TaperT
+.. autoclass:: Interpolator
 
 Entities
 --------
@@ -92,8 +92,8 @@ NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
 NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
 """Numpy bit data type."""
 
-ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
-TaperT = ArrayFunc
+TaperT = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
+Interpolator = utils.Interpolator
 
 
 @dc.dataclass(slots=True, frozen=True)
@@ -414,11 +414,21 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
     def get_interpolated(
         self,
         frequencies: npt.NDArray[NPFloatingT],
-        interpolator: Callable[..., ArrayFunc],
+        interpolator: Interpolator,
     ) -> Self:
-        """Get the phasors interpolated to the given frequencies."""
-        amplitudes = interpolator(self.frequencies, self.amplitudes)(frequencies)
-        phases = interpolator(self.frequencies, self.phases)(frequencies)
+        """Get the phasors interpolated to the given frequencies.
+        
+        Note
+        ----
+        The interpolation is done only within the support of the amplitudes.
+        Outside the support, the interpolated values for amplitudes are set to zero.
+        """
+        amplitudes = utils.trim_interp(interpolator)(self.frequencies, self.amplitudes)(
+            frequencies
+        )
+        phases = interpolator(self.frequencies, self.phases)(
+            frequencies
+        )
         return self.make(frequencies, amplitudes, phases)
 
     def to_freq_series(self) -> FrequencySeries[NPFloatingT, np.complexfloating]:
