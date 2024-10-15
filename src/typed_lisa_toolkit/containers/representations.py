@@ -311,6 +311,10 @@ class FrequencySeries(
             self.entries * np.exp(-2j * np.pi * self.frequencies * shift)
         )
 
+    def to_phasor(self) -> Phasor:
+        """Get the :class:`.Phasor` representation of the waveform."""
+        return Phasor(self.frequencies, self.entries)
+
 
 @dc.dataclass(slots=True, frozen=True)
 class TimeSeries(
@@ -423,10 +427,3 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
             self.frequencies,
             self.phasor_to_cplx(self.amplitudes, self.phases),
         )
-
-    @classmethod
-    def from_freq_series(
-        cls, freq_series: FrequencySeries[NPFloatingT, NPNumberT_co]
-    ) -> Self:
-        """Get the :class:`.Phasor` representation of the waveform."""
-        return cls(freq_series.grid, freq_series.entries)
