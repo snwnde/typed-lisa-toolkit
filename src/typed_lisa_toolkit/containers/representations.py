@@ -69,9 +69,10 @@ import dataclasses as dc
 import logging
 from typing import TypeVar, Generic, Self
 
-
 import numpy as np
 import numpy.typing as npt
+
+from .. import utils
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +116,7 @@ class Representation(Generic[NPFloatingT, NPNumberT_co]):
         # could have a different data type than the current entries.
         return type(self)(grid=self.grid, entries=entries)  # type: ignore
 
-    def __mul_num__(self, other: Numeric):
+    def __mul_num__(self, other: Numeric) -> Self:
         """Multiply a representation by a number or a numeric array."""
         return self.create_like(self.entries * other)
 
@@ -137,15 +138,15 @@ class Representation(Generic[NPFloatingT, NPNumberT_co]):
         """Divide a number or a numeric array by a series."""
         return self.create_like(other / self.entries)
 
-    def __add__(self, other: Self):
+    def __add__(self, other: Self) -> Self:
         """Add two representations."""
         return self.create_like(self.entries + other.entries)
 
-    def __sub__(self, other: Self):
+    def __sub__(self, other: Self) -> Self:
         """Subtract two representations."""
-        return self.create_like(self.entries - other.entries)
+        return self + (-other)
 
-    def __neg__(self):
+    def __neg__(self) -> Self:
         """Negate a representation."""
         return self.create_like(-self.entries)
 
@@ -189,6 +190,24 @@ class _Series(
         if isinstance(other, _Series):
             return self.create_like(self.entries / other.entries)
         return self.create_like(self.entries / other)
+    
+    def __add__(self, other: Self) -> Self:
+        """Add two series.
+        
+        Note
+        ----
+        This method allows adding two series with different grids, as long as
+        one grid is a subset of the other grid. The resulting series will have
+        the grid of the longer series.
+        """
+        if len(self.grid) < len(other.grid):
+            return other + self
+        _slice = utils.get_subset_slice(self.grid, other.grid[0], other.grid[-1])
+        if np.array_equal(self.grid[_slice], other.grid):
+            _entries = self.entries.copy()
+            _entries[_slice] += other.entries
+            return self.create_like(_entries)
+        raise ValueError("The grids of the two series are not compatible.")
 
     def exp(self) -> Self:
         """Return the exponential of the series."""
@@ -197,6 +216,13 @@ class _Series(
     def sqrt(self) -> Self:
         """Return the square root of the series."""
         return self.create_like(np.sqrt(self.entries))
+    
+    def get_subset(self, *, interval: tuple[float, float] | None = None) -> Self:
+        """Return the subset as a new instance."""
+        if interval is None:
+            return self
+        mask = utils.get_subset_slice(self.grid, interval[0], interval[1])
+        return type(self)(grid=self.grid[mask], entries=self.entries[mask])
 
 
 @dc.dataclass(slots=True, frozen=True)

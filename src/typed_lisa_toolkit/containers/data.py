@@ -69,14 +69,6 @@ ValueT = TypeVar("ValueT", bound=representations.Representation)
 
 _SeriesT = TypeVar("_SeriesT", bound=representations._Series)
 
-def get_subset_slice(
-    increasing_array: npt.NDArray[np.floating], min: float, max: float
-):
-    """Return the slice for the subset [min, max] of the increasing array."""
-    start_idx = np.searchsorted(increasing_array, min, side="left")
-    end_idx = np.searchsorted(increasing_array, max, side="right")
-    return slice(start_idx, end_idx)
-
 
 class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
     """Dictionary data container."""
@@ -90,11 +82,8 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         """Return the subset as a new instance."""
         if interval is None:
             return self
-        mask = get_subset_slice(self.grid, interval[0], interval[1])
-        value_type = type(next(iter(self.values())))
         series_dict = {
-            chnname: value_type(grid=self.grid[mask], entries=chn.entries[mask])
-            for chnname, chn in self.items()
+            chnname: chn.get_subset(interval=interval) for chnname, chn in self.items()
         }
         return self.create_new(series_dict)
 
