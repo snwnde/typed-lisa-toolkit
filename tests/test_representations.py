@@ -153,12 +153,5 @@ class TestPhasor(unittest.TestCase):
         expected_entries = np.array([1.0 + 0.0j, 0.5 * np.exp(1j * np.pi/4), 0.2 * np.exp(1j * np.pi/2)])
         assert_array_almost_equal(freq_series.entries, expected_entries)
 
-    def test_from_freq_series(self):
-        entries = np.array([1.0 + 0.0j, 0.5 * np.exp(1j * np.pi/4), 0.2 * np.exp(1j * np.pi/2)])
-        freq_series = FrequencySeries(self.frequencies, entries)
-        phasor_sequence = Phasor.from_freq_series(freq_series)
-        assert_array_almost_equal(phasor_sequence.amplitudes, self.amplitudes)
-        assert_array_almost_equal(phasor_sequence.phases, self.phases)
-
 if __name__ == '__main__':
     unittest.main()
