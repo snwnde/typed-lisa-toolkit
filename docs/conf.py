@@ -46,6 +46,7 @@ autoclass_content = "class"
 # Temporary solution for type aliases
 autodoc_type_aliases = {
     "ChnName": "ChnName",
+    "Numeric": "Numeric",
     "ArrayFunc": "ArrayFunc",
     "TaperT": "TaperT",
     "WaveformInChannel": "WaveformInChannel",

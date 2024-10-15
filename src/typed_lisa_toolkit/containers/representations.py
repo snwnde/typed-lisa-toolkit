@@ -28,6 +28,7 @@ keep track of the data type of the values in the representation.
 
 Types
 -----
+.. autoclass:: Numeric
 .. autoclass:: NPNumberT_co
 .. autoclass:: NPFloatingT
 .. autoclass:: NPTBitT
@@ -48,18 +49,21 @@ Entities
    :member-order: groupwise
    :undoc-members:
    :inherited-members:
+   :special-members: __add__
 
 .. autoclass:: FrequencySeries
    :members:
    :member-order: groupwise
    :undoc-members:
    :inherited-members:
+   :special-members: __add__
 
 .. autoclass:: Phasor
    :members:
    :member-order: groupwise
    :undoc-members:
    :inherited-members:
+   :special-members: __add__
 """
 
 from __future__ import annotations
@@ -107,7 +111,7 @@ class Representation(Generic[NPFloatingT, NPNumberT_co]):
 
     @property
     def is_consistent(self) -> bool:
-        """Check if the grid and entries have compatible shape."""
+        """Check if the grid and entries have the same shape."""
         return self.grid.shape == self.entries.shape
 
     def create_like(self, entries: npt.NDArray[np.number]):
@@ -190,10 +194,10 @@ class _Series(
         if isinstance(other, _Series):
             return self.create_like(self.entries / other.entries)
         return self.create_like(self.entries / other)
-    
+
     def __add__(self, other: Self) -> Self:
         """Add two series.
-        
+
         Note
         ----
         This method allows adding two series with different grids, as long as
@@ -216,7 +220,7 @@ class _Series(
     def sqrt(self) -> Self:
         """Return the square root of the series."""
         return self.create_like(np.sqrt(self.entries))
-    
+
     def get_subset(self, *, interval: tuple[float, float] | None = None) -> Self:
         """Return the subset as a new instance."""
         if interval is None:
@@ -229,7 +233,7 @@ class _Series(
 class FrequencySeries(
     _Series[NPFloatingT, NPNumberT_co], Generic[NPFloatingT, NPNumberT_co]
 ):
-    """A series of numbers on a frequency grid."""
+    """A series of numbers on a frequency grid. Subclass of :class:`.Representation`."""
 
     @staticmethod
     def _abs(
@@ -257,12 +261,12 @@ class FrequencySeries(
 
     @property
     def frequencies(self) -> npt.NDArray[NPFloatingT]:
-        """The frequencies of the series."""
+        """The frequencies of the series. Alias for :attr:`.grid`."""
         return self.grid
 
     @property
     def df(self) -> NPFloatingT:
-        """The frequency spacing."""
+        """The frequency spacing. Alias for :attr:`.resolution`."""
         return self.resolution
 
     def conj(self) -> Self:
@@ -312,16 +316,16 @@ class FrequencySeries(
 class TimeSeries(
     _Series[NPFloatingT, NPNumberT_co], Generic[NPFloatingT, NPNumberT_co]
 ):
-    """A series of numbers on a time grid."""
+    """A series of numbers on a time grid. Subclass of :class:`.Representation`."""
 
     @property
     def times(self) -> npt.NDArray[NPFloatingT]:
-        """The times of the series."""
+        """The times of the series. Alias for :attr:`.grid`."""
         return self.grid
 
     @property
     def dt(self) -> NPFloatingT:
-        """The time step."""
+        """The time step. Alias for :attr:`.resolution`."""
         return self.resolution
 
     def rfft(self, tapering: TaperT | None = None):
@@ -337,7 +341,7 @@ class TimeSeries(
 
 @dc.dataclass(slots=True, frozen=True)
 class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
-    """Phasor representation.
+    """Phasor representation. Subclass of :class:`.FrequencySeries`.
 
     A phasor is a couple of amplitude and phase that represent a complex number.
     This class encapsulates a sequence of phasors at different frequencies, which
@@ -355,7 +359,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
     ) -> Self:
         """Create a phasor sequence."""
         cplx = cls.phasor_to_cplx(amplitudes, phases)
-        return cls(frequencies, cplx) # type: ignore
+        return cls(frequencies, cplx)  # type: ignore
         # The returned type depends on the type of the input arrays.
 
     @staticmethod

@@ -15,10 +15,11 @@ also provides implementations for some common high-level operations.
 .. toctree::
    :maxdepth: 4
    :caption: Documentation:
-   :hidden:
+   :titlesonly:
 
    api/containers/representations
    api/containers/modes
    api/containers/arithdicts
    api/containers/waveforms
    api/containers/data
+   api/utils
