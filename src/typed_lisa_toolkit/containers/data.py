@@ -42,6 +42,7 @@ Functions
 ---------
 
 .. autofunction:: load_data
+.. autofunction:: load_ldc_data
 
 """
 
@@ -345,7 +346,7 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
 
 
 def load_data(file_path: str | pathlib.Path) -> TSData | FSData | TimedFSData:
-    """Load the data from an HDF5 file."""
+    """Load the data from a saved HDF5 file."""
     with h5py.File(file_path, "r") as f:
         data_type = f.attrs["type"]
     if data_type == "TSData":
@@ -355,3 +356,41 @@ def load_data(file_path: str | pathlib.Path) -> TSData | FSData | TimedFSData:
     if data_type == "TimedFSData":
         return TimedFSData.load(file_path)
     raise ValueError(f"Unknown data type: {data_type}")
+
+
+def load_ldc_data(
+    file_path: str | pathlib.Path,
+    name: str = "obs/tdi",
+    AET: bool = True,
+    ignore_T_channel: bool = True,
+) -> TSData:
+    """Load the data from LDC dataset.
+
+    Note
+    ----
+    This function is experimental and its signature may change in the future.
+    """
+    # TODO: reconsider the argument names
+    import ldc.common.series  # type: ignore
+
+    dataset = ldc.common.series.TDI.load(file_path, name)
+    if AET and dataset.get("X") is not None:
+        dataset.XYZ2AET()
+    if not AET and dataset.get("A") is not None:
+        dataset.AET2XYZ()
+    if AET and ignore_T_channel:
+        dataset = dataset[["A", "E"]]
+    try:
+        times = dataset["t"].to_numpy()
+        # I assume we only need to read LDC data in the time domain.
+        # When this is not true anymore, we can enhance this function.
+    except KeyError as e:
+        raise KeyError("The time grid is missing.") from e
+    else:
+        _dict = {
+            str(chnname): representations.TimeSeries(
+                grid=times, entries=dataset[chnname].to_numpy()
+            )
+            for chnname in dataset.keys()
+        }
+        return TSData(_dict)
