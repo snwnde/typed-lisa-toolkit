@@ -417,7 +417,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
         interpolator: Interpolator,
     ) -> Self:
         """Get the phasors interpolated to the given frequencies.
-        
+
         Note
         ----
         The interpolation is done only within the support of the amplitudes.
@@ -426,9 +426,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
         amplitudes = utils.trim_interp(interpolator)(self.frequencies, self.amplitudes)(
             frequencies
         )
-        phases = interpolator(self.frequencies, self.phases)(
-            frequencies
-        )
+        phases = interpolator(self.frequencies, self.phases)(frequencies)
         return self.make(frequencies, amplitudes, phases)
 
     def to_freq_series(self) -> FrequencySeries[NPFloatingT, np.complexfloating]:
