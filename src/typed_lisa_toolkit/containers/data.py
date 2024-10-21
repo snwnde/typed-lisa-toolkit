@@ -37,16 +37,24 @@ Entities
    :undoc-members:
    :inherited-members: UserDict
    :show-inheritance:
+
+Functions
+---------
+
+.. autofunction:: load_data
+
 """
 
 from __future__ import annotations
 from collections.abc import Mapping
 import logging
+import pathlib
 from typing import TypeVar, Generic, Self, TYPE_CHECKING
 import warnings
 
 import numpy as np
 import numpy.typing as npt
+import h5py  # type: ignore
 
 from . import arithdicts, representations
 
@@ -72,6 +80,8 @@ _SeriesT = TypeVar("_SeriesT", bound=representations._Series)
 
 class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
     """Dictionary data container."""
+
+    _series_type: type[_SeriesT]
 
     @property
     def grid(self) -> npt.NDArray[NPFloatingT]:
@@ -110,9 +120,55 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
             compare_to.get_subset(interval=interval), **kwargs
         )
 
+    def _additional_save(self, f: h5py.File):
+        del f
+
+    def save(self, file_path: str | pathlib.Path):
+        """Save the data to an HDF5 file.
+
+        HDF5 File Structure
+        -------------------
+        The data are saved in the following structure:
+        - The root level contains the attribute 'type' with the class name.
+        - Each channel is saved as a group.
+        - The group contains two datasets:
+          - `grid` for the grid.
+          - `entries` for the entries.
+        - For :class:`.TimedFSData`, there will be a dataset
+        'times' at the root level containing the time grid.
+        """
+        with h5py.File(file_path, "a") as f:
+            f.attrs["type"] = self.__class__.__name__
+            self._additional_save(f)
+            for chnname, chn in self.items():
+                grp = f.create_group(chnname)
+                grp.create_dataset("grid", data=chn.grid)
+                grp.create_dataset("entries", data=chn.entries)
+
+    @classmethod
+    def _additional_load(cls, f: h5py.File):
+        del f
+        return {}
+
+    @classmethod
+    def load(cls, file_path: str | pathlib.Path) -> Self:
+        """Load the data from an HDF5 file."""
+        with h5py.File(file_path, "r") as f:
+            additions = cls._additional_load(f)
+            dict_ = {
+                chnname: cls._series_type(
+                    grid=f[chnname]["grid"][...], entries=f[chnname]["entries"][...]
+                )
+                for chnname in f
+                if isinstance(f[chnname], h5py.Group)
+            }
+        return cls(dict_, **additions)
+
 
 class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]]):
     """Dictionary data container of time series data."""
+
+    _series_type = representations.TimeSeries
 
     @property
     def times(self) -> npt.NDArray[NPFloatingT]:
@@ -144,7 +200,9 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         return FSData(fsdict)
 
     def get_zero_padded(
-        self, pad_time: tuple[float, float], tapering: representations.TaperT | None = None
+        self,
+        pad_time: tuple[float, float],
+        tapering: representations.TaperT | None = None,
     ) -> Self:
         """Return the zero-padded data."""
         pad_width = tuple(int(np.rint(time / self.dt)) for time in pad_time)
@@ -173,6 +231,8 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
 
 class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]]):
     """Dictionary data container of frequency series data."""
+
+    _series_type = representations.FrequencySeries
 
     @property
     def frequencies(self) -> npt.NDArray[NPFloatingT]:
@@ -215,7 +275,10 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         return TimedFSData(self, times)
 
     def to_tsdata(
-        self, times: npt.NDArray[np.floating], *, tapering: representations.TaperT | None
+        self,
+        times: npt.NDArray[np.floating],
+        *,
+        tapering: representations.TaperT | None,
     ):
         """Return the time series data."""
         dt: NPFloatingT = times[1] - times[0]
@@ -245,6 +308,13 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
         super().__init__(data)
         self.times = times
 
+    def _additional_save(self, f: h5py.File):
+        f.create_dataset("times", data=self.times)
+
+    @classmethod
+    def _additional_load(cls, f: h5py.File):
+        return {"times": f["times"][...]}
+
     def set_times(self, times: npt.NDArray[np.floating]):
         """Set the time grid.
 
@@ -253,7 +323,10 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
         self.times = times
         return self
 
-    def create_new(self, data: Mapping[str, representations.FrequencySeries[NPNumberT]]):  # type: ignore # noqa: D102
+    def create_new(  # noqa: D102
+        self,
+        data: Mapping[str, representations.FrequencySeries[NPNumberT]],  # type: ignore
+    ):
         # Unless series.FrequencySeries is wrongly implemented so that it does not follow
         # the SupportsArithmetic protocol, there is no reason to think the type hint is wrong.
         # It is unlcear to me why mypy thinks it is wrong.
@@ -269,3 +342,16 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
         # This is intentional, as the subclass method is more specific. Ignoring the error.
         """Return the time series data."""
         return super().to_tsdata(self.times, tapering=tapering)
+
+
+def load_data(file_path: str | pathlib.Path) -> TSData | FSData | TimedFSData:
+    """Load the data from an HDF5 file."""
+    with h5py.File(file_path, "r") as f:
+        data_type = f.attrs["type"]
+    if data_type == "TSData":
+        return TSData.load(file_path)
+    if data_type == "FSData":
+        return FSData.load(file_path)
+    if data_type == "TimedFSData":
+        return TimedFSData.load(file_path)
+    raise ValueError(f"Unknown data type: {data_type}")

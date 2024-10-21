@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
 from typed_lisa_toolkit.containers.representations import TimeSeries, FrequencySeries
-
+import tempfile
+import os
 from typed_lisa_toolkit.containers.data import (
     TSData,
     FSData,
@@ -85,6 +86,48 @@ class TestDataContainers(unittest.TestCase):
         timed_fsdata = TimedFSData({"channel1": self.frequency_series}, self.times)
         tsdata = timed_fsdata.to_tsdata()
         self.assertTrue(np.array_equal(tsdata.times, self.times))
+
+    def test_save_and_load_tsdata(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmpfile:
+            self.tsdata.save(tmpfile.name)
+            loaded_tsdata = TSData.load(tmpfile.name)
+            self.assertTrue(np.array_equal(loaded_tsdata.times, self.tsdata.times))
+            self.assertTrue(
+                np.array_equal(
+                    loaded_tsdata["channel1"].entries, self.tsdata["channel1"].entries
+                )
+            )
+        os.remove(tmpfile.name)
+
+    def test_save_and_load_fsdata(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmpfile:
+            self.fsdata.save(tmpfile.name)
+            loaded_fsdata = FSData.load(tmpfile.name)
+            self.assertTrue(
+                np.array_equal(loaded_fsdata.frequencies, self.fsdata.frequencies)
+            )
+            self.assertTrue(
+                np.array_equal(
+                    loaded_fsdata["channel1"].entries, self.fsdata["channel1"].entries
+                )
+            )
+        os.remove(tmpfile.name)
+
+    def test_save_and_load_timedfsdata(self):
+        timed_fsdata = TimedFSData({"channel1": self.frequency_series}, self.times)
+        with tempfile.NamedTemporaryFile(delete=False) as tmpfile:
+            timed_fsdata.save(tmpfile.name)
+            loaded_timedfsdata = TimedFSData.load(tmpfile.name)
+            self.assertTrue(
+                np.array_equal(loaded_timedfsdata.times, timed_fsdata.times)
+            )
+            self.assertTrue(
+                np.array_equal(
+                    loaded_timedfsdata["channel1"].entries,
+                    timed_fsdata["channel1"].entries,
+                )
+            )
+        os.remove(tmpfile.name)
 
 
 if __name__ == "__main__":
