@@ -130,6 +130,7 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         HDF5 File Structure
         -------------------
         The data are saved in the following structure:
+
         - The root level contains the attribute 'type' with the class name.
         - Each channel is saved as a group.
         - The group contains two datasets:
