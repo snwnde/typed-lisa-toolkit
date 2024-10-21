@@ -133,10 +133,12 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         - The root level contains the attribute 'type' with the class name.
         - Each channel is saved as a group.
         - The group contains two datasets:
+
           - `grid` for the grid.
           - `entries` for the entries.
-        - For :class:`.TimedFSData`, there will be a dataset
-        'times' at the root level containing the time grid.
+
+        - For :class:`.TimedFSData`, there will be a dataset 'times' at the root level containing the time grid.
+
         """
         with h5py.File(file_path, "a") as f:
             f.attrs["type"] = self.__class__.__name__
