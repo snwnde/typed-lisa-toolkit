@@ -10,9 +10,9 @@ pages:
   script:
     - apt-get update
     - apt-get -y --no-install-recommends install git gcc libc-dev
-    - pip install --upgrade pip
-    - pip install -r docs/docs-requirements.txt
-    - pip install .
+    - pip install --upgrade --root-user-action pip
+    - pip install --root-user-action -r docs/docs-requirements.txt
+    - pip install --root-user-action .
     - cd docs
     - make clean html
     - cd ..
