@@ -22,4 +22,5 @@ also provides implementations for some common high-level operations.
    api/containers/arithdicts
    api/containers/waveforms
    api/containers/data
+   api/viz/plotters
    api/utils

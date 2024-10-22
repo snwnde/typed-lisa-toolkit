@@ -1,4 +1,42 @@
-"""Plotting tools for Data."""
+"""Module for plotting tools.
+
+We provide a set of classes to plot data and representations. The classes
+implemented here are used by classes in :mod:`typed_lisa_toolkit.containers.data`
+and :mod:`typed_lisa_toolkit.containers.representations` to visualize signals.
+It is also possible to call methods from these classes to obtain figures and axes
+to customize the plots.
+
+.. currentmodule:: typed_lisa_toolkit.viz.plotters
+
+Entities
+--------
+
+.. autoclass:: TSPlotter
+    :members:
+    :member-order: groupwise
+    :inherited-members:
+
+.. autoclass:: FSPlotter
+    :members:
+    :member-order: groupwise
+    :inherited-members:
+
+.. autoclass:: PhasorPlotter
+    :members:
+    :member-order: groupwise
+    :inherited-members:
+
+.. autoclass:: TSDataPlotter
+    :members:
+    :member-order: groupwise
+    :inherited-members:
+
+.. autoclass:: FSDataPlotter
+    :members:
+    :member-order: groupwise
+    :inherited-members:
+
+"""
 
 from __future__ import annotations
 import abc
