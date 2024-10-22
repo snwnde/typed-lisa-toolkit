@@ -4,7 +4,7 @@ stages:
 variables:
   SPHINX_VERSION: "8.0.2"
 
-make_docs:
+pages:
   stage: docs
   image: ghcr.io/sphinx-doc/sphinx:$SPHINX_VERSION
   script:
