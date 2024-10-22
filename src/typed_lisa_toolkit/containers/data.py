@@ -50,7 +50,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import logging
 import pathlib
-from typing import TypeVar, Generic, Self, TYPE_CHECKING
+from typing import TypeVar, Generic, Self, TYPE_CHECKING, Literal
 import warnings
 
 import numpy as np
@@ -60,7 +60,7 @@ import h5py  # type: ignore
 from . import arithdicts, representations
 
 if TYPE_CHECKING:
-    from ..viz import plotters as data_plotter
+    from ..viz import plotters
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         }
         return self.create_new(series_dict)
 
-    def _get_plotter(self) -> type[data_plotter._SeriesDataPlotter]:
+    def _get_plotter(self) -> type[plotters._SeriesDataPlotter]:
         """Return the plotter class."""
         raise NotImplementedError("The method must be implemented in the subclass.")
 
@@ -371,25 +371,29 @@ def load_data(file_path: str | pathlib.Path) -> TSData | FSData | TimedFSData:
 
 def load_ldc_data(
     file_path: str | pathlib.Path,
-    name: str = "obs/tdi",
-    AET: bool = True,
-    ignore_T_channel: bool = True,
+    name: Literal[
+        "obs/tdi", "sky/mbhb/tdi", "sky/igb/tdi", "sky/vgb/tdi", "sky/dgb/tdi"
+    ] = "obs/tdi",
+    channels: Literal["AE", "AET", "XYZ"] = "AE",
 ) -> TSData:
-    """Load the data from LDC dataset.
-
-    Note
-    ----
-    This function is experimental and its signature may change in the future.
-    """
-    # TODO: reconsider the argument names
-    import ldc.common.series  # type: ignore
+    """Load the data from LDC dataset."""
+    try:
+        import ldc.common.series  # type: ignore
+    except ImportError as e:
+        raise ImportError(
+            "The lisa-data-challenge package is required to load LDC data. See https://gitlab.in2p3.fr/LISA/LDC for installation guide."
+        ) from e
 
     dataset = ldc.common.series.TDI.load(file_path, name)
-    if AET and dataset.get("X") is not None:
-        dataset.XYZ2AET()
-    if not AET and dataset.get("A") is not None:
-        dataset.AET2XYZ()
-    if AET and ignore_T_channel:
+    if channels == "AE" or channels == "AET":
+        if dataset.get("X") is not None:
+            dataset.XYZ2AET()
+    elif channels == "XYZ":
+        if dataset.get("A") is not None:
+            dataset.AET2XYZ()
+    else:
+        raise ValueError(f"Unknown channel type: {channels}")
+    if channels == "AE":
         dataset = dataset[["A", "E"]]
     try:
         times = dataset["t"].to_numpy()
