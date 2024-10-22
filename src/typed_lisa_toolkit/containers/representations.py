@@ -71,7 +71,8 @@ import abc
 from collections.abc import Callable
 import dataclasses as dc
 import logging
-from typing import TypeVar, Generic, Self
+from re import T
+from typing import TypeVar, Generic, Self, TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
@@ -79,6 +80,9 @@ import numpy.typing as npt
 from .. import utils
 
 log = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from ..viz import plotters
 
 PyNum = int | float | complex  # Union[int, float, complex]
 Numeric = PyNum | np.number | npt.NDArray[np.number]
@@ -94,7 +98,6 @@ NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
 
 TaperT = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
 Interpolator = utils.Interpolator
-
 
 @dc.dataclass(slots=True, frozen=True)
 class Representation(Generic[NPFloatingT, NPNumberT_co]):
@@ -228,6 +231,13 @@ class _Series(
         mask = utils.get_subset_slice(self.grid, interval[0], interval[1])
         return type(self)(grid=self.grid[mask], entries=self.entries[mask])
 
+    def _get_plotter(self) -> type[plotters._SeriesPlotter]:
+        raise NotImplementedError("The method must be implemented in the subclass.")
+
+    def draw(self, **kwargs):
+        """Plot the series."""
+        plotter = self._get_plotter()
+        return plotter(self).draw(**kwargs)
 
 @dc.dataclass(slots=True, frozen=True)
 class FrequencySeries(
@@ -315,6 +325,10 @@ class FrequencySeries(
         """Get the :class:`.Phasor` representation of the waveform."""
         return Phasor(self.frequencies, self.entries)
 
+    def _get_plotter(self):
+        from ..viz import plotters
+        return plotters.FSPlotter
+
 
 @dc.dataclass(slots=True, frozen=True)
 class TimeSeries(
@@ -341,6 +355,10 @@ class TimeSeries(
             grid=np.fft.rfftfreq(n=len(self.times), d=self.dt),
             entries=np.fft.rfft(self.entries * tapering_window),
         )
+
+    def _get_plotter(self):
+        from ..viz import plotters
+        return plotters.TSPlotter
 
 
 @dc.dataclass(slots=True, frozen=True)
@@ -435,3 +453,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
             self.frequencies,
             self.phasor_to_cplx(self.amplitudes, self.phases),
         )
+
+    def _get_plotter(self):
+        from ..viz import plotters
+        return plotters.PhasorPlotter

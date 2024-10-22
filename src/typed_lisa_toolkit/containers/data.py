@@ -60,7 +60,7 @@ import h5py  # type: ignore
 from . import arithdicts, representations
 
 if TYPE_CHECKING:
-    from ..viz import data as data_plotter
+    from ..viz import plotters as data_plotter
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +84,14 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
 
     _series_type: type[_SeriesT]
 
+    def __init__(
+        self,
+        data: Mapping[str, _SeriesT],
+        name: str | None = None,
+    ):
+        super().__init__(data)
+        self.name = name
+
     @property
     def grid(self) -> npt.NDArray[NPFloatingT]:
         """Return the grid."""
@@ -98,7 +106,7 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         }
         return self.create_new(series_dict)
 
-    def _get_plotter(self) -> type[data_plotter.DataPlotter]:
+    def _get_plotter(self) -> type[data_plotter._SeriesDataPlotter]:
         """Return the plotter class."""
         raise NotImplementedError("The method must be implemented in the subclass.")
 
@@ -118,7 +126,7 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         if compare_to is None:
             return plotter(self.get_subset(interval=interval)).draw(**kwargs)
         return plotter(self.get_subset(interval=interval)).compare(
-            compare_to.get_subset(interval=interval), **kwargs
+            plotter(compare_to.get_subset(interval=interval)), **kwargs
         )
 
     def _additional_save(self, f: h5py.File):
@@ -228,9 +236,9 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         return self.create_new(tsdict)
 
     def _get_plotter(self):
-        from ..viz import data as data_plotter  # pylint: disable=import-outside-toplevel
+        from ..viz import plotters
 
-        return data_plotter.TimeSeriesPlotter
+        return plotters.TSDataPlotter
 
 
 class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]]):
@@ -296,9 +304,9 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         return TSData(tsdict)
 
     def _get_plotter(self):
-        from ..viz import data as data_plotter  # pylint: disable=import-outside-toplevel
+        from ..viz import plotters
 
-        return data_plotter.FrequencySeriesPlotter
+        return plotters.FSDataPlotter
 
 
 class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT]):
