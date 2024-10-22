@@ -47,8 +47,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 if TYPE_CHECKING:
-    from .containers import data
-    from .containers import representations
+    from ..containers import data, representations
 
 logger = logging.getLogger(__name__)
 
