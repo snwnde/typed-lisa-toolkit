@@ -13,14 +13,10 @@ also provides implementations for some common high-level operations.
    userguides/tutorials
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
    :caption: Documentation:
    :titlesonly:
 
-   api/containers/representations
-   api/containers/modes
-   api/containers/arithdicts
-   api/containers/waveforms
-   api/containers/data
-   api/viz/plotters
+   api/containers/index
+   api/viz/index
    api/utils
