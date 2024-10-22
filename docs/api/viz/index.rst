@@ -1,4 +1,4 @@
-Vizualization
+Visualization
 -------------
 
 .. toctree::
