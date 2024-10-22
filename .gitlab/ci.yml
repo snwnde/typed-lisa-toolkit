@@ -1,12 +1,11 @@
 stages:
-  - build
-  - deploy
+  - docs
 
 variables:
   SPHINX_VERSION: "8.0.2"
 
-make_html:
-  stage: build
+make_docs:
+  stage: docs
   image: ghcr.io/sphinx-doc/sphinx:$SPHINX_VERSION
   script:
     - apt-get update
@@ -16,13 +15,7 @@ make_html:
     - pip install .
     - cd docs
     - make clean html
-  artifacts:
-    paths:
-      - docs/_build/html
-
-pages:
-  stage: deploy
-  script:
+    - cd ..
     - mv docs/_build/html public
   artifacts:
     paths:
