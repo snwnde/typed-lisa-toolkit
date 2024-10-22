@@ -47,8 +47,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 if TYPE_CHECKING:
-    from ..containers import data
-    from ..containers import representations
+    from .containers import data
+    from .containers import representations
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +171,7 @@ class _SeriesPlotter(abc.ABC):
 
 
 class TSPlotter(_SeriesPlotter):
-    """Plotter for :class:`..containers.representations.TimeSeries`."""
+    """Plotter for :class:`.containers.representations.TimeSeries`."""
 
     series: representations.TimeSeries
 
@@ -212,7 +212,7 @@ class TSPlotter(_SeriesPlotter):
 
 
 class FSPlotter(_SeriesPlotter):
-    """Plotter for :class:`..containers.representations.FrequencySeries`."""
+    """Plotter for :class:`.containers.representations.FrequencySeries`."""
 
     series: representations.FrequencySeries
 
@@ -244,7 +244,7 @@ class FSPlotter(_SeriesPlotter):
 
 
 class PhasorPlotter(FSPlotter):
-    """Plotter for :class:`..containers.representations.Phasor`."""
+    """Plotter for :class:`.containers.representations.Phasor`."""
 
     series: representations.Phasor
 
@@ -348,7 +348,7 @@ class _SeriesDataPlotter(abc.ABC):
 
 
 class TSDataPlotter(_SeriesDataPlotter):
-    """Plotter for :class:`..containers.data.TSData`."""
+    """Plotter for :class:`.containers.data.TSData`."""
 
     def draw(self, set_legend: bool = False, **kwargs) -> plt.Figure:
         """Draw the time series data."""
@@ -360,7 +360,7 @@ class TSDataPlotter(_SeriesDataPlotter):
 
 
 class FSDataPlotter(_SeriesDataPlotter):
-    """Plotter for :class:`..containers.data.FSData`."""
+    """Plotter for :class:`.containers.data.FSData`."""
 
     def _draw_phasor(self, set_legend: bool = False, **kwargs) -> plt.Figure:
         chn_num = len(self.data.channel_names)
