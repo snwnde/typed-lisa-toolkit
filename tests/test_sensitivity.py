@@ -5,8 +5,8 @@ from typed_lisa_toolkit.containers.data import FSData, TSData
 from typed_lisa_toolkit.containers.representations import FrequencySeries, TimeSeries
 
 from typed_lisa_toolkit.containers.sensitivity import (
+    FDNoiseModel,
     FDSensitivity,
-    _FDNoiseModel,
     _NoiseModelSensitivity,
     _CacheSensitivity,
 )
@@ -14,7 +14,7 @@ from typed_lisa_toolkit.containers.sensitivity import (
 
 class TestFDSensitivity(unittest.TestCase):
     def setUp(self):
-        self.noise_model = create_autospec(_FDNoiseModel, instance=True)
+        self.noise_model = create_autospec(FDNoiseModel, instance=True)
         self.noise_cache = MagicMock(spec=FSData)
         self.frequencies = np.array([0.1, 0.2, 0.3])
         self.entries = np.array([1.0, 2.0, 3.0])
