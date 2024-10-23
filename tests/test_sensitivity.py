@@ -9,6 +9,7 @@ from typed_lisa_toolkit.containers.sensitivity import (
     FDSensitivity,
     _NoiseModelSensitivity,
     _CacheSensitivity,
+    _collect_frequencies,
 )
 
 
@@ -37,13 +38,13 @@ class TestFDSensitivity(unittest.TestCase):
     def test_get_noise_psd_noise_model(self):
         self.noise_model.psd.return_value = self.entries
         sensitivity = _NoiseModelSensitivity(self.noise_model)
-        noise_psd = sensitivity.get_noise_psd(self.data)
+        noise_psd = sensitivity.get_noise_psd(_collect_frequencies(self.data))
         self.assertTrue(np.array_equal(noise_psd["channel1"].entries, self.entries))
 
     def test_get_noise_psd_cache(self):
         self.noise_cache.get_subset.return_value = self.data
         sensitivity = _CacheSensitivity(self.noise_cache)
-        noise_psd = sensitivity.get_noise_psd(self.data)
+        noise_psd = sensitivity.get_noise_psd(_collect_frequencies(self.data))
         self.assertEqual(noise_psd, self.data)
 
     def test_get_integrand(self):
