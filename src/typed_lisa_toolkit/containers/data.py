@@ -271,6 +271,10 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
     def exp(self):
         """Return the exponential of the data."""
         return self.create_new({chnname: chn.exp() for chnname, chn in self.items()})
+    
+    def sqrt(self):
+        """Return the square root of the data."""
+        return self.create_new({chnname: chn.sqrt() for chnname, chn in self.items()})
 
     @property
     def real(self):

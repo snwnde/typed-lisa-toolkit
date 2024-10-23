@@ -90,8 +90,8 @@ class ArithDict(UserDict[KT, ArithT]):
         return NullValue()
 
     def __array__(self):  # noqa: D105
-        raise TypeError("""If you see this in a multiplication between a numpy array and an ArithDict,
-            most likely the numpy array is on the left side of the multiplication. Try to put it on the right side.""")
+        raise TypeError(f"""{self.__class__.__name__} can not be casted into an array. If you see this in a multiplication
+            between a numpy array and an ArithDict, most likely the numpy array is on the left side of the multiplication. Try to put it on the right side.""")
 
     def create_new(self, data: Mapping[KT, ArithTb]):
         """Create a new instance of the class."""
@@ -216,7 +216,7 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
     """A dictionary of modes."""
 
     @property
-    def modes(self) -> tuple[ModeT,...]:
+    def modes(self) -> tuple[ModeT, ...]:
         """Return the modes."""
         return tuple(self.keys())
 
@@ -240,7 +240,7 @@ class ChannelDict(ArithDict[ChnName, ArithT], Generic[ArithT]):
     """A dictionary of channels."""
 
     @property
-    def channel_names(self) -> tuple[ChnName,...]:
+    def channel_names(self) -> tuple[ChnName, ...]:
         """Return the channel names."""
         return tuple(self.keys())
 
