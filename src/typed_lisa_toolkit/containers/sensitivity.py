@@ -62,7 +62,7 @@ class FDSensitivity(Sensitivity):
         """Return an :class:`.FDSensitivity` instance.
 
         To create an instance, either provide a noise model or a noise
-        PSD cache. Only exactly one of them should be provided.
+        PSD cache. If both are provided, an error is raised.
         """
         args = (noise_model, noise_cache)
         if sum(arg is not None for arg in args) != 1:
