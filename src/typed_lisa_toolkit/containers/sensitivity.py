@@ -6,10 +6,13 @@ space is a subspace.
 
 .. currentmodule:: typed_lisa_toolkit.containers.sensitivity
 
-Entities
---------
+Types
+-----
 
 .. autoprotocol:: FDNoiseModel
+
+Entities
+--------
 
 .. autoclass:: FDSensitivity
    :members:
@@ -37,7 +40,7 @@ class FDNoiseModel(Protocol):
 
     @abc.abstractmethod
     def psd(self, *args, option: ChnName, **kwargs) -> npt.NDArray[np.floating]:
-        """Return the PSD."""
+        """Return the power spectral density (PSD)."""
 
 
 class Sensitivity:
@@ -118,13 +121,13 @@ class FDSensitivity(Sensitivity):
         ],
     ) -> arithdicts.ChannelDict[np.complexfloating]:
         r"""Return the complex scalar product.
-        
+
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
         this method returns
 
         .. math::
 
-            4 \int_{f_\text{min}}^{f_\text{max}} \frac{d(f) h^*(f)}{S_n(f)} \, \mathrm{d} f.
+            \langle d, h \rangle = 4 \int_{f_\text{min}}^{f_\text{max}} \frac{d(f) h^*(f)}{S_n(f)} \, \mathrm{d} f.
         """
         integrand = self.get_integrand(left, right)
         _dict = {
@@ -147,7 +150,7 @@ class FDSensitivity(Sensitivity):
         ],
     ):
         r"""Return the cumulative complex scalar product.
-        
+
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
         this method returns an array of the following function on the input frequency grid
         :math:`[f_\text{min}, f_\text{max}]`:
@@ -190,13 +193,13 @@ class FDSensitivity(Sensitivity):
         ],
     ):
         r"""Return the scalar product.
-        
+
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
         this method returns
 
         .. math::
 
-            \langle d, h \rangle = 4 \Re \int_{f_\text{min}}^{f_\text{max}} \frac{d(f) h^*(f)}{S_n(f)} \, \mathrm{d} f.
+            \left( d \middle| h \right) = 4 \Re \int_{f_\text{min}}^{f_\text{max}} \frac{d(f) h^*(f)}{S_n(f)} \, \mathrm{d} f.
         """
         return self.get_complex_scalar_product(left, right).pass_through(np.real)
 
@@ -212,7 +215,7 @@ class FDSensitivity(Sensitivity):
         ],
     ):
         r"""Return the cumulative scalar product.
-        
+
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
         this method returns an array of the following function on the input frequency grid
         :math:`[f_\text{min}, f_\text{max}]`:
@@ -235,25 +238,32 @@ class FDSensitivity(Sensitivity):
             data_.NPFloatingT,
             np.complexfloating,
         ],
-    ) -> data_.TSData[np.floating, np.float64]:
-        r"""Return the cross_correlation.
-        
+    ) -> arithdicts.ChannelDict[repr.TimeSeries[np.floating, np.complex128]]:
+        r"""Return the cross correlation.
+
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
-        this method computes the cross-correlation
+        we define the cross-correlation as
 
         .. math::
 
-            (d \ast h)(\tau) = \langle \hat{d}(t), \hat{h}(t + \tau) \rangle.
+            (d \ast h)(\tau) := \left( \hat{d}(t) \middle| \hat{h}(t + \tau) \right),
 
-        In the implementation, the above expression is computed using
+        where the hat denotes the real Fourier transform. This methods returns a generalization of the above
+        cross-correlation which is **complex-valued**
 
         .. math::
 
-            (d \ast h)(\tau) \propto \mathcal{F}^{-1}\left(4\frac{d(f) h^*(f)}{S_n(f)}\right),
+            (d \star h)(\tau) := \langle \hat{d}(t), \hat{h}(t + \tau) \rangle.
 
-        where the hat denotes the real Fourier transform, :math:`\mathcal{F}^{-1}` the two-sided inverse Fourier transform. Note 
-        that the input arrays :math:`d(f)` and :math:`h(f)` are one-sided, and the negative frequencies are populated by **zero**
-        before the inverse Fourier transform.
+        In the implementation, the generalized cross-correlation is computed using
+
+        .. math::
+
+            (d \star h)(\tau) \propto \mathcal{F}^{-1}\left(4\frac{d(f) h^*(f)}{S_n(f)}\right),
+
+        where :math:`\mathcal{F}^{-1}` is the two-sided inverse Fourier transform. Note
+        that the input arrays :math:`d(f)` and :math:`h(f)` are one-sided, and the negative frequencies are
+        populated by **zero** before the inverse Fourier transform.
         """
         two_sided_freq = np.fft.fftshift(
             np.fft.fftfreq(len(left.times), left.times[1] - left.times[0])
@@ -276,14 +286,16 @@ class FDSensitivity(Sensitivity):
                 len(left.times),
                 norm="forward",
             )
-            return repr.TimeSeries(left.times, cross_correlation.real)
+            return repr.TimeSeries(left.times, cross_correlation)
 
-        _dict = {chnname: make_cross_correlation(chnname) for chnname in integrand.keys()}
-        return data_.TSData(_dict)
+        _dict = {
+            chnname: make_cross_correlation(chnname) for chnname in integrand.keys()
+        }
+        return arithdicts.ChannelDict(_dict)
 
     def get_whitened(self, data: data_.FSData):
         r"""Return the whitened data.
-        
+
         Assuming the noise PSD is :math:`S_n(f)`, this method returns
 
         .. math::
@@ -295,7 +307,7 @@ class FDSensitivity(Sensitivity):
 
     def get_overlap(self, left: data_.FSData, right: data_.FSData):
         r"""Return the overlap.
-        
+
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
         this method returns
 
