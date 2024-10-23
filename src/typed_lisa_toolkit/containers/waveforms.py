@@ -1,4 +1,7 @@
-"""Module for waveform representation formatting and transformation tool.
+"""Module for waveform representation.
+
+The module provides formatting and transformation functions, as well as
+a protocol for waveform templates.
 
 .. currentmodule:: typed_lisa_toolkit.containers.waveforms
 
@@ -11,6 +14,7 @@ Types
 .. autoclass:: WaveformInChannel
 .. autoclass:: Waveform
 .. autoclass:: FormattedWaveform
+.. autoprotocol:: Template
 
 Functions
 ---------
@@ -23,7 +27,7 @@ Functions
 from __future__ import annotations
 from collections.abc import Mapping
 import logging
-from typing import TypeVar
+from typing import TypeVar, Protocol
 
 import numpy as np
 
@@ -45,16 +49,21 @@ mode."""
 
 WaveformInChannel = Mapping[tuple[int, ...], WaveformInMode]
 Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[WaveformInMode]]
-FormattedWaveform = arithdicts.ChannelDict[
-    arithdicts.ModeDict[modes.Harmonic | modes.QNM, WaveformInMode]
+FormattedWaveformInChannel = arithdicts.ModeDict[
+    modes.Harmonic | modes.QNM, WaveformInMode
 ]
+FormattedWaveform = arithdicts.ChannelDict[FormattedWaveformInChannel[WaveformInMode]]
 
 
-def _format_waveform_in_channel(wf: WaveformInChannel[WaveformInMode]):
+def _format_waveform_in_channel(
+    wf: WaveformInChannel[WaveformInMode] | FormattedWaveformInChannel[WaveformInMode],
+) -> FormattedWaveformInChannel[WaveformInMode]:
     return arithdicts.ModeDict({modes.cast_mode(k): v for k, v in wf.items()})
 
 
-def format(wf: Waveform[WaveformInMode]) -> FormattedWaveform:
+def format(
+    wf: Waveform[WaveformInMode] | FormattedWaveform[WaveformInMode],
+) -> FormattedWaveform[WaveformInMode]:
     """Format a waveform.
 
     This function converts :class:`.Waveform` to :class:`.arithdicts.ChannelDict`
@@ -66,7 +75,8 @@ def format(wf: Waveform[WaveformInMode]) -> FormattedWaveform:
 
 
 def to_fsdata(
-    wf: Waveform[representations.FrequencySeries[NPFloatingT, NPNumberT]],
+    wf: Waveform[representations.FrequencySeries[NPFloatingT, NPNumberT]]
+    | FormattedWaveform[representations.FrequencySeries[NPFloatingT, NPNumberT]],
 ) -> data.FSData[NPFloatingT, NPNumberT]:
     """Convert :class:`.Waveform` to :class:`.data.FSData`.
 
@@ -75,8 +85,20 @@ def to_fsdata(
     returns an instance of :class:`.data.FSData`.
     """
 
-    def _sum_modes(wf: WaveformInChannel[WaveformInMode]):
+    def _sum_modes(
+        wf: WaveformInChannel[WaveformInMode]
+        | FormattedWaveformInChannel[WaveformInMode],
+    ):
         # Sum the contributions of all modes in each channel
         return _format_waveform_in_channel(wf).sum()
 
     return data.FSData({k: _sum_modes(v) for k, v in wf.items()})
+
+
+class Template(Protocol):
+    """Protocol for waveform templates."""
+
+    def get_waveform(
+        self, *args, **kwargs
+    ) -> Waveform[WaveformInMode] | FormattedWaveform[WaveformInMode]:
+        """Return the waveform representation."""

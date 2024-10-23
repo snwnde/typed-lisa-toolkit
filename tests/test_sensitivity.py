@@ -93,7 +93,7 @@ class TestFDSensitivity(unittest.TestCase):
         self.noise_model.psd.return_value = np.ones_like(timed_data.frequencies)
         sensitivity = _NoiseModelSensitivity(self.noise_model)
         cross_correlation = sensitivity.get_cross_correlation(timed_data, another_data)
-        self.assertIsInstance(cross_correlation, TSData)
+        self.assertIsInstance(next(iter(cross_correlation.values())), TimeSeries)
 
     def test_get_whitened(self):
         self.noise_model.psd.return_value = self.entries

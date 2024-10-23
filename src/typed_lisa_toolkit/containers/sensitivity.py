@@ -22,6 +22,7 @@ Entities
 """
 
 import abc
+import logging
 from typing import Protocol
 
 import numpy as np
@@ -32,13 +33,14 @@ from . import representations as repr
 from . import data as data_
 from .. import utils
 
+log = logging.getLogger(__name__)
+
 ChnName = str
 
 
 class FDNoiseModel(Protocol):
     """Protocol for frequency domain noise models."""
 
-    @abc.abstractmethod
     def psd(self, *args, option: ChnName, **kwargs) -> npt.NDArray[np.floating]:
         """Return the power spectral density (PSD)."""
 
@@ -107,7 +109,7 @@ class FDSensitivity(Sensitivity):
             4\frac{d(f) h^*(f)}{S_n(f)}.
         """
         noise_psd = self.get_noise_psd(left)
-        return 4.0 * (1.0 / noise_psd) * left * right.conj()
+        return 4 * right.conj() * left * (1 / noise_psd)
 
     def get_complex_scalar_product(
         self,
