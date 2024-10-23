@@ -79,7 +79,7 @@ class TestFDSensitivity(unittest.TestCase):
         )
         self.assertTrue(np.array_equal(product["channel1"], expected_product))
 
-    def test_get_correlation(self):
+    def test_get_cross_correlation(self):
         times = np.array([0.0, 1.0, 2.0])
         tsdata = TSData({"channel1": TimeSeries(times, np.sin(times))})
         timed_data = tsdata.to_fsdata()
@@ -92,8 +92,8 @@ class TestFDSensitivity(unittest.TestCase):
         )
         self.noise_model.psd.return_value = np.ones_like(timed_data.frequencies)
         sensitivity = _NoiseModelSensitivity(self.noise_model)
-        correlation = sensitivity.get_correlation(timed_data, another_data)
-        self.assertIsInstance(correlation, TSData)
+        cross_correlation = sensitivity.get_cross_correlation(timed_data, another_data)
+        self.assertIsInstance(cross_correlation, TSData)
 
     def test_get_whitened(self):
         self.noise_model.psd.return_value = self.entries
