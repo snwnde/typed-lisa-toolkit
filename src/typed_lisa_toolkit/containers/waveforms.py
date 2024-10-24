@@ -30,6 +30,7 @@ import logging
 from typing import TypeVar, Protocol
 
 import numpy as np
+import numpy.typing as npt
 
 from . import representations, arithdicts, modes, data
 
@@ -95,10 +96,15 @@ def to_fsdata(
     return data.FSData({k: _sum_modes(v) for k, v in wf.items()})
 
 
-class Template(Protocol):
-    """Protocol for waveform templates."""
+class FDTemplate(Protocol):
+    """Protocol for frequency domain waveform templates."""
+
+    def get_frequencies(self) -> arithdicts.ModeDict[modes.Harmonic | modes.QNM, npt.NDArray[np.floating]]:
+        """Get the internal frequencies of the waveform template."""
 
     def get_waveform(
-        self, *args, **kwargs
-    ) -> Waveform[WaveformInMode] | FormattedWaveform[WaveformInMode]:
-        """Return the waveform representation."""
+        self,
+        frequencies: npt.NDArray[np.floating]
+        | arithdicts.ModeDict[modes.Harmonic | modes.QNM, npt.NDArray[np.floating]],
+    ) -> FormattedWaveform[representations.FrequencySeries]:
+        """Get the frequency domain waveform at the given frequencies."""
