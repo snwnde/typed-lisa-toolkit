@@ -14,7 +14,7 @@ Types
 .. autoclass:: WaveformInChannel
 .. autoclass:: Waveform
 .. autoclass:: FormattedWaveform
-.. autoprotocol:: Template
+.. autoprotocol:: FDTemplate
 
 Functions
 ---------
