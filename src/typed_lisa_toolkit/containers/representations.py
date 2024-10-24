@@ -71,7 +71,6 @@ import abc
 from collections.abc import Callable
 import dataclasses as dc
 import logging
-from re import T
 from typing import TypeVar, Generic, Self, TYPE_CHECKING
 
 import numpy as np

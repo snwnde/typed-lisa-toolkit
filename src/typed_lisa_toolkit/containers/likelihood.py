@@ -85,20 +85,20 @@ class WhittleLikelihood(Likelihood):
         return log_likelihood_ratio - 0.5 * data_square
 
     def get_log_likelihood(
-        self, template: wf_.FDTemplate
+        self, template: wf_.FSWaveformGen
     ) -> arithdicts.ChannelDict[np.floating]:
         """Get the log likelihood."""
         return self.log_likelihood(
             self.get_log_likelihood_ratio(template), self.data_square
         )
 
-    def get_log_likelihood_ratio(self, template: wf_.FDTemplate):
+    def get_log_likelihood_ratio(self, template: wf_.FSWaveformGen):
         """Get the log likelihood ratio."""
         return self.log_likelihood_ratio(
             self.get_cross_product(template), self.get_template_square(template)
         )
 
-    def get_cross_product(self, template: wf_.FDTemplate):
+    def get_cross_product(self, template: wf_.FSWaveformGen):
         r"""Get the cross product.
 
         This method computes the term :math:`\left( d \middle| h \right)`.
@@ -109,7 +109,7 @@ class WhittleLikelihood(Likelihood):
             template_waveform.get_subset(interval=f_interval),
         )
 
-    def get_template_square(self, template: wf_.FDTemplate):
+    def get_template_square(self, template: wf_.FSWaveformGen):
         r"""Get the template square.
 
         This method computes the term :math:`\left( h \middle| h \right)`.
@@ -121,7 +121,7 @@ class WhittleLikelihood(Likelihood):
             template_waveform_,
         )
 
-    def _process(self, template: wf_.FDTemplate):
+    def _process(self, template: wf_.FSWaveformGen):
         """Process the template."""
         internal_frequencies = template.get_frequencies()
         f_min = min(f[0] for f in internal_frequencies.values())

@@ -5,7 +5,6 @@ from typed_lisa_toolkit.containers.likelihood import WhittleLikelihood
 from typed_lisa_toolkit.containers import (
     arithdicts,
     waveforms as wf_,
-    representations,
     sensitivity as sens_,
     data as data_,
     modes,
@@ -30,21 +29,9 @@ class TestWhittleLikelihood(unittest.TestCase):
         )
 
         # Mock template
-        self.mock_template = MagicMock(spec=wf_.FDTemplate)
+        self.mock_template = MagicMock(spec=wf_.FSWaveformGen)
         self.mock_template.get_frequencies.return_value = arithdicts.ModeDict(
             {modes.Harmonic(2, 2): np.array([1.0, 2.0, 3.0])}
-        )
-        self.mock_template.get_waveform.return_value = arithdicts.ChannelDict(
-            {
-                "channel1": arithdicts.ModeDict(
-                    {
-                        modes.Harmonic(2, 2): representations.FrequencySeries(
-                            np.array([1.0, 2.0, 3.0]),
-                            np.array([1.0 + 1.0j, 2.0 + 1.0j, 3.0 + 1.0j]),
-                        )
-                    }
-                )
-            }
         )
 
     def test_get_log_likelihood_ratio(self):

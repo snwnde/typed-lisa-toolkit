@@ -14,7 +14,8 @@ Types
 .. autoclass:: WaveformInChannel
 .. autoclass:: Waveform
 .. autoclass:: FormattedWaveform
-.. autoprotocol:: FDTemplate
+.. autoclass:: FrequencyModeDict
+.. autoprotocol:: FSWaveformGen
 
 Functions
 ---------
@@ -54,6 +55,9 @@ FormattedWaveformInChannel = arithdicts.ModeDict[
     modes.Harmonic | modes.QNM, WaveformInMode
 ]
 FormattedWaveform = arithdicts.ChannelDict[FormattedWaveformInChannel[WaveformInMode]]
+FrequencyModeDict = arithdicts.ModeDict[
+    modes.Harmonic | modes.QNM, npt.NDArray[np.floating]
+]
 
 
 def _format_waveform_in_channel(
@@ -96,15 +100,16 @@ def to_fsdata(
     return data.FSData({k: _sum_modes(v) for k, v in wf.items()})
 
 
-class FDTemplate(Protocol):
-    """Protocol for frequency domain waveform templates."""
+class FSWaveformGen(Protocol):
+    """Protocol for frequency domain waveform generators."""
 
-    def get_frequencies(self) -> arithdicts.ModeDict[modes.Harmonic | modes.QNM, npt.NDArray[np.floating]]:
+    def get_frequencies(
+        self,
+    ) -> arithdicts.ModeDict[modes.Harmonic | modes.QNM, npt.NDArray[np.floating]]:
         """Get the internal frequencies of the waveform template."""
 
     def get_waveform(
         self,
-        frequencies: npt.NDArray[np.floating]
-        | arithdicts.ModeDict[modes.Harmonic | modes.QNM, npt.NDArray[np.floating]],
+        frequencies: npt.NDArray[np.floating] | FrequencyModeDict,
     ) -> FormattedWaveform[representations.FrequencySeries]:
         """Get the frequency domain waveform at the given frequencies."""
