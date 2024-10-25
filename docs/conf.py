@@ -26,7 +26,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
-    "nbsphinx",
+    "myst_nb",
     "sphinx.ext.mathjax",
     "sphinx_toolbox.more_autodoc.autoprotocol",
     "sphinx_toolbox.more_autodoc.autonamedtuple",

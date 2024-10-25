@@ -1,7 +1,9 @@
 h5py==3.12.1
 insipid-sphinx-theme==0.4.2
+lisaorbits==2.4.2
 matplotlib==3.9.2
-nbsphinx==0.9.5
+myst-nb==1.1.2
 numpy==2.1.1
 sphinx-autodoc-typehints==2.5.0
 sphinx-toolbox==3.8.0
+git+https://gitlab.in2p3.fr/LISA/fastgb.git
