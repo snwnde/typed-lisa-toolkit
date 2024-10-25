@@ -25,6 +25,7 @@ from __future__ import annotations
 from collections.abc import Callable
 import functools
 import logging
+from typing import TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -32,7 +33,7 @@ import numpy.typing as npt
 
 log = logging.getLogger(__name__)
 
-
+NPNumT = TypeVar("NPNumT", bound=np.number)
 ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
 Interpolator = Callable[[npt.NDArray[np.floating], npt.NDArray[np.floating]], ArrayFunc]
 
@@ -68,6 +69,40 @@ def get_support_slice(array: npt.NDArray[np.number]):
     return slice(non_zero_indices[0], non_zero_indices[-1] + 1)
 
 
+def extend_to(target_grid: npt.NDArray[np.floating]):
+    """Return a function that extends the entries to the target grid.
+
+    The returned function has the signature:
+
+    .. code-block:: python
+
+            def get_extension(grid: npt.NDArray[np.floating], entries: npt.NDArray[NPNumT]) -> npt.NDArray[NPNumT]:
+                ...
+
+    The function extends the entries to the target grid by setting the entries
+    outside the input grid to zero. Both the input grid and the target grid are
+    assumed to be increasing, and the input grid is assumed to be a connected
+    subset of the target grid.
+
+    Examples
+    --------
+    >>> grid = 2 + np.arange(5)
+    >>> entries = np.array([1, 2, 3, 4, 5])
+    >>> target_grid = np.arange(10)
+    >>> extend_to(target_grid)(grid, entries)
+    array([0, 0, 1, 2, 3, 4, 5, 0, 0, 0])
+
+    """
+
+    def get_extension(grid: npt.NDArray[np.floating], entries: npt.NDArray[NPNumT]):
+        support_slice = get_subset_slice(target_grid, grid[0], grid[-1])
+        extended_entries = np.zeros_like(target_grid, dtype=entries.dtype)
+        extended_entries[support_slice] = entries
+        return extended_entries
+
+    return get_extension
+
+
 def trim_interp(interpolator: Interpolator):
     """Return decorated interpolator.
 
@@ -93,10 +128,11 @@ def trim_interp(interpolator: Interpolator):
         ) -> npt.NDArray[np.floating]:
             """Return the interpolated entries at the target grid."""
             target_support_slice = get_subset_slice(target_grid, min, max)
-            target_entries = np.zeros_like(target_grid)
-            target_entries[target_support_slice] = interpolator(
-                grid[support_slice], entries[support_slice]
-            )(target_grid[target_support_slice])
+            interp_grid = target_grid[target_support_slice]
+            interpolated = interpolator(grid[support_slice], entries[support_slice])(
+                interp_grid
+            )
+            target_entries = extend_to(target_grid)(interp_grid, interpolated)
             return target_entries
 
         return _interpolated

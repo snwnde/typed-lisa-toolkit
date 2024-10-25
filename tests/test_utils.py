@@ -1,6 +1,11 @@
 import unittest
 import numpy as np
-from typed_lisa_toolkit.utils import get_subset_slice, get_support_slice, trim_interp
+from typed_lisa_toolkit.utils import (
+    get_subset_slice,
+    get_support_slice,
+    extend_to,
+    trim_interp,
+)
 
 
 class TestUtils(unittest.TestCase):
@@ -29,6 +34,14 @@ class TestUtils(unittest.TestCase):
         array = np.array([0, 0, 0, 0, 0])
         result = get_support_slice(array)
         self.assertEqual(result, slice(0, 0, None))
+
+    def test_extend_to(self):
+        grid = 2 + np.arange(5)
+        entries = np.array([1, 2, 3, 4, 5])
+        target_grid = np.arange(10)
+        result = extend_to(target_grid)(grid, entries)
+        expect = np.array([0, 0, 1, 2, 3, 4, 5, 0, 0, 0])
+        self.assertTrue(np.array_equal(result, expect))
 
     def test_trim_interp(self):
         # Define a simple interpolator function
