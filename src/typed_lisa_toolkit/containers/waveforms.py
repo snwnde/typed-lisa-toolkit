@@ -103,13 +103,7 @@ def to_fsdata(
 class FSWaveformGen(Protocol):
     """Protocol for frequency domain waveform generators."""
 
-    def get_frequencies(
-        self,
-    ) -> arithdicts.ModeDict[modes.Harmonic | modes.QNM, npt.NDArray[np.floating]]:
-        """Get the internal frequencies of the waveform template."""
-
-    def get_waveform(
-        self,
-        frequencies: npt.NDArray[np.floating] | FrequencyModeDict,
+    def __call__(
+        self, *args, **kwargs
     ) -> FormattedWaveform[representations.FrequencySeries]:
         """Get the frequency domain waveform at the given frequencies."""

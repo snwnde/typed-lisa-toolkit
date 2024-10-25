@@ -85,20 +85,20 @@ class WhittleLikelihood(Likelihood):
         return log_likelihood_ratio - 0.5 * data_square
 
     def get_log_likelihood(
-        self, template: wf_.FSWaveformGen
+        self, template: wf_.FormattedWaveform
     ) -> arithdicts.ChannelDict[np.floating]:
         """Get the log likelihood."""
         return self.log_likelihood(
             self.get_log_likelihood_ratio(template), self.data_square
         )
 
-    def get_log_likelihood_ratio(self, template: wf_.FSWaveformGen):
+    def get_log_likelihood_ratio(self, template: wf_.FormattedWaveform):
         """Get the log likelihood ratio."""
         return self.log_likelihood_ratio(
             self.get_cross_product(template), self.get_template_square(template)
         )
 
-    def get_cross_product(self, template: wf_.FSWaveformGen):
+    def get_cross_product(self, template: wf_.FormattedWaveform):
         r"""Get the cross product.
 
         This method computes the term :math:`\left( d \middle| h \right)`.
@@ -109,7 +109,7 @@ class WhittleLikelihood(Likelihood):
             template_waveform.get_subset(interval=f_interval),
         )
 
-    def get_template_square(self, template: wf_.FSWaveformGen):
+    def get_template_square(self, template: wf_.FormattedWaveform):
         r"""Get the template square.
 
         This method computes the term :math:`\left( h \middle| h \right)`.
@@ -121,12 +121,8 @@ class WhittleLikelihood(Likelihood):
             template_waveform_,
         )
 
-    def _process(self, template: wf_.FSWaveformGen):
+    def _process(self, template: wf_.FormattedWaveform):
         """Process the template."""
-        internal_frequencies = template.get_frequencies()
-        f_min = min(f[0] for f in internal_frequencies.values())
-        f_max = max(f[-1] for f in internal_frequencies.values())
-        f_interval = f_min, f_max
-        data_frequencies = self.data.frequencies
-        template_waveform = wf_.to_fsdata(template.get_waveform(data_frequencies))
+        template_waveform = wf_.to_fsdata(template)
+        f_interval = template_waveform.frequencies[0], template_waveform.frequencies[-1]
         return template_waveform, f_interval

@@ -94,7 +94,11 @@ def extend_to(target_grid: npt.NDArray[np.floating]):
     array([0, 0, 1, 2, 3, 4, 5, 0, 0, 0])
 
     """
-
+    # One might consider pre-allocate memory for extended_entries, i.e. designing
+    # a class that stores extended_entries and reinitializes it with zeros before
+    # each call to get_extension. This would accelerate the function, but I fail
+    # to guarantee the correctness of the implementation, probably due to some
+    # issue with np.memmap.fill.
     def get_extension(grid: npt.NDArray[np.floating], entries: npt.NDArray[NPNumT]):
         support_slice = get_subset_slice(target_grid, grid[0], grid[-1])
         extended_entries = np.zeros_like(target_grid, dtype=entries.dtype)

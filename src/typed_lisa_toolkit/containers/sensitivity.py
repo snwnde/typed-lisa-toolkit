@@ -29,7 +29,7 @@ import numpy as np
 import numpy.typing as npt
 
 from . import arithdicts
-from . import representations as repr
+from . import representations as reps
 from . import data as data_
 from .. import utils
 
@@ -76,14 +76,16 @@ class FDSensitivity(Sensitivity):
         PSD cache. If both are provided, an error is raised.
         """
         args = (noise_model, noise_cache)
+        error = ValueError(
+            "Exactly one of noise_model and noise_cache should be provided."
+        )
         if sum(arg is not None for arg in args) != 1:
-            raise ValueError(
-                "Exactly one of noise_model and noise_cache should be provided."
-            )
+            raise error
         if noise_model is not None:
             return _NoiseModelSensitivity(noise_model)
-        elif noise_cache is not None:
+        if noise_cache is not None:
             return _CacheSensitivity(noise_cache)
+        raise error
 
     @abc.abstractmethod
     def get_noise_psd(
@@ -178,10 +180,10 @@ class FDSensitivity(Sensitivity):
             try:
                 import scipy.integrate  # type: ignore
                 # scipy stubs issue
-            except ImportError:
+            except ImportError as e:
                 raise ImportError(
                     "scipy is required for cumulative trapezoidal integration."
-                )
+                ) from e
 
             return scipy.integrate.cumulative_trapezoid(
                 series.entries, x=series.frequencies, initial=0
@@ -247,7 +249,7 @@ class FDSensitivity(Sensitivity):
             data_.NPFloatingT,
             np.complexfloating,
         ],
-    ) -> arithdicts.ChannelDict[repr.TimeSeries[np.floating, np.complex128]]:
+    ) -> arithdicts.ChannelDict[reps.TimeSeries[np.floating, np.complex128]]:
         r"""Return the cross correlation.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
@@ -295,7 +297,7 @@ class FDSensitivity(Sensitivity):
                 len(left.times),
                 norm="forward",
             )
-            return repr.TimeSeries(left.times, cross_correlation)
+            return reps.TimeSeries(left.times, cross_correlation)
 
         _dict = {
             chnname: make_cross_correlation(chnname) for chnname in integrand.keys()
@@ -353,7 +355,7 @@ class _NoiseModelSensitivity(FDSensitivity):
         def make_psd(chnname: ChnName):
             freq = frequencies[chnname]
             entries = self.noise_model.psd(freq, option=chnname)
-            return repr.FrequencySeries(freq, entries)
+            return reps.FrequencySeries(freq, entries)
 
         _dict = {chnname: make_psd(chnname) for chnname in frequencies.keys()}
         return data_.FSData(_dict)
@@ -369,5 +371,17 @@ class _CacheSensitivity(FDSensitivity):
         freq = next(iter(frequencies.values()))
         interval = freq[0], freq[-1]
         noise_psd = self.noise_cache.get_subset(interval=interval)
-        assert np.array_equal(noise_psd.frequencies, freq)
+        if log.isEnabledFor(logging.DEBUG):
+            try:
+                assert np.array_equal(
+                    noise_psd.frequencies, freq
+                ), f"The frequencies {noise_psd.frequencies} and {freq} are not exactly equal."
+            except AssertionError as e:
+                log.debug(e)
+                try:
+                    assert np.allclose(
+                        noise_psd.frequencies, freq
+                    ), f"The frequencies {noise_psd.frequencies} and {freq} are not close."
+                except AssertionError as exc:
+                    log.debug(exc)
         return noise_psd
