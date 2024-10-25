@@ -13,6 +13,7 @@ Functions
 
 .. autofunction:: get_subset_slice
 .. autofunction:: get_support_slice
+.. autofunction:: extend_to
 
 Decorators
 ----------
