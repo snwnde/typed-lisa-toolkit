@@ -2,6 +2,33 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.2.0 - 2024-10-26
+#### Bug Fixes
+- type hinting for waveforms - (3fa78a1) - Senwen Deng
+- renamed cross-correlation - (20b9bd5) - Senwen Deng
+#### Documentation
+- minor update - (0da1cac) - Senwen Deng
+- add tutorial for sampling GB - (d6f9228) - Senwen Deng
+- add `extend_to` - (7d9434d) - Senwen Deng
+- add likelihood module documentation - (6409eae) - Senwen Deng
+- improve `get_cross_correlation` docstring - (11b7563) - Senwen Deng
+- add sensitivity - (581c1e9) - Senwen Deng
+#### Features
+- add `extend_to` utility function - (ff8e22b) - Senwen Deng
+- add likelihood - (3112c9f) - Senwen Deng
+- add Template protocol - (c132d53) - Senwen Deng
+- implemented sensitivity - (7d100ef) - Senwen Deng
+#### Refactoring
+- amend WhittleLikelihood - (0640b10) - Senwen Deng
+- rename FDTemplate to FSWaveformGen - (80405aa) - Senwen Deng
+- redesign `get_noise_psd` - (4d71b93) - Senwen Deng
+#### Tests
+- add test_likelihood.py - (d42f056) - Senwen Deng
+- minor fix - (59dbfd9) - Senwen Deng
+- add test_sensitivity.py - (b7fb088) - Senwen Deng
+
+- - -
+
 ## 0.1.0 - 2024-10-22
 #### Bug Fixes
 - improve the signature of `load_ldc_data` - (49f9ca3) - Senwen Deng
