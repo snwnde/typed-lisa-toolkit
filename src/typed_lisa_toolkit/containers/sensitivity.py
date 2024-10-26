@@ -47,7 +47,9 @@ def _collect_frequencies(data: data_.FSData):
 class FDNoiseModel(Protocol):
     """Protocol for frequency domain noise models."""
 
-    def psd(self, *args, option: ChnName, **kwargs) -> npt.NDArray[np.floating]:
+    def psd(
+        self, frequencies: npt.NDArray[np.floating], option: ChnName
+    ) -> npt.NDArray[np.floating]:
         """Return the power spectral density (PSD)."""
 
 

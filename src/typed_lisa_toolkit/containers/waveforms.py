@@ -49,8 +49,11 @@ WaveformInMode = TypeVar("WaveformInMode", bound=representations.Representation)
 this type are used to represent the signal of a waveform in a specific
 mode."""
 
-WaveformInChannel = Mapping[tuple[int, ...], WaveformInMode]
-Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[WaveformInMode]]
+ModeT = TypeVar("ModeT", bound=tuple[int, ...])
+"""Invariant type variable for mode tuples."""
+
+WaveformInChannel = Mapping[ModeT, WaveformInMode]
+Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[ModeT, WaveformInMode]]
 FormattedWaveformInChannel = arithdicts.ModeDict[
     modes.Harmonic | modes.QNM, WaveformInMode
 ]
@@ -61,13 +64,14 @@ FrequencyModeDict = arithdicts.ModeDict[
 
 
 def _format_waveform_in_channel(
-    wf: WaveformInChannel[WaveformInMode] | FormattedWaveformInChannel[WaveformInMode],
+    wf: WaveformInChannel[ModeT, WaveformInMode]
+    | FormattedWaveformInChannel[WaveformInMode],
 ) -> FormattedWaveformInChannel[WaveformInMode]:
     return arithdicts.ModeDict({modes.cast_mode(k): v for k, v in wf.items()})
 
 
 def format(
-    wf: Waveform[WaveformInMode] | FormattedWaveform[WaveformInMode],
+    wf: Waveform[ModeT, WaveformInMode],
 ) -> FormattedWaveform[WaveformInMode]:
     """Format a waveform.
 
@@ -80,8 +84,7 @@ def format(
 
 
 def to_fsdata(
-    wf: Waveform[representations.FrequencySeries[NPFloatingT, NPNumberT]]
-    | FormattedWaveform[representations.FrequencySeries[NPFloatingT, NPNumberT]],
+    wf: Waveform[ModeT, representations.FrequencySeries[NPFloatingT, NPNumberT]],
 ) -> data.FSData[NPFloatingT, NPNumberT]:
     """Convert :class:`.Waveform` to :class:`.data.FSData`.
 
@@ -91,7 +94,7 @@ def to_fsdata(
     """
 
     def _sum_modes(
-        wf: WaveformInChannel[WaveformInMode]
+        wf: WaveformInChannel[ModeT, WaveformInMode]
         | FormattedWaveformInChannel[WaveformInMode],
     ):
         # Sum the contributions of all modes in each channel
