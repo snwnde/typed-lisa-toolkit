@@ -10,6 +10,7 @@ Types
 
 .. autoclass:: NPFloatingT
 .. autoclass:: NPNumberT
+.. autoclass:: ModeT
 .. autoclass:: WaveformInMode
 .. autoclass:: WaveformInChannel
 .. autoclass:: Waveform
