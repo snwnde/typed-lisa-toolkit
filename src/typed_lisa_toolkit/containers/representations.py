@@ -325,7 +325,7 @@ class FrequencySeries(
 
     def to_phasor(self) -> Phasor:
         """Get the :class:`.Phasor` representation of the waveform."""
-        return Phasor(self.frequencies, self.entries)
+        return Phasor(self.frequencies, self.entries.astype(np.complexfloating))
 
     def _get_plotter(self):
         from ..viz import plotters
@@ -366,7 +366,10 @@ class TimeSeries(
 
 
 @dc.dataclass(slots=True, frozen=True)
-class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
+class Phasor(
+    FrequencySeries[NPFloatingT, np.complexfloating[NPTBitT, NPTBitT]],
+    Generic[NPFloatingT, NPTBitT],
+):
     """Phasor representation. Subclass of :class:`.FrequencySeries`.
 
     A phasor is a couple of amplitude and phase that represent a complex number.
@@ -380,13 +383,12 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
     def make(
         cls,
         frequencies: npt.NDArray[NPFloatingT],
-        amplitudes: npt.NDArray[np.floating],
-        phases: npt.NDArray[np.floating],
+        amplitudes: npt.NDArray[np.floating[NPTBitT]],
+        phases: npt.NDArray[np.floating[NPTBitT]],
     ) -> Self:
         """Create a phasor sequence."""
         cplx = cls.phasor_to_cplx(amplitudes, phases)
-        return cls(frequencies, cplx)  # type: ignore
-        # The returned type depends on the type of the input arrays.
+        return cls(frequencies, cplx)
 
     @staticmethod
     def reim_to_cplx(
@@ -449,7 +451,9 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
         phases = interpolator(self.frequencies, self.phases)(frequencies)
         return self.make(frequencies, amplitudes, phases)
 
-    def to_freq_series(self) -> FrequencySeries[NPFloatingT, np.complexfloating]:
+    def to_freq_series(
+        self,
+    ) -> FrequencySeries[NPFloatingT, np.complexfloating[NPTBitT, NPTBitT]]:
         """Get the :class:`.FrequencySeries` representation of the waveform."""
         return FrequencySeries(
             self.frequencies,
