@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.2.1 - 2024-10-28
+#### Bug Fixes
+- do not use trim_interp - (e7f614b) - Senwen Deng
+#### Documentation
+- update waveforms - (6641548) - Senwen Deng
+
+- - -
+
 ## 0.2.0 - 2024-10-26
 #### Bug Fixes
 - type hinting for waveforms - (3fa78a1) - Senwen Deng
