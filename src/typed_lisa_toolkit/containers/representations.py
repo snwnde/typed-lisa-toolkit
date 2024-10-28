@@ -95,8 +95,10 @@ NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
 NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
 """Numpy bit data type."""
 
-TaperT = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
-Interpolator = utils.Interpolator
+ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
+TaperT = ArrayFunc
+Interpolator = Callable[[npt.NDArray[np.floating], npt.NDArray[np.floating]], ArrayFunc]
+
 
 @dc.dataclass(slots=True, frozen=True)
 class Representation(Generic[NPFloatingT, NPNumberT_co]):
@@ -238,6 +240,7 @@ class _Series(
         plotter = self._get_plotter()
         return plotter(self).draw(**kwargs)
 
+
 @dc.dataclass(slots=True, frozen=True)
 class FrequencySeries(
     _Series[NPFloatingT, NPNumberT_co], Generic[NPFloatingT, NPNumberT_co]
@@ -326,6 +329,7 @@ class FrequencySeries(
 
     def _get_plotter(self):
         from ..viz import plotters
+
         return plotters.FSPlotter
 
 
@@ -357,6 +361,7 @@ class TimeSeries(
 
     def _get_plotter(self):
         from ..viz import plotters
+
         return plotters.TSPlotter
 
 
@@ -440,9 +445,7 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
         The interpolation is done only within the support of the amplitudes.
         Outside the support, the interpolated values for amplitudes are set to zero.
         """
-        amplitudes = utils.trim_interp(interpolator)(self.frequencies, self.amplitudes)(
-            frequencies
-        )
+        amplitudes = interpolator(self.frequencies, self.amplitudes)(frequencies)
         phases = interpolator(self.frequencies, self.phases)(frequencies)
         return self.make(frequencies, amplitudes, phases)
 
@@ -455,4 +458,5 @@ class Phasor(FrequencySeries[NPFloatingT, NPNumberT_co]):
 
     def _get_plotter(self):
         from ..viz import plotters
+
         return plotters.PhasorPlotter
