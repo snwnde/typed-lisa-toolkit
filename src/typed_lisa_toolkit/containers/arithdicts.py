@@ -211,6 +211,11 @@ class ArithDict(UserDict[KT, ArithT]):
             {key: self[key] for key in self.keys() if key not in keys}
         )
 
+    def sum(self) -> ArithT:
+        """Return the sum of all the values in the dictionary."""
+        _sum = sum(self.values(), self._get_null_value())
+        return _sum
+
 
 class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
     """A dictionary of modes."""
@@ -229,11 +234,6 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
         # Otherwise, it is a sequence of modes
         keys = cast(Sequence[ModeT], keys)
         return list(keys)
-
-    def sum(self) -> ArithT:
-        """Return the sum of all the values in the dictionary."""
-        _sum = sum(self.values(), self._get_null_value())
-        return _sum
 
 
 class ChannelDict(ArithDict[ChnName, ArithT], Generic[ArithT]):
