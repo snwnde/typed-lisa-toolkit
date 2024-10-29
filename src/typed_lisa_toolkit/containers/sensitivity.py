@@ -27,6 +27,7 @@ from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
+import scipy.integrate  # type: ignore
 
 from . import arithdicts
 from . import representations as reps
@@ -65,6 +66,18 @@ class FDSensitivity(Sensitivity):
     class might not be suitable for non-stationary noise.
 
     """
+
+    def __init__(
+        self,
+        integrator=scipy.integrate.trapezoid,
+        cumulative_integrator=scipy.integrate.cumulative_trapezoid,
+    ) -> None:
+        self.integrator = integrator
+        self.cumulative_integrator = cumulative_integrator
+
+    def create_new(self, integrator, cumulative_integrator):
+        """Return a new instance of the class with the given integrators."""
+        return type(self)(integrator, cumulative_integrator)
 
     @classmethod
     def make(
@@ -144,7 +157,7 @@ class FDSensitivity(Sensitivity):
         """
         integrand = self.get_integrand(left, right)
         _dict = {
-            chnname: np.trapezoid(series.entries, x=series.frequencies)
+            chnname: self.integrator(series.entries, x=series.frequencies)
             for chnname, series in integrand.items()
         }
         return arithdicts.ChannelDict(_dict)  # type: ignore
@@ -179,15 +192,7 @@ class FDSensitivity(Sensitivity):
         ) -> npt.NDArray[np.complexfloating]:
             series = integrand[chname]
 
-            try:
-                import scipy.integrate  # type: ignore
-                # scipy stubs issue
-            except ImportError as e:
-                raise ImportError(
-                    "scipy is required for cumulative trapezoidal integration."
-                ) from e
-
-            return scipy.integrate.cumulative_trapezoid(
+            return self.cumulative_integrator(
                 series.entries, x=series.frequencies, initial=0
             )
 
@@ -344,12 +349,20 @@ class FDSensitivity(Sensitivity):
         subset of it, without calling the noise model again.
         """
         noise_psd = self.get_noise_psd(_collect_frequencies(data))
-        return _CacheSensitivity(noise_cache=noise_psd)
+        return _CacheSensitivity(
+            noise_cache=noise_psd,
+            integrator=self.integrator,
+            cumulative_integrator=self.cumulative_integrator,
+        )
 
 
 class _NoiseModelSensitivity(FDSensitivity):
-    def __init__(self, noise_model: FDNoiseModel) -> None:
+    def __init__(self, noise_model: FDNoiseModel, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.noise_model = noise_model
+
+    def create_new(self, integrator, cumulative_integrator):
+        return type(self)(self.noise_model, integrator, cumulative_integrator)
 
     def get_noise_psd(
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data_.NPFloatingT]]
@@ -364,8 +377,12 @@ class _NoiseModelSensitivity(FDSensitivity):
 
 
 class _CacheSensitivity(FDSensitivity):
-    def __init__(self, noise_cache: data_.FSData) -> None:
+    def __init__(self, noise_cache: data_.FSData, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.noise_cache = noise_cache
+
+    def create_new(self, integrator, cumulative_integrator):
+        return type(self)(self.noise_cache, integrator, cumulative_integrator)
 
     def get_noise_psd(
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data_.NPFloatingT]]
