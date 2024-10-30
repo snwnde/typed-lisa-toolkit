@@ -323,6 +323,7 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
     ):
         super().__init__(data)
         self.times = times
+        self.dt : np.floating = times[1] - times[0]
 
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=self.times)
