@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.2.2 - 2024-10-31
+#### Bug Fixes
+- warning message for `to_tsdata` - (eb70bf0) - Senwen Deng
+- behaviour of `_draw` - (5cffe83) - Senwen Deng
+- unwrap the angles for phasor - (e7d79e6) - Senwen Deng
+- add back `dt` attribute for TimedFSData - (fb32630) - Senwen Deng
+- promote `sum` method to `ArithDict` class - (4bb8da0) - Senwen Deng
+- type annotations for phasor - (1ee219c) - Senwen Deng
+#### Features
+- allow custom interpolators for sensitivity - (a66d873) - Senwen Deng
+
+- - -
+
 ## 0.2.1 - 2024-10-28
 #### Bug Fixes
 - do not use trim_interp - (e7f614b) - Senwen Deng
