@@ -213,7 +213,7 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         :class:`.FSData` | :class:`.TimedFSData`
             The frequency series data. If `keep_times` is `True`, the time grid is kept.
         """
-        fsdict = {chnname: chn.rfft(tapering=tapering) for chnname, chn in self.items()}
+        fsdict = {chnname: (chn * self.dt).rfft(tapering=tapering) for chnname, chn in self.items()}
         if keep_times:
             return TimedFSData(fsdict, times=self.times)
         return FSData(fsdict)
@@ -309,7 +309,7 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         if dt < nyquist_dt and not np.isclose(dt, nyquist_dt):
             warnings.warn("The time grid is denser than the Nyquist limit.")
         tsdict = {
-            chnname: chn.irfft(times, tapering=tapering)
+            chnname: (chn / dt).irfft(times, tapering=tapering)
             for chnname, chn in self.items()
         }
         return TSData(tsdict)
