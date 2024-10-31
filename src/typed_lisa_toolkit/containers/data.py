@@ -300,7 +300,7 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         dt: NPFloatingT = times[1] - times[0]
         nyquist_dt = 1 / (2 * self.frequencies[-1])
         if dt < nyquist_dt and not np.isclose(dt, nyquist_dt):
-            warnings.warn("The time grid is too coarse.")
+            warnings.warn("The time grid is denser than the Nyquist limit.")
         tsdict = {
             chnname: chn.irfft(times, tapering=tapering)
             for chnname, chn in self.items()
@@ -323,7 +323,7 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
     ):
         super().__init__(data)
         self.times = times
-        self.dt : np.floating = times[1] - times[0]
+        self.dt: np.floating = times[1] - times[0]
 
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=self.times)
