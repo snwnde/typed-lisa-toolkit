@@ -241,9 +241,22 @@ class _Series(
         raise NotImplementedError("The method must be implemented in the subclass.")
 
     def draw(self, **kwargs):
-        """Plot the series."""
+        """Plot the series.
+        
+        This method provides an informative visual representation
+        of the series.
+        """
         plotter = self._get_plotter()
         return plotter(self).draw(**kwargs)
+    
+    def plot(self, **kwargs):
+        """Plot the series.
+        
+        Different from :meth:`.draw`, this method accept an
+        already created axis as argument and plot on it.
+        """
+        plotter = self._get_plotter()
+        return plotter(self).plot(**kwargs)
 
 
 @dc.dataclass(slots=True, frozen=True)

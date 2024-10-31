@@ -292,12 +292,7 @@ class _SeriesDataPlotter(abc.ABC):
     ) -> plt.Figure:
         chn_num = len(self.data.channel_names)
 
-        fig_ = kwargs.pop("fig", None)
-        ax_ = kwargs.pop("ax", None)
-        if fig_ is None and ax_ is None:
-            fig, axs = plt.subplots(chn_num, sharex=True)
-        else:
-            fig, axs = fig_, ax_
+        fig, axs = plt.subplots(chn_num, sharex=True)
 
         # If only one channel, axs is not a list
         try:
