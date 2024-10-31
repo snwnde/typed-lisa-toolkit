@@ -257,7 +257,7 @@ class FrequencySeries(
     def _angle(
         complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
     ) -> npt.NDArray[np.floating[NPTBitT]]:
-        return np.angle(complex_numbers)
+        return np.unwrap(np.angle(complex_numbers), period=2 * np.pi)
 
     @staticmethod
     def _real(
