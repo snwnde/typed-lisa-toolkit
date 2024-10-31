@@ -106,6 +106,13 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         }
         return self.create_new(series_dict)
 
+    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
+        """Return the embedded data."""
+        series_dict = {
+            chnname: chn.get_embedded(embedding_grid) for chnname, chn in self.items()
+        }
+        return self.create_new(series_dict)
+
     def _get_plotter(self) -> type[plotters._SeriesDataPlotter]:
         """Return the plotter class."""
         raise NotImplementedError("The method must be implemented in the subclass.")

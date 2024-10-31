@@ -232,6 +232,11 @@ class _Series(
         mask = utils.get_subset_slice(self.grid, interval[0], interval[1])
         return type(self)(grid=self.grid[mask], entries=self.entries[mask])
 
+    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
+        """Return the series embedded in a new grid."""
+        entries = utils.extend_to(embedding_grid)(self.grid, self.entries)
+        return type(self)(grid=embedding_grid, entries=entries)
+
     def _get_plotter(self) -> type[plotters._SeriesPlotter]:
         raise NotImplementedError("The method must be implemented in the subclass.")
 
