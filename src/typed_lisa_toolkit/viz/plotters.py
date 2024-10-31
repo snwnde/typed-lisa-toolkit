@@ -291,7 +291,22 @@ class _SeriesDataPlotter(abc.ABC):
         self, plotter: type[_SeriesPlotter], set_legend: bool = False, **kwargs
     ) -> plt.Figure:
         chn_num = len(self.data.channel_names)
-        fig, axs = plt.subplots(chn_num, sharex=True)
+
+        fig_ = kwargs.pop("fig", None)
+        ax_ = kwargs.pop("ax", None)
+        if fig_ is None and ax_ is None:
+            fig, axs = plt.subplots(chn_num, sharex=True)
+        else:
+            fig, axs = fig_, ax_
+
+        # If only one channel, axs is not a list
+        try:
+            axs[0]
+        except TypeError:
+            axs = [axs]
+
+        label = kwargs.pop("label", self.data.name)
+
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == chn_num - 1 else False
             plotter(self.data[chnname]).plot(
@@ -299,7 +314,7 @@ class _SeriesDataPlotter(abc.ABC):
                 set_xlabel=xlabel_bool,
                 set_ylabel=True,
                 set_legend=set_legend,
-                label=self.data.name,
+                label=label,
                 ylabel=f"{chnname}",
                 **kwargs,
             )
