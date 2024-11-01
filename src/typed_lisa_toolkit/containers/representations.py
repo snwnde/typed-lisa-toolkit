@@ -461,13 +461,7 @@ class Phasor(
         frequencies: npt.NDArray[NPFloatingT],
         interpolator: Interpolator,
     ):
-        """Get the phasors interpolated to the given frequencies.
-
-        Note
-        ----
-        The interpolation is done only within the support of the amplitudes.
-        Outside the support, the interpolated values for amplitudes are set to zero.
-        """
+        """Get the phasors interpolated to the given frequencies."""
         amp_real, amp_imag = self.cplx_to_reim(self.amplitudes)
         amplitudes_real = interpolator(self.frequencies, amp_real)(frequencies)
         amplitudes_imag = interpolator(self.frequencies, amp_imag)(frequencies)
