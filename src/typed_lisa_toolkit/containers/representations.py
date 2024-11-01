@@ -181,13 +181,18 @@ class _Series(
         """
         return self.grid[1] - self.grid[0]
 
+    def _guard_binary_op(self, other):
+        del other
+
     def __mul_series__(self, other: _Series[NPFloatingT, np.number]):
         """Multiply two series."""
+        self._guard_binary_op(other)
         return self.create_like(self.entries * other.entries)
 
     def __mul__(self, other: _Series[NPFloatingT, np.number] | Numeric):  # type: ignore
         # We violate the Liskov Substitution Principle on purpose here.
         """Multiply a series by another series, a number or a numeric array."""
+        self._guard_binary_op(other)
         if isinstance(other, _Series):
             return self.__mul_series__(other)
         return self.__mul_num__(other)
@@ -195,6 +200,7 @@ class _Series(
     def __truediv__(self, other: _Series[NPFloatingT, np.number] | Numeric):  # type: ignore
         # We violate the Liskov Substitution Principle on purpose here.
         """Divide a series by another series, a number or a numeric array."""
+        self._guard_binary_op(other)
         if isinstance(other, _Series):
             return self.create_like(self.entries / other.entries)
         return self.create_like(self.entries / other)
@@ -208,6 +214,7 @@ class _Series(
         one grid is a subset of the other grid. The resulting series will have
         the grid of the longer series.
         """
+        self._guard_binary_op(other)
         if len(self.grid) < len(other.grid):
             return other + self
         _slice = utils.get_subset_slice(self.grid, other.grid[0], other.grid[-1])
@@ -324,10 +331,6 @@ class FrequencySeries(
             self.entries * np.exp(-2j * np.pi * self.frequencies * shift)
         )
 
-    def to_phasor(self) -> Phasor:
-        """Get the :class:`.Phasor` representation of the waveform."""
-        return Phasor(self.frequencies, self.entries.astype(np.complexfloating))
-
     def get_plotter(self) -> plotters.FSPlotter:
         """Return the plotter for the series."""
         from ..viz import plotters
@@ -380,18 +383,44 @@ class Phasor(
     can be used to represent a waveform. This representation is useful for
     interpolating waveforms generated on a sparse grid of frequencies to a dense
     grid of frequencies.
+
+    The input phases are expected to be smooth, without zigzags, so as the real
+    and imaginary parts of the amplitudes. This is crucial for the interpolation
+    to work properly.
+
+    Note
+    ----
+
+    The so-called amplitude is itself complex number in general.
+    The attribute :attr:`.amplitudes` gives the complex amplitudes,
+    while the method :meth:`.abs` gives the absolute values of the amplitudes.
+    Similarly, the attribute :attr:`.phases` gives the phases of the phasors
+    as input, while the method :meth:`.angle` gives the angles of the full
+    complex numbers as their argument.
     """
+
+    phases: npt.NDArray[np.floating[NPTBitT]]
 
     @classmethod
     def make(
         cls,
         frequencies: npt.NDArray[NPFloatingT],
-        amplitudes: npt.NDArray[np.floating[NPTBitT]],
+        amplitudes: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
         phases: npt.NDArray[np.floating[NPTBitT]],
-    ) -> Self:
-        """Create a phasor sequence."""
-        cplx = cls.phasor_to_cplx(amplitudes, phases)
-        return cls(frequencies, cplx)
+    ) -> Phasor:
+        """Create a phasor from amplitudes and phases."""
+        entries = cls.phasor_to_cplx(amplitudes, phases)
+        return cls(grid=frequencies, entries=entries, phases=phases)
+
+    def _guard_binary_op(self, other):
+        if isinstance(other, Phasor):
+            raise ValueError("Binary operations between phasors are not supported.")
+
+    def create_like(self, entries: npt.NDArray[np.number]):
+        """Create a new series with the same grid as the current one."""
+        # We ignore the type check below since we know that the new entries
+        # could have a different data type than the current entries.
+        return type(self)(grid=self.grid, entries=entries, phases=self.phases)  # type: ignore
 
     @staticmethod
     def reim_to_cplx(
@@ -402,47 +431,36 @@ class Phasor(
         return real_parts + 1j * imag_parts
 
     @staticmethod
-    def cplx_to_phasor(
+    def cplx_to_reim(
         complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
     ) -> tuple[npt.NDArray[np.floating[NPTBitT]], npt.NDArray[np.floating[NPTBitT]]]:
-        """Convert complex numbers to phasors."""
-        return Phasor._abs(complex_numbers), Phasor._angle(complex_numbers)
+        """Convert complex numbers to real and imaginary parts."""
+        return np.real(complex_numbers), np.imag(complex_numbers)
 
     @staticmethod
     def phasor_to_cplx(
-        amplitudes: npt.NDArray[np.floating[NPTBitT]],
+        amplitudes: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
         phases: npt.NDArray[np.floating[NPTBitT]],
     ) -> npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]]:
         """Convert phasors to complex numbers."""
         return amplitudes * np.exp(1j * phases)
 
-    @staticmethod
-    def reim_to_phasor(
-        real_parts: npt.NDArray[np.floating[NPTBitT]],
-        imag_parts: npt.NDArray[np.floating[NPTBitT]],
-    ) -> tuple[npt.NDArray[np.floating[NPTBitT]], npt.NDArray[np.floating[NPTBitT]]]:
-        """Convert real and imaginary parts to phasors."""
-        return Phasor.cplx_to_phasor(Phasor.reim_to_cplx(real_parts, imag_parts))
-
     @property
     def amplitudes(self):
-        """The amplitudes of the phasors."""
-        return self._abs(self.entries)
+        """The amplitudes of the phasors.
 
-    @property
-    def phases(self):
-        """The phases of the phasors."""
-        return self._angle(self.entries)
+        Note
+        ----
 
-    def __repr__(self) -> str:
-        """Return the string representation of the phasor."""
-        return f"{self.__class__.__name__}(frequencies={self.frequencies}, amplitudes={self.amplitudes}, phases={self.phases})"
+        The amplitudes are complex numbers in general.
+        """
+        return self.entries * np.exp(-1j * self.phases)
 
     def get_interpolated(
         self,
         frequencies: npt.NDArray[NPFloatingT],
         interpolator: Interpolator,
-    ) -> Self:
+    ):
         """Get the phasors interpolated to the given frequencies.
 
         Note
@@ -450,18 +468,27 @@ class Phasor(
         The interpolation is done only within the support of the amplitudes.
         Outside the support, the interpolated values for amplitudes are set to zero.
         """
-        amplitudes = interpolator(self.frequencies, self.amplitudes)(frequencies)
+        amp_real, amp_imag = self.cplx_to_reim(self.amplitudes)
+        amplitudes_real = interpolator(self.frequencies, amp_real)(frequencies)
+        amplitudes_imag = interpolator(self.frequencies, amp_imag)(frequencies)
+        amplitudes = self.reim_to_cplx(amplitudes_real, amplitudes_imag)
         phases = interpolator(self.frequencies, self.phases)(frequencies)
-        return self.make(frequencies, amplitudes, phases)
+        return type(self).make(frequencies, amplitudes, phases)
 
-    def to_freq_series(
+    def to_frequency_series(
         self,
     ) -> FrequencySeries[NPFloatingT, np.complexfloating[NPTBitT, NPTBitT]]:
         """Get the :class:`.FrequencySeries` representation of the waveform."""
         return FrequencySeries(
             self.frequencies,
-            self.phasor_to_cplx(self.amplitudes, self.phases),
+            self.entries,
         )
+
+    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
+        """Return the series embedded in a new grid."""
+        entries = utils.extend_to(embedding_grid)(self.grid, self.entries)
+        phases = utils.extend_to(embedding_grid)(self.grid, self.phases)
+        return type(self)(grid=embedding_grid, entries=entries, phases=phases)
 
     def get_plotter(self) -> plotters.PhasorPlotter:
         """Return the plotter for the phasor."""

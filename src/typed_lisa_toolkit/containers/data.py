@@ -213,7 +213,10 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         :class:`.FSData` | :class:`.TimedFSData`
             The frequency series data. If `keep_times` is `True`, the time grid is kept.
         """
-        fsdict = {chnname: (chn * self.dt).rfft(tapering=tapering) for chnname, chn in self.items()}
+        fsdict = {
+            chnname: (chn * self.dt).rfft(tapering=tapering)
+            for chnname, chn in self.items()
+        }
         if keep_times:
             return TimedFSData(fsdict, times=self.times)
         return FSData(fsdict)
@@ -252,6 +255,20 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
     """Dictionary data container of frequency series data."""
 
     _series_type = representations.FrequencySeries
+
+    def __init__(
+        self,
+        data: Mapping[str, representations.FrequencySeries[NPFloatingT, NPNumberT]],
+        name: str | None = None,
+    ):
+        def sieve(chn: representations.FrequencySeries):
+            if isinstance(chn, representations.Phasor):
+                return chn.to_frequency_series()
+            return chn
+
+        dict_ = {chnname: sieve(chn) for chnname, chn in data.items()}
+
+        super().__init__(dict_, name)
 
     @property
     def frequencies(self) -> npt.NDArray[NPFloatingT]:
