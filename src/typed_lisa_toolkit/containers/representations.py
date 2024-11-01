@@ -237,26 +237,9 @@ class _Series(
         entries = utils.extend_to(embedding_grid)(self.grid, self.entries)
         return type(self)(grid=embedding_grid, entries=entries)
 
-    def _get_plotter(self) -> type[plotters._SeriesPlotter]:
-        raise NotImplementedError("The method must be implemented in the subclass.")
-
-    def draw(self, **kwargs):
-        """Plot the series.
-        
-        This method provides an informative visual representation
-        of the series.
-        """
-        plotter = self._get_plotter()
-        return plotter(self).draw(**kwargs)
-    
-    def plot(self, **kwargs):
-        """Plot the series.
-        
-        Different from :meth:`.draw`, this method accept an
-        already created axis as argument and plot on it.
-        """
-        plotter = self._get_plotter()
-        return plotter(self).plot(**kwargs)
+    def get_plotter(self):
+        """Return the plotter for the series."""
+        raise NotImplementedError("This method needs to be implemented in subclasses.")
 
 
 @dc.dataclass(slots=True, frozen=True)
@@ -345,10 +328,11 @@ class FrequencySeries(
         """Get the :class:`.Phasor` representation of the waveform."""
         return Phasor(self.frequencies, self.entries.astype(np.complexfloating))
 
-    def _get_plotter(self):
+    def get_plotter(self) -> plotters.FSPlotter:
+        """Return the plotter for the series."""
         from ..viz import plotters
 
-        return plotters.FSPlotter
+        return plotters.FSPlotter(self)
 
 
 @dc.dataclass(slots=True, frozen=True)
@@ -377,10 +361,11 @@ class TimeSeries(
             entries=np.fft.rfft(self.entries * tapering_window),
         )
 
-    def _get_plotter(self):
+    def get_plotter(self) -> plotters.TSPlotter:
+        """Return the plotter for the series."""
         from ..viz import plotters
 
-        return plotters.TSPlotter
+        return plotters.TSPlotter(self)
 
 
 @dc.dataclass(slots=True, frozen=True)
@@ -478,7 +463,8 @@ class Phasor(
             self.phasor_to_cplx(self.amplitudes, self.phases),
         )
 
-    def _get_plotter(self):
+    def get_plotter(self) -> plotters.PhasorPlotter:
+        """Return the plotter for the phasor."""
         from ..viz import plotters
 
-        return plotters.PhasorPlotter
+        return plotters.PhasorPlotter(self)

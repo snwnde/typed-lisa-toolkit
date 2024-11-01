@@ -241,14 +241,43 @@ class FSPlotter(_SeriesPlotter):
             ax.legend(**_legend_kwargs)
         return ax
 
+    def plot_angle(
+        self,
+        ax: plt.Axes,
+        set_xlabel: bool = False,
+        set_ylabel: bool = False,
+        set_legend: bool = False,
+        **kwargs,
+    ) -> plt.Axes:
+        """Plot the angle of the series on the provided Axes."""
+        _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
+        angle = self.series.angle().entries
+        ax.semilogx(self.series.grid, angle, **_kwargs)
+        if set_xlabel:
+            ax.set_xlabel("Frequency [Hz]")
+        if set_ylabel:
+            ax.set_ylabel("Angle [rad]")
+        if set_legend:
+            _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
+            ax.legend(**_legend_kwargs)
+        return ax
+
+    def draw(self, **kwargs) -> plt.Figure:
+        """Draw the representation on a figure."""
+        fig, axs = plt.subplots(2, sharex=True)
+        amp_ax, phase_ax = axs[0], axs[1]
+        self.plot(amp_ax, set_xlabel=False, set_ylabel=True, **kwargs)
+        self.plot_angle(phase_ax, set_xlabel=True, set_ylabel=True, **kwargs)
+        return fig
+
 
 class PhasorPlotter(FSPlotter):
     """Plotter for :class:`.containers.representations.Phasor`."""
 
     series: representations.Phasor
 
-    def __init__(self, series: representations.FrequencySeries) -> None:
-        self.series = series.to_phasor()
+    def __init__(self, series: representations.Phasor) -> None:
+        self.series = series
 
     def plot_phase(
         self,
@@ -256,15 +285,12 @@ class PhasorPlotter(FSPlotter):
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
-        unwrap: bool = False,
         **kwargs,
     ) -> plt.Axes:
         """Plot the phase of the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
-        _phases = self.series.phases
-        if unwrap:
-            _phases = np.unwrap(_phases, np.pi)
-        ax.semilogx(self.series.grid, _phases, **_kwargs)
+        phases = self.series.phases
+        ax.semilogx(self.series.grid, phases, **_kwargs)
         if set_xlabel:
             ax.set_xlabel("Frequency [Hz]")
         if set_ylabel:
@@ -273,14 +299,6 @@ class PhasorPlotter(FSPlotter):
             _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
             ax.legend(**_legend_kwargs)
         return ax
-
-    def draw(self, **kwargs) -> plt.Figure:
-        """Draw the phasor representation on a figure."""
-        fig, axs = plt.subplots(2, sharex=True)
-        amp_ax, phase_ax = axs[0], axs[1]
-        self.plot(amp_ax, set_xlabel=False, set_ylabel=True, **kwargs)
-        self.plot_phase(phase_ax, set_xlabel=True, set_ylabel=True, **kwargs)
-        return fig
 
 
 class _SeriesDataPlotter(abc.ABC):
@@ -371,7 +389,7 @@ class TSDataPlotter(_SeriesDataPlotter):
 class FSDataPlotter(_SeriesDataPlotter):
     """Plotter for :class:`.containers.data.FSData`."""
 
-    def _draw_phasor(self, set_legend: bool = False, **kwargs) -> plt.Figure:
+    def _draw_angle(self, set_legend: bool = False, **kwargs) -> plt.Figure:
         chn_num = len(self.data.channel_names)
         fig, axs = plt.subplots(2 * chn_num, sharex=True)
         for idx, chnname in enumerate(self.data.channel_names):
@@ -388,7 +406,7 @@ class FSDataPlotter(_SeriesDataPlotter):
                 ylabel=f"{chnname} Amplitude",
                 **kwargs,
             )
-            plotter.plot_phase(
+            plotter.plot_angle(
                 axs[phase_idx],
                 set_xlabel=xlabel_bool,
                 set_ylabel=True,
@@ -398,7 +416,7 @@ class FSDataPlotter(_SeriesDataPlotter):
             )
         return fig
 
-    def _compare_phasor(self, other: Self, **kwargs) -> plt.Figure:
+    def _compare_angle(self, other: Self, **kwargs) -> plt.Figure:
         chn_num = len(self.data.channel_names)
         fig, axs = plt.subplots(4 * chn_num, sharex=True)
         for idx, chnname in enumerate(self.data.channel_names):
@@ -457,15 +475,15 @@ class FSDataPlotter(_SeriesDataPlotter):
         return fig
 
     def draw(
-        self, set_legend: bool = False, phasor: bool = False, **kwargs
+        self, set_legend: bool = False, angle: bool = False, **kwargs
     ) -> plt.Figure:
         """Draw the frequency series data."""
-        if not phasor:
+        if not angle:
             return self._draw(plotter=FSPlotter, set_legend=set_legend, **kwargs)
-        return self._draw_phasor(set_legend=set_legend, **kwargs)
+        return self._draw_angle(set_legend=set_legend, **kwargs)
 
-    def compare(self, other: Self, phasor: bool = False, **kwargs) -> plt.Figure:
+    def compare(self, other: Self, angle: bool = False, **kwargs) -> plt.Figure:
         """Compare two frequency series data."""
-        if not phasor:
+        if not angle:
             return self._compare(plotter=FSPlotter, other=other, **kwargs)
-        return self._compare_phasor(other=other, **kwargs)
+        return self._compare_angle(other=other, **kwargs)
