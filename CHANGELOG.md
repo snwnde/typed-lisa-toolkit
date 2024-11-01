@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.2.3 - 2024-11-01
+#### Bug Fixes
+- correct phasor representation - (3033cd9) - Senwen Deng
+- improved series plotting - (c242bef) - Senwen Deng
+- correct `to_tsdata` and `to_fsdata` - (2df64fb) - Senwen Deng
+- align with the design purpose for `draw` & `plot` - (2154d3e) - Senwen Deng
+#### Features
+- add `get_embedded` - (8fac2cb) - Senwen Deng
+#### Tests
+- adapt for phasor - (4dded23) - Senwen Deng
+
+- - -
+
 ## 0.2.2 - 2024-10-31
 #### Bug Fixes
 - warning message for `to_tsdata` - (eb70bf0) - Senwen Deng
