@@ -97,6 +97,11 @@ class ArithDict(UserDict[KT, ArithT]):
         """Create a new instance of the class."""
         return type(self)(data)
 
+    @property
+    def _cls_binary_op(self):
+        """Return the class to check before some binary operations."""
+        return type(self)
+
     def __mul_arithdict__(self, other: ArithDict[KT, ArithTb]):
         """Multiply two ArithDicts."""
         return self.create_new({k: self[k] * other[k] for k in self.keys()})
@@ -106,13 +111,8 @@ class ArithDict(UserDict[KT, ArithT]):
         return self.create_new({k: self[k] * value for k in self.keys()})
 
     def __mul__(self, other: ArithTb):  # noqa: D105
-        if isinstance(other, ArithDict):
-            try:
-                return self.__mul_arithdict__(other)
-            except KeyError as ke:
-                log.debug(
-                    f"Trying to multiply {self} by {other} as two ArithDict. Got KeyError: {ke}"
-                )
+        if isinstance(other, self._cls_binary_op):
+            return self.__mul_arithdict__(other)
         try:
             return self.__mul_value__(other)
         except TypeError as e:
@@ -124,12 +124,12 @@ class ArithDict(UserDict[KT, ArithT]):
 
     def __truediv__(self, other: ArithTb):
         """Divide an arithmetic dictionary by another arithmetic dictionary or an object of its value type."""
+        if isinstance(other, self._cls_binary_op):
+            return self.create_new({k: self[k] / other[k] for k in self.keys()})
         try:
             return self.create_new({k: self[k] / other for k in self.keys()})
-        except TypeError:
-            if isinstance(other, ArithDict):
-                return self.create_new({k: self[k] / other[k] for k in self.keys()})
-        raise TypeError(f"Cannot divide {type(self)} by {type(other)}")
+        except TypeError as e:
+            raise TypeError(f"Cannot divide {type(self)} by {type(other)}") from e
 
     def __rtruediv__(self, value: ArithTb):
         """Divide an arithmetic dictionary by an object of its value type."""
@@ -144,11 +144,8 @@ class ArithDict(UserDict[KT, ArithT]):
         return self.create_new({k: self[k] + value for k in self.keys()})
 
     def __add__(self, other: ArithTb):  # noqa: D105
-        if isinstance(other, ArithDict):
-            try:
-                return self.__add_arithdict__(other)
-            except KeyError:
-                pass
+        if isinstance(other, self._cls_binary_op):
+            return self.__add_arithdict__(other)
         try:
             return self.__add_value__(other)
         except TypeError as e:
@@ -221,6 +218,10 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
     """A dictionary of modes."""
 
     @property
+    def _cls_binary_op(self):
+        return ModeDict
+
+    @property
     def modes(self) -> tuple[ModeT, ...]:
         """Return the modes."""
         return tuple(self.keys())
@@ -238,6 +239,10 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
 
 class ChannelDict(ArithDict[ChnName, ArithT], Generic[ArithT]):
     """A dictionary of channels."""
+
+    @property
+    def _cls_binary_op(self):
+        return ChannelDict
 
     @property
     def channel_names(self) -> tuple[ChnName, ...]:
