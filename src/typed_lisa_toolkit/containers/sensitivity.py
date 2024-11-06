@@ -133,7 +133,7 @@ class FDSensitivity(Sensitivity):
             4\frac{d(f) h^*(f)}{S_n(f)}.
         """
         noise_psd = self.get_noise_psd(_collect_frequencies(left))
-        return 4 * right.conj() * left * (1 / noise_psd)
+        return 4 * left * (1 / noise_psd) * right.conj() 
 
     def get_complex_scalar_product(
         self,
