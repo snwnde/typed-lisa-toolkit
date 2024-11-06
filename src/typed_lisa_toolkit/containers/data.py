@@ -204,7 +204,7 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         return np.fft.rfftfreq(len(self.times), d=self.dt)
 
     def to_fsdata(
-        self, *, keep_times: bool = True, tapering: representations.TaperT | None = None
+        self, *, keep_times: bool = True, tapering: representations.Tapering | None = None
     ):
         """Return the frequency series data.
 
@@ -224,7 +224,7 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
     def get_zero_padded(
         self,
         pad_time: tuple[float, float],
-        tapering: representations.TaperT | None = None,
+        tapering: representations.Tapering | None = None,
     ) -> Self:
         """Return the zero-padded data."""
         pad_width = tuple(int(np.rint(time / self.dt)) for time in pad_time)
@@ -318,7 +318,7 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         self,
         times: npt.NDArray[np.floating],
         *,
-        tapering: representations.TaperT | None,
+        tapering: representations.Tapering | None,
     ):
         """Return the time series data."""
         dt: NPFloatingT = times[1] - times[0]
@@ -378,7 +378,7 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
         """Drop the time grid."""
         return FSData(self.data)
 
-    def to_tsdata(self, *, tapering: representations.TaperT | None = None):  # type: ignore
+    def to_tsdata(self, *, tapering: representations.Tapering | None = None):  # type: ignore
         # Indeed the signature of this subclass method is different from the superclass method.
         # This is intentional, as the subclass method is more specific. Ignoring the error.
         """Return the time series data."""

@@ -32,8 +32,8 @@ Types
 .. autoclass:: NPNumberT_co
 .. autoclass:: NPFloatingT
 .. autoclass:: NPTBitT
-.. autoclass:: TaperT
 .. autoclass:: Interpolator
+.. autoprotocol:: Tapering
 
 Entities
 --------
@@ -71,7 +71,7 @@ import abc
 from collections.abc import Callable
 import dataclasses as dc
 import logging
-from typing import TypeVar, Generic, Self, TYPE_CHECKING
+from typing import TypeVar, Generic, Self, Protocol, TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
@@ -96,8 +96,14 @@ NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
 """Numpy bit data type."""
 
 ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
-TaperT = ArrayFunc
 Interpolator = Callable[[npt.NDArray[np.floating], npt.NDArray[np.floating]], ArrayFunc]
+
+
+class Tapering(Protocol):
+    """Protocol for tapering functions."""
+
+    def __call__(self, __array: npt.NDArray[np.number]) -> npt.NDArray[np.floating]:
+        """Return the tapering window to apply on the array."""
 
 
 @dc.dataclass(slots=True, frozen=True)
@@ -312,7 +318,7 @@ class FrequencySeries(
         return self.create_like(self._imag(self.entries))
 
     def irfft(
-        self, time_grid: npt.NDArray[np.floating], tapering: TaperT | None = None
+        self, time_grid: npt.NDArray[np.floating], tapering: Tapering | None = None
     ):
         """Inverse real FFT of the series."""
         tapering_window = (
@@ -354,7 +360,7 @@ class TimeSeries(
         """The time step. Alias for :attr:`.resolution`."""
         return self.resolution
 
-    def rfft(self, tapering: TaperT | None = None):
+    def rfft(self, tapering: Tapering | None = None):
         """Fast Fourier transform of the series."""
         tapering_window = (
             tapering(self.times) if tapering is not None else np.ones_like(self.times)
