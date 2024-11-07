@@ -238,12 +238,25 @@ class _Series(
         """Return the square root of the series."""
         return self.create_like(np.sqrt(self.entries))
 
-    def get_subset(self, *, interval: tuple[float, float] | None = None) -> Self:
+    def get_subset(
+        self,
+        *,
+        interval: tuple[float, float] | None = None,
+        slice: slice | None = None,
+    ) -> Self:
         """Return the subset as a new instance."""
         if interval is None:
-            return self
-        mask = utils.get_subset_slice(self.grid, interval[0], interval[1])
-        return type(self)(grid=self.grid[mask], entries=self.entries[mask])
+            # Note that slice(None) is not None
+            if slice is None:
+                return self
+            # Otherwise we use the input slice
+        else:
+            if slice is not None:
+                raise ValueError(
+                    "Only one of `interval` and `slice` should be provided."
+                )
+            slice = utils.get_subset_slice(self.grid, interval[0], interval[1])
+        return type(self)(grid=self.grid[slice], entries=self.entries[slice])
 
     def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
         """Return the series embedded in a new grid."""

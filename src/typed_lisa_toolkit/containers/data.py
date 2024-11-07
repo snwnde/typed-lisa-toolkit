@@ -97,12 +97,13 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         """Return the grid."""
         return next(iter(self.values())).grid
 
-    def get_subset(self, *, interval: tuple[float, float] | None = None) -> Self:
+    def get_subset(
+        self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
+    ) -> Self:
         """Return the subset as a new instance."""
-        if interval is None:
-            return self
         series_dict = {
-            chnname: chn.get_subset(interval=interval) for chnname, chn in self.items()
+            chnname: chn.get_subset(interval=interval, slice=slice)
+            for chnname, chn in self.items()
         }
         return self.create_new(series_dict)
 
@@ -204,7 +205,10 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         return np.fft.rfftfreq(len(self.times), d=self.dt)
 
     def to_fsdata(
-        self, *, keep_times: bool = True, tapering: representations.Tapering | None = None
+        self,
+        *,
+        keep_times: bool = True,
+        tapering: representations.Tapering | None = None,
     ):
         """Return the frequency series data.
 
