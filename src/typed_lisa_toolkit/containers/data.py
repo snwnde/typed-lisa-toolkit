@@ -50,7 +50,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import logging
 import pathlib
-from typing import TypeVar, Generic, Self, TYPE_CHECKING, Literal
+from typing import TypeVar, Generic, Self, TYPE_CHECKING, Literal, overload
 import warnings
 
 import numpy as np
@@ -203,6 +203,22 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
     def get_frequencies(self) -> npt.NDArray[NPFloatingT]:
         """Return the frequencies grid matching the time grid."""
         return np.fft.rfftfreq(len(self.times), d=self.dt)
+
+    @overload
+    def to_fsdata(
+        self,
+        *,
+        keep_times: Literal[False],
+        tapering: representations.Tapering | None = None,
+    ) -> FSData: ...
+
+    @overload
+    def to_fsdata(
+        self,
+        *,
+        keep_times: Literal[True] = True,
+        tapering: representations.Tapering | None = None,
+    ) -> TimedFSData: ...
 
     def to_fsdata(
         self,
