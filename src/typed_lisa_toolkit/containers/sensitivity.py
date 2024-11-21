@@ -23,7 +23,7 @@ Entities
 
 import abc
 import logging
-from typing import Protocol
+from typing import Protocol, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -310,6 +310,12 @@ class FDSensitivity(Sensitivity):
             chnname: make_cross_correlation(chnname) for chnname in integrand.keys()
         }
         return arithdicts.ChannelDict(_dict)
+
+    @overload
+    def get_whitened(self, data: data_.TimedFSData) -> data_.TimedFSData: ...
+
+    @overload
+    def get_whitened(self, data: data_.FSData) -> data_.FSData: ...
 
     def get_whitened(self, data: data_.FSData):
         r"""Return the whitened data.
