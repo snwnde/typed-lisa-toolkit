@@ -90,7 +90,20 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         name: str | None = None,
     ):
         super().__init__(data)
+        self.set_name(name)
+
+    def set_name(self, name: str | None) -> Self:
+        """Set the name of the data container.
+
+        The name is used for labeling the data container in plots.
+        This method returns `self` to allow for fluent method chaining.
+        """
         self.name = name
+        return self
+
+    def create_new(self, data: Mapping[str, _SeriesT]): # type: ignore[override]
+        """Create a new instance of the class."""
+        return type(self)(data, self.name)
 
     @property
     def grid(self) -> npt.NDArray[NPFloatingT]:
