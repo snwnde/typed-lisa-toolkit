@@ -98,6 +98,7 @@ NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
 ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
 Interpolator = Callable[[npt.NDArray[np.floating], npt.NDArray[np.floating]], ArrayFunc]
 
+_slice = slice # Alias for slice
 
 class Tapering(Protocol):
     """Protocol for tapering functions."""
@@ -238,17 +239,17 @@ class _Series(
         """Return the square root of the series."""
         return self.create_like(np.sqrt(self.entries))
 
-    def get_subset(
+    def _get_subset_slice(
         self,
         *,
         interval: tuple[float, float] | None = None,
         slice: slice | None = None,
-    ) -> Self:
+    ) -> slice:
         """Return the subset as a new instance."""
         if interval is None:
             # Note that slice(None) is not None
             if slice is None:
-                return self
+                return _slice(None)
             # Otherwise we use the input slice
         else:
             if slice is not None:
@@ -256,6 +257,16 @@ class _Series(
                     "Only one of `interval` and `slice` should be provided."
                 )
             slice = utils.get_subset_slice(self.grid, interval[0], interval[1])
+        return slice
+
+    def get_subset(
+        self,
+        *,
+        interval: tuple[float, float] | None = None,
+        slice: slice | None = None,
+    ) -> Self:
+        """Return the subset as a new instance."""
+        slice = self._get_subset_slice(interval=interval, slice=slice)
         return type(self)(grid=self.grid[slice], entries=self.entries[slice])
 
     def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
@@ -441,6 +452,22 @@ class Phasor(
         # could have a different data type than the current entries.
         return type(self)(grid=self.grid, entries=entries, phases=self.phases)  # type: ignore
 
+    def get_subset(
+        self,
+        *,
+        interval: tuple[float, float] | None = None,
+        slice: slice | None = None,
+    ) -> Self:
+        """Return the subset as a new instance."""
+        slice = self._get_subset_slice(interval=interval, slice=slice)
+        return type(self)(grid=self.grid[slice], entries=self.entries[slice], phases=self.phases[slice])
+
+    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
+        """Return the series embedded in a new grid."""
+        entries = utils.extend_to(embedding_grid)(self.grid, self.entries)
+        phases = utils.extend_to(embedding_grid)(self.grid, self.phases)
+        return type(self)(grid=embedding_grid, entries=entries, phases=phases)
+
     @staticmethod
     def reim_to_cplx(
         real_parts: npt.NDArray[np.floating[NPTBitT]],
@@ -496,12 +523,6 @@ class Phasor(
             self.frequencies,
             self.entries,
         )
-
-    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
-        """Return the series embedded in a new grid."""
-        entries = utils.extend_to(embedding_grid)(self.grid, self.entries)
-        phases = utils.extend_to(embedding_grid)(self.grid, self.phases)
-        return type(self)(grid=embedding_grid, entries=entries, phases=phases)
 
     def get_plotter(self) -> plotters.PhasorPlotter:
         """Return the plotter for the phasor."""

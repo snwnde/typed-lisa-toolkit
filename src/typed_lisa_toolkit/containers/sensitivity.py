@@ -394,7 +394,10 @@ class _CacheSensitivity(FDSensitivity):
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data_.NPFloatingT]]
     ):
         freq = next(iter(frequencies.values()))
-        interval = freq[0], freq[-1]
+        try:
+            interval = freq[0], freq[-1]
+        except IndexError:
+            interval = (0, 0) # An empty interval.
         noise_psd = self.noise_cache.get_subset(interval=interval)
         if log.isEnabledFor(logging.DEBUG):
             try:

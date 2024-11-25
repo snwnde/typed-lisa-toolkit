@@ -124,5 +124,11 @@ class WhittleLikelihood(Likelihood):
     def _process(self, template: wf.FormattedWaveform):
         """Process the template."""
         template_waveform = wf.to_fsdata(template)
-        f_interval = template_waveform.frequencies[0], template_waveform.frequencies[-1]
+        try:
+            f_interval = (
+                template_waveform.frequencies[0],
+                template_waveform.frequencies[-1],
+            )
+        except IndexError:
+            f_interval = (0, 0)  # An empty interval
         return template_waveform, f_interval

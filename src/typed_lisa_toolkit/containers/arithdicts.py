@@ -73,21 +73,16 @@ class SupportsArithmetic(Protocol):
     def __neg__(self: ArithT) -> ArithT: ...  # noqa: D105
 
 
+class _NullDict:
+    def __add__(self, other):
+        return other
+
+
 class ArithDict(UserDict[KT, ArithT]):
     """A dictionary of values that support arithmetic operations."""
 
-    @classmethod
-    def _get_null_value(cls) -> ArithT:
-        """Get the null value for the class."""
-
-        class NullValue(cls):  # type: ignore
-            # `cls` is a class, so it should be used as a type.
-            # Ignoring the error that I got from mypy.
-
-            def __add__(self, other: ArithTb):
-                return other
-
-        return NullValue()
+    NULL: ArithT = _NullDict()  # type: ignore[assignment]
+    """A null value for the value type of the dictionary."""
 
     def __array__(self):  # noqa: D105
         raise TypeError(f"""{self.__class__.__name__} can not be casted into an array. If you see this in a multiplication
@@ -144,6 +139,8 @@ class ArithDict(UserDict[KT, ArithT]):
         return self.create_new({k: self[k] + value for k in self.keys()})
 
     def __add__(self, other: ArithTb):  # noqa: D105
+        if other is self.NULL:
+            return self
         if isinstance(other, self._cls_binary_op):
             return self.__add_arithdict__(other)
         try:
@@ -210,7 +207,7 @@ class ArithDict(UserDict[KT, ArithT]):
 
     def sum(self) -> ArithT:
         """Return the sum of all the values in the dictionary."""
-        _sum = sum(self.values(), self._get_null_value())
+        _sum = sum(self.values(), self.NULL)
         return _sum
 
 
