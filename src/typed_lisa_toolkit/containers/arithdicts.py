@@ -73,7 +73,7 @@ class SupportsArithmetic(Protocol):
     def __neg__(self: ArithT) -> ArithT: ...  # noqa: D105
 
 
-class _NullDict:
+class _NullValue:
     def __add__(self, other):
         return other
 
@@ -81,7 +81,7 @@ class _NullDict:
 class ArithDict(UserDict[KT, ArithT]):
     """A dictionary of values that support arithmetic operations."""
 
-    NULL: ArithT = _NullDict()  # type: ignore[assignment]
+    NULL: ArithT = _NullValue()  # type: ignore[assignment]
     """A null value for the value type of the dictionary."""
 
     def __array__(self):  # noqa: D105
