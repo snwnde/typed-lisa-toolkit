@@ -77,6 +77,9 @@ class _NullValue:
     def __add__(self, other):
         return other
 
+    def __neg__(self):
+        return self
+
 
 class ArithDict(UserDict[KT, ArithT]):
     """A dictionary of values that support arithmetic operations."""
