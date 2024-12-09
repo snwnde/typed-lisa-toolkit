@@ -338,6 +338,8 @@ class _SeriesDataPlotter(abc.ABC):
     ) -> plt.Figure:
         chn_num = len(self.data.channel_names)
         fig, axs = plt.subplots(2 * chn_num, sharex=True)
+        ylabel_bool = kwargs.pop("set_ylabel", False)
+        diff_ylabel = kwargs.pop("diff_ylabel", "difference")
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == chn_num - 1 else False
             orig_idx = 2 * idx
@@ -345,24 +347,25 @@ class _SeriesDataPlotter(abc.ABC):
             plotter(self.data[chnname]).plot(
                 axs[orig_idx],
                 set_xlabel=False,
-                set_ylabel=True,
                 set_legend=True,
+                set_ylabel=ylabel_bool,
                 label=self.data.name,
                 ylabel=f"{chnname}",
                 **kwargs,
             )
             plotter(other.data[chnname]).plot(
                 axs[orig_idx],
+                set_legend=True,
                 label=other.data.name,
                 **kwargs,
             )
             plotter(self.data[chnname] - other.data[chnname]).plot(
                 axs[diff_idx],
                 set_xlabel=xlabel_bool,
-                set_ylabel=True,
+                set_ylabel=ylabel_bool,
                 set_legend=False,
                 method="semilogx",
-                ylabel=f"{chnname}: {self.data.name} - {other.data.name}",
+                ylabel=f"{chnname}: {diff_ylabel}",
                 **kwargs,
             )
         return fig
