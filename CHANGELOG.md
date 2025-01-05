@@ -2,6 +2,28 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.2.4 - 2025-01-05
+#### Bug Fixes
+- comparison plot labels - (e77da02) - Senwen Deng
+- add `__neg__` for `_NullValue` - (e49b2e4) - Senwen Deng
+- value null arithdict - (a6dcbb3) - Senwen Deng
+- keep names of `_SeriesData` - (0c8f4d4) - Senwen Deng
+- type hinting `get_whitened` - (cc994f5) - Senwen Deng
+- improved type hinting - (ba94d97) - Senwen Deng
+- `get_integrand` factor order - (65aa0b6) - Senwen Deng
+- use a protocol to annotate tapering callables - (c701864) - Senwen Deng
+#### Documentation
+- correct `get_interpolated` doc string - (f50e4bc) - Senwen Deng
+#### Features
+- take slice subset - (d53f28d) - Senwen Deng
+#### Miscellaneous Chores
+- rename `_NullDict` to `_NullValue` - (53320a9) - Senwen Deng
+- remove trailing whitespace - (da8cb32) - Senwen Deng
+#### Refactoring
+- improve arithdicts arithmetics - (b7ec08a) - Senwen Deng
+
+- - -
+
 ## 0.2.3 - 2024-11-01
 #### Bug Fixes
 - correct phasor representation - (3033cd9) - Senwen Deng
