@@ -98,7 +98,8 @@ NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
 ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
 Interpolator = Callable[[npt.NDArray[np.floating], npt.NDArray[np.floating]], ArrayFunc]
 
-_slice = slice # Alias for slice
+_slice = slice  # Alias for slice
+
 
 class Tapering(Protocol):
     """Protocol for tapering functions."""
@@ -107,29 +108,19 @@ class Tapering(Protocol):
         """Return the tapering window to apply on the array."""
 
 
-@dc.dataclass(slots=True, frozen=True)
 class Representation(Generic[NPFloatingT, NPNumberT_co]):
     """A format in which detector data are displayed.
 
-    This is the base class for all representations.
+    This is the base class for all representations, which
+    is abstract and cannot be instantiated directly.
     """
 
-    grid: npt.NDArray[NPFloatingT]
-    """ The grid of the representation. """
-
     entries: npt.NDArray[NPNumberT_co]
-    """ The values loaded on the grid. """
+    """ The data values. """
 
-    @property
-    def is_consistent(self) -> bool:
-        """Check if the grid and entries have the same shape."""
-        return self.grid.shape == self.entries.shape
-
-    def create_like(self, entries: npt.NDArray[np.number]):
-        """Create a new series with the same grid as the current one."""
-        # We ignore the type check below since we know that the new entries
-        # could have a different data type than the current entries.
-        return type(self)(grid=self.grid, entries=entries)  # type: ignore
+    @abc.abstractmethod
+    def create_like(self, entries: npt.NDArray[np.number]) -> Self:
+        """Create a new series with different entries but the same grid."""
 
     def __mul_num__(self, other: Numeric) -> Self:
         """Multiply a representation by a number or a numeric array."""
@@ -171,6 +162,23 @@ class _Series(
     Representation[NPFloatingT, NPNumberT_co], Generic[NPFloatingT, NPNumberT_co]
 ):
     """A series of numbers on a grid."""
+
+    grid: npt.NDArray[NPFloatingT]
+    """ The grid of the representation. """
+
+    entries: npt.NDArray[NPNumberT_co]
+    """ The values loaded on the grid. """
+
+    @property
+    def is_consistent(self) -> bool:
+        """Check if the grid and entries have the same shape."""
+        return self.grid.shape == self.entries.shape
+
+    def create_like(self, entries: npt.NDArray[np.number]):
+        """Create a new series with the same grid as the current one."""
+        # We ignore the type check below since we know that the new entries
+        # could have a different data type than the current entries.
+        return type(self)(grid=self.grid, entries=entries)  # type: ignore
 
     @property
     def has_even_spacing(self) -> bool:
@@ -460,7 +468,11 @@ class Phasor(
     ) -> Self:
         """Return the subset as a new instance."""
         slice = self._get_subset_slice(interval=interval, slice=slice)
-        return type(self)(grid=self.grid[slice], entries=self.entries[slice], phases=self.phases[slice])
+        return type(self)(
+            grid=self.grid[slice],
+            entries=self.entries[slice],
+            phases=self.phases[slice],
+        )
 
     def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
         """Return the series embedded in a new grid."""
