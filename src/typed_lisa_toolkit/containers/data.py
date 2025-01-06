@@ -79,18 +79,20 @@ ValueT = TypeVar("ValueT", bound=representations.Representation)
 _SeriesT = TypeVar("_SeriesT", bound=representations._Series)
 
 
-class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
+class _Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
     """Dictionary data container."""
-
-    _series_type: type[_SeriesT]
 
     def __init__(
         self,
-        data: Mapping[str, _SeriesT],
+        data: Mapping[str, ValueT],
         name: str | None = None,
     ):
         super().__init__(data)
         self.set_name(name)
+
+    def create_new(self, data: Mapping[str, ValueT]):  # type: ignore[override]
+        """Create a new instance of the class."""
+        return type(self)(data, self.name)
 
     def set_name(self, name: str | None) -> Self:
         """Set the name of the data container.
@@ -101,9 +103,11 @@ class _SeriesData(arithdicts.ChannelDict[_SeriesT], Generic[_SeriesT]):
         self.name = name
         return self
 
-    def create_new(self, data: Mapping[str, _SeriesT]): # type: ignore[override]
-        """Create a new instance of the class."""
-        return type(self)(data, self.name)
+
+class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
+    """Series data container."""
+
+    _series_type: type[_SeriesT]
 
     @property
     def grid(self) -> npt.NDArray[NPFloatingT]:
@@ -253,6 +257,16 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         if keep_times:
             return TimedFSData(fsdict, times=self.times)
         return FSData(fsdict)
+
+    def to_tfdata(
+        self,
+        *,
+        win: npt.NDArray[np.floating],
+        hop: int,
+    ):
+        """Return the time-frequency data."""
+        tfdict = {chnname: chn.stfft(win, hop) for chnname, chn in self.items()}
+        return TFData(tfdict)
 
     def get_zero_padded(
         self,
@@ -471,3 +485,39 @@ def load_ldc_data(
             for chnname in dataset.keys()
         }
         return TSData(_dict)
+
+
+class TFData(
+    _Data[representations.TimeFrequency[NPFloatingT, representations.NPNumberT_co]],
+    Generic[NPFloatingT, representations.NPNumberT_co],
+):
+    """Dictionary data container of time-frequency data."""
+
+    def get_subset(
+        self,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+    ):
+        """Return the subset as a new instance."""
+        tfdict = {
+            chnname: chn.get_subset(
+                time_interval=time_interval, freq_interval=freq_interval
+            )
+            for chnname, chn in self.items()
+        }
+        return self.create_new(tfdict)
+
+    def draw(
+        self,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+        **kwargs,
+    ):
+        """Plot the data."""
+        from ..viz import plotters
+
+        return plotters.TFDataPlotter(
+            self.get_subset(time_interval=time_interval, freq_interval=freq_interval)
+        ).draw(**kwargs)

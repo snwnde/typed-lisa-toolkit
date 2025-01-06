@@ -14,15 +14,19 @@ of multiple channels or modes, we use arithmetic dictionaries (see
 :mod:`.arithdicts`, :mod:`.data` and :mod:`.waveforms`).
 
 We have two main types of representations, either in a single domain
-(time or frequency) or in both domains. In the first case, there is
-:class:`.TimeSeries`, :class:`.FrequencySeries` and :class:`.Phasor`.
-The second case consists of time-frequency matrices  (spectrograms,
-scalograms, etc.). In both cases, we need a grid (1D or 2D) and values
-loaded on the grid. We model these representations as immutable data
-classes that support arithmetic operations between them and with numeric
-values or arrays. We implement generic classes that accept a certain
-:class:`numpy.dtype` as type parameter. This allows us to specify and
-keep track of the data type of the values in the representation.
+(time or frequency) or in both domains. Conceptually, we can think of
+a grid (1D or 2D) and values loaded on the grid.
+In the first case, we implement data classes for the series
+(:class:`.TimeSeries`, :class:`.FrequencySeries` and :class:`.Phasor`),
+where both the grid and the values are 1D arrays and stored in the
+instances. In the second case, we do not store the 2D grid directly
+to save memory, but we store the arrays of times, frequencies and
+the values for the time-frequency matrices (:class:`.TimeFrequency`).
+We model these representations as immutable data classes that support
+arithmetic operations between them and with numeric values or arrays.
+We implement generic classes that accept a certain :class:`numpy.dtype`
+as type parameter. This allows us to specify and keep track of the data
+type of the values in the representation.
 
 .. currentmodule:: typed_lisa_toolkit.containers.representations
 
@@ -64,6 +68,13 @@ Entities
    :undoc-members:
    :inherited-members:
    :special-members: __add__
+
+.. autoclass:: TimeFrequency
+    :members:
+    :member-order: groupwise
+    :undoc-members:
+    :inherited-members:
+
 """
 
 from __future__ import annotations
@@ -75,6 +86,7 @@ from typing import TypeVar, Generic, Self, Protocol, TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
+import scipy.signal  # type: ignore[import-untyped]
 
 from .. import utils
 
@@ -121,6 +133,9 @@ class Representation(Generic[NPFloatingT, NPNumberT_co]):
     @abc.abstractmethod
     def create_like(self, entries: npt.NDArray[np.number]) -> Self:
         """Create a new series with different entries but the same grid."""
+
+    def _guard_binary_op(self, other):
+        del other
 
     def __mul_num__(self, other: Numeric) -> Self:
         """Multiply a representation by a number or a numeric array."""
@@ -178,7 +193,7 @@ class _Series(
         """Create a new series with the same grid as the current one."""
         # We ignore the type check below since we know that the new entries
         # could have a different data type than the current entries.
-        return type(self)(grid=self.grid, entries=entries)  # type: ignore
+        return type(self)(grid=self.grid, entries=entries)  # type: ignore[arg-type]
 
     @property
     def has_even_spacing(self) -> bool:
@@ -195,9 +210,6 @@ class _Series(
         Just return the difference between the first two grid points.
         """
         return self.grid[1] - self.grid[0]
-
-    def _guard_binary_op(self, other):
-        del other
 
     def __mul_series__(self, other: _Series[NPFloatingT, np.number]):
         """Multiply two series."""
@@ -408,6 +420,14 @@ class TimeSeries(
 
         return plotters.TSPlotter(self)
 
+    def stfft(self, win: npt.NDArray[np.floating], hop: int):
+        """Short-time Fourier transform of the series."""
+        SFT = scipy.signal.ShortTimeFFT(win=win, hop=hop, fs=1 / self.dt)
+        times = SFT.t(len(self.entries))
+        freqs = SFT.f
+        Sx = SFT.stft(self.entries)
+        return TimeFrequency(times=times, frequencies=freqs, entries=Sx)
+
 
 @dc.dataclass(slots=True, frozen=True)
 class Phasor(
@@ -541,3 +561,96 @@ class Phasor(
         from ..viz import plotters
 
         return plotters.PhasorPlotter(self)
+
+
+@dc.dataclass(slots=True, frozen=True)
+class TimeFrequency(
+    Representation[NPFloatingT, NPNumberT_co], Generic[NPFloatingT, NPNumberT_co]
+):
+    """Time-frequency representation.
+
+    The entries are stored in a 2D array, where the first axis corresponds to
+    the frequencies and the second axis corresponds to the times. The time and
+    frequency grids are stored as 1D arrays.
+
+    The time-frequency representation could contain the spectrogram or the
+    scalogram of a signal, depending on how the entries are computed.
+    """
+
+    times: npt.NDArray[NPFloatingT]
+    """ The time grid of the time-frequency representation. """
+
+    frequencies: npt.NDArray[NPFloatingT]
+    """ The frequency grid of the time-frequency representation. """
+
+    entries: npt.NDArray[NPNumberT_co]
+    """ The data values in the time-frequency representation. """
+
+    @property
+    def dt(self) -> NPFloatingT:
+        """The time step."""
+        return self.times[1] - self.times[0]
+
+    @property
+    def df(self) -> NPFloatingT:
+        """The frequency spacing."""
+        return self.frequencies[1] - self.frequencies[0]
+
+    def get_subset(
+        self,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+    ) -> Self:
+        """Return the subset as a new instance."""
+        if time_interval is not None:
+            time_slice = utils.get_subset_slice(
+                self.times, time_interval[0], time_interval[1]
+            )
+        else:
+            time_slice = _slice(None)
+        if freq_interval is not None:
+            freq_slice = utils.get_subset_slice(
+                self.frequencies, freq_interval[0], freq_interval[1]
+            )
+        else:
+            freq_slice = _slice(None)
+        return type(self)(
+            times=self.times[time_slice],
+            frequencies=self.frequencies[freq_slice],
+            entries=self.entries[freq_slice, time_slice],
+        )
+
+    def create_like(self, entries: npt.NDArray[np.number]):
+        """Create a new series with different entries but the same grid."""
+        return type(self)(
+            times=self.times,
+            frequencies=self.frequencies,
+            entries=entries,  # type: ignore[arg-type]
+        )
+
+    def __mul_tf__(self, other: TimeFrequency[NPFloatingT, np.number]):
+        """Multiply two time-frequency representations."""
+        self._guard_binary_op(other)
+        return self.create_like(self.entries * other.entries)
+
+    def __mul__(self, other: TimeFrequency[NPFloatingT, np.number] | Numeric):
+        """Multiply a series by another time-frequency representations or a number."""
+        self._guard_binary_op(other)
+        if isinstance(other, TimeFrequency):
+            return self.__mul_tf__(other)
+        return self.__mul_num__(other)
+
+    def __truediv__(self, other: TimeFrequency[NPFloatingT, np.number] | Numeric):  # type: ignore[override]
+        # We violate the Liskov Substitution Principle on purpose here.
+        """Divide a series by another series or a number."""
+        self._guard_binary_op(other)
+        if isinstance(other, TimeFrequency):
+            return self.create_like(self.entries / other.entries)
+        return self.create_like(self.entries / other)
+
+    def get_plotter(self) -> plotters.TimeFrequencyPlotter:
+        """Return the plotter for the time-frequency representation."""
+        from ..viz import plotters
+
+        return plotters.TimeFrequencyPlotter(self)

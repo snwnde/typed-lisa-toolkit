@@ -26,6 +26,11 @@ Entities
     :member-order: groupwise
     :inherited-members:
 
+.. autoclass:: TimeFrequencyPlotter
+    :members:
+    :member-order: groupwise
+    :inherited-members:
+
 .. autoclass:: TSDataPlotter
     :members:
     :member-order: groupwise
@@ -108,6 +113,22 @@ plot_kwargs = [
     "ms",
     "zorder",
     "rasterized",
+]
+
+imshow_kwargs = [
+    "cmap",
+    "norm",
+    "aspect",
+    "interpolation",
+    "alpha",
+    "vmin",
+    "vmax",
+    "origin",
+    "extent",
+    "filternorm",
+    "filterrad",
+    "resample",
+    "url",
 ]
 
 savefig_kwargs = [
@@ -295,6 +316,48 @@ class PhasorPlotter(FSPlotter):
             ax.set_xlabel("Frequency [Hz]")
         if set_ylabel:
             ax.set_ylabel("Phase [rad]")
+        if set_legend:
+            _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
+            ax.legend(**_legend_kwargs)
+        return ax
+
+
+class TimeFrequencyPlotter:
+    """Plotter for :class:`.containers.representations.TimeFrequency`."""
+
+    def __init__(self, representation: representations.TimeFrequency) -> None:
+        self.representation = representation
+
+    def plot(
+        self,
+        ax: plt.Axes,
+        set_xlabel: bool = False,
+        set_ylabel: bool = False,
+        set_legend: bool = False,
+        **kwargs,
+    ) -> plt.Axes:
+        """Plot the time-frequency representation on the provided Axes."""
+        _kwargs = sieve_kwargs(imshow_kwargs, **kwargs)
+        times_extent = (
+            self.representation.times[0] / 3600,
+            (self.representation.times[-1] + self.representation.dt) / 3600,
+        )
+        freqs_extent = (
+            self.representation.frequencies[0],
+            self.representation.frequencies[-1] + self.representation.df,
+        )
+        extent = times_extent + freqs_extent
+        ax.imshow(
+            abs(self.representation.entries),
+            origin="lower",
+            aspect="auto",
+            extent=extent,
+            **_kwargs,
+        )
+        if set_xlabel:
+            ax.set_xlabel("Time [hrs]")
+        if set_ylabel:
+            ax.set_ylabel("Frequency [Hz]")
         if set_legend:
             _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
             ax.legend(**_legend_kwargs)
@@ -490,3 +553,29 @@ class FSDataPlotter(_SeriesDataPlotter):
         if not angle:
             return self._compare(plotter=FSPlotter, other=other, **kwargs)
         return self._compare_angle(other=other, **kwargs)
+
+
+class TFDataPlotter:
+    """Plotter for :class:`.containers.data.TFData`."""
+
+    def __init__(self, data: data.TFData) -> None:
+        self.data = copy.deepcopy(data)
+
+    def draw(self, set_legend: bool = False, **kwargs) -> plt.Figure:
+        """Draw the time-frequency data."""
+        fig, axs = plt.subplots(len(self.data.channel_names), sharex=True)
+        # If only one channel, axs is not a list
+        try:
+            axs[0]
+        except TypeError:
+            axs = [axs]
+        for idx, chnname in enumerate(self.data.channel_names):
+            xlabel_bool = True if idx == len(self.data.channel_names) - 1 else False
+            TimeFrequencyPlotter(self.data[chnname]).plot(
+                axs[idx],
+                set_xlabel=xlabel_bool,
+                set_ylabel=True,
+                set_legend=set_legend,
+                **kwargs,
+            )
+        return fig
