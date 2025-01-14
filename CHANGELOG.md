@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.0 - 2025-01-14
+#### Documentation
+- improved gb example - (1d2c1f2) - Senwen Deng
+#### Features
+- more fs plot units - (19e6c85) - Senwen Deng
+- time-freq representation - (af26103) - Senwen Deng
+#### Refactoring
+- abstractify `Representation` - (9039193) - Senwen Deng
+
+- - -
+
 ## 0.2.4 - 2025-01-05
 #### Bug Fixes
 - comparison plot labels - (e77da02) - Senwen Deng
