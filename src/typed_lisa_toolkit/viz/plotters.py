@@ -201,7 +201,7 @@ class TSPlotter(_SeriesPlotter):
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
-        time_unit: str = "hrs",
+        time_unit: Literal["hrs"] = "hrs",
         ylabel: str = "strain",
         **kwargs,
     ) -> plt.Axes:
@@ -242,6 +242,7 @@ class FSPlotter(_SeriesPlotter):
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
+        freq_unit: Literal["Hz", "mHz"] = "Hz",
         ylabel: str = "Strain",
         method: Literal["loglog"] | Literal["semilogx"] = "loglog",
         **kwargs,
@@ -249,12 +250,22 @@ class FSPlotter(_SeriesPlotter):
         """Plot the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
         series_abs = self.series.abs()
+        if freq_unit == "Hz":
+            grid = series_abs.grid
+            grid_label = "Frequency [Hz]"
+        elif freq_unit == "mHz":
+            grid = series_abs.grid * 1e3
+            grid_label = "Frequency [mHz]"
+        else:
+            raise ValueError(
+                f"The frequency unit {freq_unit} is not supported. Please use 'Hz' or 'mHz'."
+            )
         if method == "loglog":
-            ax.loglog(series_abs.grid, series_abs.entries, **_kwargs)
+            ax.loglog(grid, series_abs.entries, **_kwargs)
         elif method == "semilogx":
-            ax.semilogx(series_abs.grid, series_abs.entries, **_kwargs)
+            ax.semilogx(grid, series_abs.entries, **_kwargs)
         if set_xlabel:
-            ax.set_xlabel("Frequency [Hz]")
+            ax.set_xlabel(grid_label)
         if set_ylabel:
             ax.set_ylabel(ylabel)
         if set_legend:
