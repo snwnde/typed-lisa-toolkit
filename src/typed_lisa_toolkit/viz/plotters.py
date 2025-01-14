@@ -408,16 +408,26 @@ class _SeriesDataPlotter(abc.ABC):
         return fig
 
     def _compare(
-        self, plotter: type[_SeriesPlotter], other: Self, **kwargs
+        self,
+        plotter: type[_SeriesPlotter],
+        other: Self,
+        plot_residual: bool = True,
+        **kwargs,
     ) -> plt.Figure:
         chn_num = len(self.data.channel_names)
-        fig, axs = plt.subplots(2 * chn_num, sharex=True)
         ylabel_bool = kwargs.pop("set_ylabel", False)
+        if plot_residual:
+            fig, axs = plt.subplots(2 * chn_num, sharex=True)
+        else:
+            fig, axs = plt.subplots(chn_num, sharex=True)
         diff_ylabel = kwargs.pop("diff_ylabel", "difference")
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == chn_num - 1 else False
-            orig_idx = 2 * idx
-            diff_idx = 2 * idx + 1
+            if plot_residual:
+                orig_idx = 2 * idx
+                diff_idx = 2 * idx + 1
+            else:
+                orig_idx = idx
             plotter(self.data[chnname]).plot(
                 axs[orig_idx],
                 set_xlabel=False,
@@ -430,18 +440,20 @@ class _SeriesDataPlotter(abc.ABC):
             plotter(other.data[chnname]).plot(
                 axs[orig_idx],
                 set_legend=True,
+                set_xlabel=xlabel_bool and not plot_residual,
                 label=other.data.name,
                 **kwargs,
             )
-            plotter(self.data[chnname] - other.data[chnname]).plot(
-                axs[diff_idx],
-                set_xlabel=xlabel_bool,
-                set_ylabel=ylabel_bool,
-                set_legend=False,
-                method="semilogx",
-                ylabel=f"{chnname}: {diff_ylabel}",
-                **kwargs,
-            )
+            if plot_residual:
+                plotter(self.data[chnname] - other.data[chnname]).plot(
+                    axs[diff_idx],
+                    set_xlabel=xlabel_bool,
+                    set_ylabel=ylabel_bool,
+                    set_legend=False,
+                    method="semilogx",
+                    ylabel=f"{chnname}: {diff_ylabel}",
+                    **kwargs,
+                )
         return fig
 
     @abc.abstractmethod
