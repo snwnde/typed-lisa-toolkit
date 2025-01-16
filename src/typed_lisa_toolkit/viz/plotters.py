@@ -87,7 +87,7 @@ legend_kwargs = [
     "markerfirst",
     "markerscale",
     "mode",
-    "ncols",
+    "ncol",
     "numpoints",
     "prop",
     "reverse",
