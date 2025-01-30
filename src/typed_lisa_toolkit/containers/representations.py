@@ -150,9 +150,7 @@ class Representation(Generic[NPFloatingT, NPNumberT_co]):
         return self.__mul_num__(other)
 
     @abc.abstractmethod
-    def __truediv__(
-        self, other: Representation[NPFloatingT, np.number] | Numeric
-    ) -> Self:
+    def __truediv__(self, other: Self | Numeric) -> Self:
         """Divide a representation by another representation, a number or a numeric array."""
 
     def __rtruediv__(self, other: Numeric):
@@ -216,16 +214,14 @@ class _Series(
         self._guard_binary_op(other)
         return self.create_like(self.entries * other.entries)
 
-    def __mul__(self, other: _Series[NPFloatingT, np.number] | Numeric):  # type: ignore
-        # We violate the Liskov Substitution Principle on purpose here.
+    def __mul__(self, other: _Series[NPFloatingT, np.number] | Numeric):
         """Multiply a series by another series, a number or a numeric array."""
         self._guard_binary_op(other)
         if isinstance(other, _Series):
             return self.__mul_series__(other)
         return self.__mul_num__(other)
 
-    def __truediv__(self, other: _Series[NPFloatingT, np.number] | Numeric):  # type: ignore
-        # We violate the Liskov Substitution Principle on purpose here.
+    def __truediv__(self, other: _Series[NPFloatingT, np.number] | Numeric):
         """Divide a series by another series, a number or a numeric array."""
         self._guard_binary_op(other)
         if isinstance(other, _Series):
@@ -423,7 +419,7 @@ class TimeSeries(
     def stfft(self, win: npt.NDArray[np.floating], hop: int):
         """Short-time Fourier transform of the series."""
         SFT = scipy.signal.ShortTimeFFT(win=win, hop=hop, fs=1 / self.dt)
-        times = SFT.t(len(self.entries))
+        times = SFT.t(len(self.entries)) + self.times[0]
         freqs = SFT.f
         Sx = SFT.stft(self.entries)
         return TimeFrequency(times=times, frequencies=freqs, entries=Sx)
@@ -478,7 +474,7 @@ class Phasor(
         """Create a new series with the same grid as the current one."""
         # We ignore the type check below since we know that the new entries
         # could have a different data type than the current entries.
-        return type(self)(grid=self.grid, entries=entries, phases=self.phases)  # type: ignore
+        return type(self)(grid=self.grid, entries=entries, phases=self.phases)  # type: ignore[arg-type]
 
     def get_subset(
         self,
