@@ -201,7 +201,7 @@ class TSPlotter(_SeriesPlotter):
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
-        time_unit: Literal["hrs"] = "hrs",
+        time_unit: Literal["hrs", "days"] = "hrs",
         ylabel: str = "strain",
         **kwargs,
     ) -> plt.Axes:
