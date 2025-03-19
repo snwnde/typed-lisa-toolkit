@@ -366,9 +366,10 @@ class FrequencySeries(
             if tapering is not None
             else np.ones_like(self.frequencies)
         )
+        dt = time_grid[1] - time_grid[0]
         return TimeSeries(
             grid=time_grid,
-            entries=np.fft.irfft(self.entries * tapering_window, n=len(time_grid)),
+            entries=np.fft.irfft(self.entries * tapering_window / dt, n=len(time_grid)),
         )
 
     def get_time_shifted(self, shift: float):
@@ -407,7 +408,7 @@ class TimeSeries(
         )
         return FrequencySeries(
             grid=np.fft.rfftfreq(n=len(self.times), d=self.dt),
-            entries=np.fft.rfft(self.entries * tapering_window),
+            entries=np.fft.rfft(self.entries * tapering_window * self.dt),
         )
 
     def get_plotter(self) -> plotters.TSPlotter:
@@ -421,7 +422,7 @@ class TimeSeries(
         SFT = scipy.signal.ShortTimeFFT(win=win, hop=hop, fs=1 / self.dt)
         times = SFT.t(len(self.entries)) + self.times[0]
         freqs = SFT.f
-        Sx = SFT.stft(self.entries)
+        Sx = SFT.stft(self.entries * self.dt)
         return TimeFrequency(times=times, frequencies=freqs, entries=Sx)
 
 
