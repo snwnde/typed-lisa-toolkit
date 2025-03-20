@@ -2,6 +2,17 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.1 - 2025-03-20
+#### Bug Fixes
+- rfft, irfft, stfft dimension - (869498e) - Senwen Deng
+- ts plotter type hints - (16a41d7) - Senwen Deng
+- sft times - (f9300d0) - Senwen Deng
+- legend kwargs - (7fe2064) - Senwen Deng
+#### Features
+- optional residual plot in compare - (3b6203c) - Senwen Deng
+
+- - -
+
 ## 0.3.0 - 2025-01-14
 #### Documentation
 - improved gb example - (1d2c1f2) - Senwen Deng
