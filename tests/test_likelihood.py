@@ -1,14 +1,14 @@
 import unittest
 from unittest.mock import MagicMock
 from typed_lisa_toolkit.containers.likelihood import WhittleLikelihood
-from typed_lisa_toolkit.containers import sensitivity, data
+from typed_lisa_toolkit.containers import noisemodel, data
 
 
 class TestWhittleLikelihood(unittest.TestCase):
     def setUp(self):
-        # Mock data and sensitivity
+        # Mock data and noisemodel
         self.mock_data = MagicMock(spec=data.FSData)
-        self.mock_sensitivity = MagicMock(spec=sensitivity.FDSensitivity)
+        self.mock_noisemodel = MagicMock(spec=noisemodel.FDNoiseModel)
 
     def test_log_likelihood_ratio(self):
         cross_product = 5.0

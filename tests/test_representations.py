@@ -11,7 +11,7 @@ class TestSeries(unittest.TestCase):
         self.time_series = TimeSeries(grid=self.time_grid, entries=self.entries)
 
         self.freq_grid = np.fft.rfftfreq(len(self.time_grid), d=self.time_grid[1] - self.time_grid[0])
-        self.freq_entries = np.fft.rfft(self.entries)
+        self.freq_entries = np.fft.rfft(self.entries * (self.time_grid[1] - self.time_grid[0]))
         self.freq_series = FrequencySeries(grid=self.freq_grid, entries=self.freq_entries)
 
     def test_is_consistent(self):

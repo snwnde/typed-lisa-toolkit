@@ -1,7 +1,7 @@
 """Module for data containers.
 
 We model data containers as :class:`.arithdicts.ChannelDict` instances that encapsulate
-data (for now, :class:`.series.TimeSeries` and :class:`.series.FrequencySeries`). In this
+data (for now, :class:`.representations.TimeSeries` and :class:`.representations.FrequencySeries`). In this
 model, data are recorded instead of being generated, and for that reason we do not
 distinguish different modes in data containers.
 

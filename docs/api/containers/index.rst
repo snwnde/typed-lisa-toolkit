@@ -9,5 +9,5 @@ Containers
    arithdicts
    waveforms
    data
-   sensitivity
+   noisemodel
    likelihood

@@ -26,7 +26,7 @@ import numpy.typing as npt
 
 from . import arithdicts
 from . import waveforms as wf
-from . import sensitivity as sens
+from . import noisemodel as nm
 from . import data as data_
 
 log = logging.getLogger(__name__)
@@ -67,12 +67,12 @@ class WhittleLikelihood(Likelihood):
     The term :math:`\left( d \middle| d \right)` is computed upon initialization and is constant.
     """
 
-    def __init__(self, data: data_.FSData, sensitivity: sens.FDSensitivity):
+    def __init__(self, data: data_.FSData, noisemodel: nm.FDNoiseModel):
         self.data = data
-        self.sensitivity = sensitivity.get_cache(
-            sensitivity.get_noise_psd(sens._collect_frequencies(data))
+        self.noisemodel = noisemodel.get_cache(
+            noisemodel.get_noise_psd(nm._collect_frequencies(data))
         )
-        self.data_square = self.sensitivity.get_scalar_product(data, data)
+        self.data_square = self.noisemodel.get_scalar_product(data, data)
 
     @classmethod
     def log_likelihood_ratio(cls, cross_product: VT, template_square: VT) -> VT:
@@ -104,7 +104,7 @@ class WhittleLikelihood(Likelihood):
         This method computes the term :math:`\left( d \middle| h \right)`.
         """
         template_waveform, f_interval = self._process(template)
-        return self.sensitivity.get_scalar_product(
+        return self.noisemodel.get_scalar_product(
             self.data.get_subset(interval=f_interval),
             template_waveform.get_subset(interval=f_interval),
         )
@@ -116,7 +116,7 @@ class WhittleLikelihood(Likelihood):
         """
         template_waveform, f_interval = self._process(template)
         template_waveform_ = template_waveform.get_subset(interval=f_interval)
-        return self.sensitivity.get_scalar_product(
+        return self.noisemodel.get_scalar_product(
             template_waveform_,
             template_waveform_,
         )
