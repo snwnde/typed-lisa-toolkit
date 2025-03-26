@@ -77,6 +77,8 @@ ValueT = TypeVar("ValueT", bound=representations.Representation)
 """Value type in the data container."""
 
 _SeriesT = TypeVar("_SeriesT", bound=representations._Series)
+_ChnT = TypeVar("_ChnT", bound=arithdicts.ChannelDict)
+_DataT = TypeVar("_DataT", bound="_Data")
 
 
 class _Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
@@ -432,61 +434,6 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
         return super().to_tsdata(self.times, tapering=tapering)
 
 
-def load_data(file_path: str | pathlib.Path) -> TSData | FSData | TimedFSData:
-    """Load the data from a saved HDF5 file."""
-    with h5py.File(file_path, "r") as f:
-        data_type = f.attrs["type"]
-    if data_type == "TSData":
-        return TSData.load(file_path)
-    if data_type == "FSData":
-        return FSData.load(file_path)
-    if data_type == "TimedFSData":
-        return TimedFSData.load(file_path)
-    raise ValueError(f"Unknown data type: {data_type}")
-
-
-def load_ldc_data(
-    file_path: str | pathlib.Path,
-    name: Literal[
-        "obs/tdi", "sky/mbhb/tdi", "sky/igb/tdi", "sky/vgb/tdi", "sky/dgb/tdi"
-    ] = "obs/tdi",
-    channels: Literal["AE", "AET", "XYZ"] = "AE",
-) -> TSData:
-    """Load the data from LDC dataset."""
-    try:
-        import ldc.common.series  # type: ignore
-    except ImportError as e:
-        raise ImportError(
-            "The lisa-data-challenge package is required to load LDC data. See https://gitlab.in2p3.fr/LISA/LDC for installation guide."
-        ) from e
-
-    dataset = ldc.common.series.TDI.load(file_path, name)
-    if channels == "AE" or channels == "AET":
-        if dataset.get("X") is not None:
-            dataset.XYZ2AET()
-    elif channels == "XYZ":
-        if dataset.get("A") is not None:
-            dataset.AET2XYZ()
-    else:
-        raise ValueError(f"Unknown channel type: {channels}")
-    if channels == "AE":
-        dataset = dataset[["A", "E"]]
-    try:
-        times = dataset["t"].to_numpy()
-        # I assume we only need to read LDC data in the time domain.
-        # When this is not true anymore, we can enhance this function.
-    except KeyError as e:
-        raise KeyError("The time grid is missing.") from e
-    else:
-        _dict = {
-            str(chnname): representations.TimeSeries(
-                grid=times, entries=dataset[chnname].to_numpy()
-            )
-            for chnname in dataset.keys()
-        }
-        return TSData(_dict)
-
-
 class TFData(
     _Data[representations.TimeFrequency[NPFloatingT, representations.NPNumberT_co]],
     Generic[NPFloatingT, representations.NPNumberT_co],
@@ -521,3 +468,76 @@ class TFData(
         return plotters.TFDataPlotter(
             self.get_subset(time_interval=time_interval, freq_interval=freq_interval)
         ).draw(**kwargs)
+
+
+def load_data(file_path: str | pathlib.Path):
+    """Load the data from a saved HDF5 file."""
+    with h5py.File(file_path, "r") as f:
+        data_type = f.attrs["type"]
+    if data_type == "TSData":
+        return TSData.load(file_path)
+    if data_type == "FSData":
+        return FSData.load(file_path)
+    if data_type == "TimedFSData":
+        return TimedFSData.load(file_path)
+    raise ValueError(f"Unknown data type: {data_type}")
+
+
+def load_ldc_data(
+    file_path: str | pathlib.Path,
+    name: Literal[
+        "obs/tdi", "sky/mbhb/tdi", "sky/igb/tdi", "sky/vgb/tdi", "sky/dgb/tdi"
+    ] = "obs/tdi",
+    channels: Literal["AE", "AET", "XYZ"] = "AE",
+) -> TSData:
+    """Load the data from LDC dataset."""
+
+    def XYZ2AET(X: _ChnT, Y: _ChnT, Z: _ChnT) -> tuple[_ChnT, _ChnT, _ChnT]:
+        A, E, T = (
+            (Z - X) / np.sqrt(2.0),
+            (X - 2.0 * Y + Z) / np.sqrt(6.0),
+            (X + Y + Z) / np.sqrt(3.0),
+        )
+        return A, E, T
+
+    def AET2XYZ(A: _ChnT, E: _ChnT, T: _ChnT) -> tuple[_ChnT, _ChnT, _ChnT]:
+        X, Y, Z = [
+            -1 / np.sqrt(2.0) * A + 1 / np.sqrt(6.0) * E + 1 / np.sqrt(3.0) * T,
+            -np.sqrt(2.0 / 3.0) * E + 1 / np.sqrt(3.0) * T,
+            1 / np.sqrt(2.0) * A + 1 / np.sqrt(6.0) * E + 1 / np.sqrt(3.0) * T,
+        ]
+        return X, Y, Z
+
+    def transform_channels(data: _DataT):
+        channel_names = tuple(name for name in channels)
+        if set(channel_names).issubset(data.channel_names):
+            return data.pick(channel_names)
+        if set(channel_names).issubset(("X", "Y", "Z")):
+            X, Y, Z = AET2XYZ(data["A"], data["E"], data["T"])
+            return type(data)({"X": X, "Y": Y, "Z": Z}).pick(channel_names)
+        if set(channel_names).issubset(("A", "E", "T")):
+            A, E, T = XYZ2AET(data["X"], data["Y"], data["Z"])
+            return type(data)({"A": A, "E": E, "T": T}).pick(channel_names)
+        raise ValueError(
+            f"The data does not have the expected channels. The data has {data.channel_names}."
+        )
+
+    with h5py.File(file_path, "r") as fid:
+        dataset = np.array(fid[name])
+    if dtype_names := dataset.dtype.names:
+        domain = dtype_names[0]
+        channel_names = dtype_names[1:]
+        # I assume we only need to read LDC data in the time domain.
+        # When this is not true anymore, we can enhance this function.
+        if domain == "t":
+            tsdata = TSData(
+                {
+                    chnname: representations.TimeSeries(
+                        grid=dataset[domain].squeeze(),
+                        entries=dataset[chnname].squeeze(),
+                    )
+                    for chnname in channel_names
+                }
+            )
+            return transform_channels(tsdata)
+    raise ValueError("The dataset does not have the expected structure.")
