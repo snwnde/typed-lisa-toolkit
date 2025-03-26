@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.2 - 2025-03-26
+#### Refactoring
+- noisemodel name convention - (b67a97d) - Senwen Deng
+- removed ldc dependency - (6e20e4c) - Senwen Deng
+
+- - -
+
 ## 0.3.1 - 2025-03-20
 #### Bug Fixes
 - rfft, irfft, stfft dimension - (869498e) - Senwen Deng
