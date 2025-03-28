@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.4 - 2025-03-28
+#### Bug Fixes
+- noisemodel instance init - (899aee4) - Senwen Deng
+#### Documentation
+- fix GB tutorial - (407fbeb) - Senwen Deng
+
+- - -
+
 ## 0.3.3 - 2025-03-28
 #### Bug Fixes
 - fft convention - (638b3e0) - Senwen Deng
