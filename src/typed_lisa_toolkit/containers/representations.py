@@ -83,6 +83,7 @@ from collections.abc import Callable
 import dataclasses as dc
 import logging
 from typing import TypeVar, Generic, Self, Protocol, TYPE_CHECKING
+import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -366,7 +367,10 @@ class FrequencySeries(
             if tapering is not None
             else np.ones_like(self.frequencies)
         )
-        dt = time_grid[1] - time_grid[0]
+        dt: np.floating = time_grid[1] - time_grid[0]
+        nyquist_dt = 1 / (2 * self.frequencies[-1])
+        if dt < nyquist_dt and not np.isclose(dt, nyquist_dt):
+            warnings.warn("The time grid is denser than the Nyquist limit.")
         return TimeSeries(
             grid=time_grid,
             entries=np.fft.irfft(self.entries * tapering_window / dt, n=len(time_grid)),

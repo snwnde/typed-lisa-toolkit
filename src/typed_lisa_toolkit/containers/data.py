@@ -51,7 +51,6 @@ from collections.abc import Mapping
 import logging
 import pathlib
 from typing import TypeVar, Generic, Self, TYPE_CHECKING, Literal, overload
-import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -252,10 +251,7 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         :class:`.FSData` | :class:`.TimedFSData`
             The frequency series data. If `keep_times` is `True`, the time grid is kept.
         """
-        fsdict = {
-            chnname: (chn * self.dt).rfft(tapering=tapering)
-            for chnname, chn in self.items()
-        }
+        fsdict = {chnname: chn.rfft(tapering=tapering) for chnname, chn in self.items()}
         if keep_times:
             return TimedFSData(fsdict, times=self.times)
         return FSData(fsdict)
@@ -370,12 +366,8 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         tapering: representations.Tapering | None,
     ):
         """Return the time series data."""
-        dt: NPFloatingT = times[1] - times[0]
-        nyquist_dt = 1 / (2 * self.frequencies[-1])
-        if dt < nyquist_dt and not np.isclose(dt, nyquist_dt):
-            warnings.warn("The time grid is denser than the Nyquist limit.")
         tsdict = {
-            chnname: (chn / dt).irfft(times, tapering=tapering)
+            chnname: chn.irfft(times, tapering=tapering)
             for chnname, chn in self.items()
         }
         return TSData(tsdict)
