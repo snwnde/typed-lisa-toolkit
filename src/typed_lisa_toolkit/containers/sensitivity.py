@@ -71,6 +71,24 @@ class FDSensitivity(noisemodel.FDNoiseModel):
         )
         super().__init__(integrator, cumulative_integrator)
 
+    @classmethod
+    def make(  # noqa: D102
+        cls,
+        noise_model: FDNoiseModel | None = None,
+        noise_cache: data.FSData | None = None,
+    ):
+        args = (noise_model, noise_cache)
+        error = ValueError(
+            "Exactly one of fd_noise and noise_cache should be provided."
+        )
+        if sum(arg is not None for arg in args) != 1:
+            raise error
+        if noise_model is not None:
+            return _NoiseModelSensitivity(noise_model)
+        if noise_cache is not None:
+            return _CacheSensitivity(noise_cache)
+        raise error
+
 
 class _NoiseModelSensitivity(FDSensitivity):
     def __init__(self, noise_model: FDNoiseModel, *args, **kwargs) -> None:

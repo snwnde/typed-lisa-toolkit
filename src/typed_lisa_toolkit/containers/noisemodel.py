@@ -9,7 +9,7 @@ space is a subspace.
 Types
 -----
 
-.. autoprotocol:: StationaryNoiseFD
+.. autoprotocol:: StationaryFDNoise
 
 Entities
 --------
@@ -45,7 +45,7 @@ def _collect_frequencies(data: data.FSData):
     )
 
 
-class StationaryNoiseFD(Protocol):
+class StationaryFDNoise(Protocol):
     """Protocol for frequency domain stationary noise models."""
 
     def psd(
@@ -82,7 +82,7 @@ class FDNoiseModel(NoiseModel):
     @classmethod
     def make(
         cls,
-        noise_fd: StationaryNoiseFD | None = None,
+        fd_noise: StationaryFDNoise | None = None,
         noise_cache: data.FSData | None = None,
     ):
         """Return an :class:`.FDNoiseModel` instance.
@@ -90,14 +90,14 @@ class FDNoiseModel(NoiseModel):
         To create an instance, either provide a noise model or a noise
         PSD cache. If both are provided, an error is raised.
         """
-        args = (noise_fd, noise_cache)
+        args = (fd_noise, noise_cache)
         error = ValueError(
-            "Exactly one of noise_fd and noise_cache should be provided."
+            "Exactly one of fd_noise and noise_cache should be provided."
         )
         if sum(arg is not None for arg in args) != 1:
             raise error
-        if noise_fd is not None:
-            return _StationaryNoiseModel(noise_fd)
+        if fd_noise is not None:
+            return _StationaryNoiseModel(fd_noise)
         if noise_cache is not None:
             return _CacheNoiseModel(noise_cache)
         raise error
@@ -363,19 +363,19 @@ class FDNoiseModel(NoiseModel):
 
 
 class _StationaryNoiseModel(FDNoiseModel):
-    def __init__(self, noise_fd: StationaryNoiseFD, *args, **kwargs) -> None:
+    def __init__(self, fd_noise: StationaryFDNoise, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.noise_fd = noise_fd
+        self.fd_noise = fd_noise
 
     def create_new(self, integrator, cumulative_integrator):
-        return type(self)(self.noise_fd, integrator, cumulative_integrator)
+        return type(self)(self.fd_noise, integrator, cumulative_integrator)
 
     def get_noise_psd(
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
     ):
         def make_psd(chnname: ChnName):
             freq = frequencies[chnname]
-            entries = self.noise_fd.psd(freq, option=chnname)
+            entries = self.fd_noise.psd(freq, option=chnname)
             return reps.FrequencySeries(freq, entries)
 
         _dict = {chnname: make_psd(chnname) for chnname in frequencies.keys()}
