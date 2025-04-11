@@ -108,8 +108,8 @@ NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
 NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
 """Numpy bit data type."""
 
-ArrayFunc = Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]]
-Interpolator = Callable[[npt.NDArray[np.floating], npt.NDArray[np.floating]], ArrayFunc]
+ArrayFunc = Callable[[npt.NDArray[NPFloatingT]], npt.NDArray[NPFloatingT]]
+Interpolator = Callable[[npt.NDArray[NPFloatingT], npt.NDArray[NPFloatingT]], ArrayFunc]
 
 _slice = slice  # Alias for slice
 

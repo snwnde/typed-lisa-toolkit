@@ -22,6 +22,7 @@ Functions
 
 .. autofunction:: format
 .. autofunction:: to_fsdata
+.. autofunction:: get_dense_maker
 
 """
 
@@ -33,7 +34,8 @@ from typing import TypeVar, Protocol
 import numpy as np
 import numpy.typing as npt
 
-from . import representations, arithdicts, modes, data
+from . import representations as reps, arithdicts, modes, data
+from .. import utils
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +45,7 @@ NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
 NPNumberT = TypeVar("NPNumberT", bound=np.number)
 """Numpy dtype."""
 
-WaveformInMode = TypeVar("WaveformInMode", bound=representations.Representation)
+WaveformInMode = TypeVar("WaveformInMode", bound=reps.Representation)
 """Invariant type variable for either :class:`.series.FrequencySeries`,
 :class:`.series.TimeSeries`, or :class:`.PhasorSequence`. Instances of
 this type are used to represent the signal of a waveform in a specific
@@ -51,7 +53,7 @@ mode."""
 
 _ModeT = tuple[int, int] | tuple[int, int, int]
 _FModeT = TypeVar("_FModeT", bound=modes.Harmonic | modes.QNM)
-
+_PhasorT = TypeVar("_PhasorT", bound=reps.Phasor)
 
 WaveformInChannel = Mapping[_ModeT, WaveformInMode]
 Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[WaveformInMode]]
@@ -80,7 +82,7 @@ def format(
 
 
 def to_fsdata(
-    wf: Waveform[representations.FrequencySeries[NPFloatingT, NPNumberT]],
+    wf: Waveform[reps.FrequencySeries[NPFloatingT, NPNumberT]],
 ) -> data.FSData[NPFloatingT, NPNumberT]:
     """Convert :class:`.Waveform` to :class:`.data.FSData`.
 
@@ -101,5 +103,48 @@ class FSWaveformGen(Protocol):
 
     def __call__(
         self, *args, **kwargs
-    ) -> FormattedWaveform[modes.Harmonic | modes.QNM, representations.FrequencySeries]:
+    ) -> FormattedWaveform[modes.Harmonic | modes.QNM, reps.FrequencySeries]:
         """Get the frequency domain waveform at the given frequencies."""
+
+
+def get_dense_maker(
+    interpolator: reps.Interpolator,
+):
+    """Return a function to convert a phasor waveform to a dense representation.
+
+    This function is to be used with `pass_through` to convert a :class:`.arithdicts.ModeDict`
+    or :class:`.arithdicts.ChannelDict` of :class:`.PhasorSequence` to dictionaries of
+    dense representations.
+
+    The returned function has the signature:
+
+    .. code-block:: python
+
+        def make(
+            frequencies: npt.NDArray[np.floating],
+            embed: bool = False,
+        ) -> Callable[[reps.Phasor], reps.Phasor]
+
+    The function takes a list of frequencies and an optional boolean
+    `embed` argument. If `embed` is True, the returned function will
+    return a waveform with the same frequencies as the input. If `embed`
+    is False, the returned function will return a waveform with the
+    frequencies truncated to the lowest and highest frequencies of the
+    input waveform.
+    """
+
+    def make(
+        frequencies: npt.NDArray[np.floating],
+        embed: bool = False,
+    ):
+        def do(wf: _PhasorT):
+            fmin, fmax = wf.frequencies[0], wf.frequencies[-1]
+            freqs = frequencies[utils.get_subset_slice(frequencies, fmin, fmax)]
+            nwf = wf.get_interpolated(freqs, interpolator)
+            if not embed:
+                return nwf
+            return nwf.get_embedded(frequencies)
+
+        return do
+
+    return make
