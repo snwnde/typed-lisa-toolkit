@@ -43,7 +43,7 @@ from __future__ import annotations
 from collections import UserDict
 from collections.abc import Mapping, Sequence
 import logging
-from typing import TypeVar, Protocol, Self, Generic, Callable, cast
+from typing import TypeVar, Protocol, Self, Generic, Callable, Union, cast
 import numpy.typing as npt
 
 
@@ -52,10 +52,10 @@ log = logging.getLogger(__name__)
 KT = TypeVar("KT")
 """Key type."""
 
-ArithT = TypeVar("ArithT", bound="SupportsArithmetic" | "ArithDict" | npt.NDArray)
+ArithT = TypeVar("ArithT", bound=Union["SupportsArithmetic", "ArithDict", npt.NDArray])
 """Arithmetic type."""
 
-ArithTb = TypeVar("ArithTb", bound="SupportsArithmetic" | "ArithDict" | npt.NDArray)
+ArithTb = TypeVar("ArithTb", bound=Union["SupportsArithmetic", "ArithDict", npt.NDArray])
 """Arithmetic type (bis)."""
 
 ModeT = TypeVar("ModeT", bound=tuple[int, ...])
