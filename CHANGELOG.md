@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.6 - 2025-04-11
+#### Bug Fixes
+- wf typing - (8c0d181) - Senwen Deng
+- type string union - (17a194b) - Senwen Deng
+- waveform typing - (a556c7c) - Senwen Deng
+#### Features
+- func to make dense waveform reps - (757f96d) - Senwen Deng
+#### Tests
+- dense maker - (b62dbec) - Senwen Deng
+
+- - -
+
 ## 0.3.5 - 2025-04-10
 #### Bug Fixes
 - python version requirement - (66fd518) - Senwen Deng
