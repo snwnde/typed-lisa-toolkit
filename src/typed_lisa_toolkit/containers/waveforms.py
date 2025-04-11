@@ -29,7 +29,7 @@ Functions
 from __future__ import annotations
 from collections.abc import Mapping
 import logging
-from typing import TypeVar, Protocol, overload
+from typing import TypeVar, Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -115,7 +115,7 @@ def get_dense_maker(
     """Return a function to convert a phasor waveform to a dense representation.
 
     This function is to be used with `pass_through` to convert a :class:`.arithdicts.ModeDict`
-    or :class:`.arithdicts.ChannelDict` of :class:`.PhasorSequence` to dictionaries of
+    or :class:`.arithdicts.ChannelDict` of :class:`.representations.Phasor` to dictionaries of
     dense representations.
 
     The returned function has the signature:
