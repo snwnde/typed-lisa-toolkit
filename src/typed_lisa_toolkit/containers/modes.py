@@ -1,7 +1,7 @@
 """Module for modes."""
 
 import logging
-from typing import NamedTuple, Self, overload
+from typing import NamedTuple, Self, TypeVar, overload
 
 log = logging.getLogger(__name__)
 

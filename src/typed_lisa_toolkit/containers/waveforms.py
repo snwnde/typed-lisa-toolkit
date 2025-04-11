@@ -29,7 +29,7 @@ Functions
 from __future__ import annotations
 from collections.abc import Mapping
 import logging
-from typing import TypeVar, Protocol
+from typing import TypeVar, Protocol, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -51,12 +51,14 @@ WaveformInMode = TypeVar("WaveformInMode", bound=reps.Representation)
 this type are used to represent the signal of a waveform in a specific
 mode."""
 
-_ModeT = tuple[int, int] | tuple[int, int, int]
+_ModeT = TypeVar(
+    "_ModeT", tuple[int, int], tuple[int, int, int], modes.Harmonic, modes.QNM
+)
 _FModeT = TypeVar("_FModeT", bound=modes.Harmonic | modes.QNM)
 _PhasorT = TypeVar("_PhasorT", bound=reps.Phasor)
 
 WaveformInChannel = Mapping[_ModeT, WaveformInMode]
-Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[WaveformInMode]]
+Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[_ModeT, WaveformInMode]]
 FormattedWaveformInChannel = arithdicts.ModeDict[_FModeT, WaveformInMode]
 FormattedWaveform = arithdicts.ChannelDict[
     FormattedWaveformInChannel[_FModeT, WaveformInMode]
@@ -64,12 +66,12 @@ FormattedWaveform = arithdicts.ChannelDict[
 FrequencyModeDict = arithdicts.ModeDict[_FModeT, npt.NDArray[np.floating]]
 
 
-def _format_waveform_in_channel(wf: WaveformInChannel[WaveformInMode]):
+def _format_waveform_in_channel(wf: WaveformInChannel[_ModeT, WaveformInMode]):
     return arithdicts.ModeDict({modes.cast_mode(k): v for k, v in wf.items()})
 
 
 def format(
-    wf: Waveform[WaveformInMode],
+    wf: Waveform[_ModeT, WaveformInMode],
 ):
     """Format a waveform.
 
@@ -82,7 +84,7 @@ def format(
 
 
 def to_fsdata(
-    wf: Waveform[reps.FrequencySeries[NPFloatingT, NPNumberT]],
+    wf: Waveform[_ModeT, reps.FrequencySeries[NPFloatingT, NPNumberT]],
 ) -> data.FSData[NPFloatingT, NPNumberT]:
     """Convert :class:`.Waveform` to :class:`.data.FSData`.
 
@@ -91,7 +93,7 @@ def to_fsdata(
     returns an instance of :class:`.data.FSData`.
     """
 
-    def _sum_modes(wf: WaveformInChannel[WaveformInMode]):
+    def _sum_modes(wf: WaveformInChannel[_ModeT, WaveformInMode]):
         # Sum the contributions of all modes in each channel
         return _format_waveform_in_channel(wf).sum()
 
