@@ -55,11 +55,7 @@ class StationaryFDNoise(Protocol):
         """Return the power spectral density (PSD)."""
 
 
-class NoiseModel:
-    """Base noise model class."""
-
-
-class FDNoiseModel(NoiseModel):
+class FDNoiseModel:
     """Frequency domain noise model.
 
     Assuming the noise is stationary, the noise model is given by the
