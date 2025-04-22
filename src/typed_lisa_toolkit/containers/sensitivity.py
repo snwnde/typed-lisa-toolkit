@@ -23,7 +23,7 @@ Entities
 
 import warnings
 import logging
-from typing import Protocol
+from typing import Protocol, Unpack
 
 import numpy as np
 import numpy.typing as npt
@@ -76,6 +76,7 @@ class FDSensitivity(noisemodel.FDNoiseModel):
         cls,
         noise_model: FDNoiseModel | None = None,
         noise_cache: data.FSData | None = None,
+        **kwargs: Unpack[noisemodel.IntegratorConfig],
     ):
         args = (noise_model, noise_cache)
         error = ValueError(
@@ -84,9 +85,9 @@ class FDSensitivity(noisemodel.FDNoiseModel):
         if sum(arg is not None for arg in args) != 1:
             raise error
         if noise_model is not None:
-            return _NoiseModelSensitivity(noise_model)
+            return _NoiseModelSensitivity(noise_model, **kwargs)
         if noise_cache is not None:
-            return _CacheSensitivity(noise_cache)
+            return _CacheSensitivity(noise_cache, **kwargs)
         raise error
 
 

@@ -10,6 +10,9 @@ Types
 -----
 
 .. autoprotocol:: StationaryFDNoise
+.. autoprotocol:: Integrator
+.. autoprotocol:: CumIntegrator
+.. autoclass:: IntegratorConfig
 
 Entities
 --------
@@ -23,7 +26,7 @@ Entities
 
 import abc
 import logging
-from typing import Protocol, TypeVar
+from typing import Protocol, TypeVar, TypedDict, Unpack, Self
 
 import numpy as np
 import numpy.typing as npt
@@ -38,6 +41,36 @@ log = logging.getLogger(__name__)
 
 ChnName = str
 FSDataT = TypeVar("FSDataT", bound=data.FSData)
+NPNumT = TypeVar("NPNumT", bound=np.number)
+
+
+class Integrator(Protocol):
+    """Protocol for integrators."""
+
+    def __call__(
+        self,
+        __y: npt.NDArray[NPNumT],
+        **kwargs,
+    ) -> NPNumT:
+        """Integrate the given data."""
+
+
+class CumIntegrator(Protocol):
+    """Protocol for cumulative integrators."""
+
+    def __call__(
+        self,
+        __y: npt.NDArray[NPNumT],
+        **kwargs,
+    ) -> npt.NDArray[NPNumT]:
+        """Integrate the given data."""
+
+
+class IntegratorConfig(TypedDict):
+    """Kwargs for integrators."""
+
+    integrator: Integrator
+    cumulative_integrator: CumIntegrator
 
 
 def _collect_frequencies(data: data.FSData):
@@ -64,28 +97,38 @@ class FDNoiseModel:
 
     """
 
+    DEFAULT_INTEGRATOR = scipy.integrate.trapezoid
+    DEFAULT_CUM_INTEGRATOR = scipy.integrate.cumulative_trapezoid
+
     def __init__(
         self,
-        integrator=scipy.integrate.trapezoid,
-        cumulative_integrator=scipy.integrate.cumulative_trapezoid,
+        integrator: Integrator = DEFAULT_INTEGRATOR,
+        cumulative_integrator: CumIntegrator = DEFAULT_CUM_INTEGRATOR,
     ) -> None:
         self.integrator = integrator
         self.cumulative_integrator = cumulative_integrator
 
-    def create_new(self, integrator, cumulative_integrator):
+    @abc.abstractmethod
+    def create_new(self, **kwargs: Unpack[IntegratorConfig]) -> Self:
         """Return a new instance of the class with the given integrators."""
-        return type(self)(integrator, cumulative_integrator)
 
     @classmethod
     def make(
         cls,
         fd_noise: StationaryFDNoise | None = None,
         noise_cache: data.FSData | None = None,
+        **kwargs: Unpack[IntegratorConfig],
     ):
         """Return an :class:`.FDNoiseModel` instance.
 
         To create an instance, either provide a noise PSD model or a noise
         PSD cache. If both are provided, an error is raised.
+
+        The user may also provide a custom integrator :class:`.Integrator`
+        and/or a custom cumulative integrator :class:`.CumIntegrator` to be
+        used in the scalar product and the cumulative scalar product
+        computations. The default integrator is :func:`scipy.integrate.trapezoid`
+        and the default cumulative integrator is :func:`scipy.integrate.cumulative_trapezoid`.
         """
         args = (fd_noise, noise_cache)
         error = ValueError(
@@ -94,9 +137,9 @@ class FDNoiseModel:
         if sum(arg is not None for arg in args) != 1:
             raise error
         if fd_noise is not None:
-            return _StationaryNoiseModel(fd_noise)
+            return _StationaryNoiseModel(fd_noise, **kwargs)
         if noise_cache is not None:
-            return _CacheNoiseModel(noise_cache)
+            return _CacheNoiseModel(noise_cache, **kwargs)
         raise error
 
     @abc.abstractmethod
@@ -352,12 +395,14 @@ class FDNoiseModel:
 
 
 class _StationaryNoiseModel(FDNoiseModel):
-    def __init__(self, fd_noise: StationaryFDNoise, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self, fd_noise: StationaryFDNoise, **kwargs: Unpack[IntegratorConfig]
+    ) -> None:
+        super().__init__(**kwargs)
         self.fd_noise = fd_noise
 
-    def create_new(self, integrator, cumulative_integrator):
-        return type(self)(self.fd_noise, integrator, cumulative_integrator)
+    def create_new(self, **kwargs: Unpack[IntegratorConfig]):
+        return type(self)(self.fd_noise, **kwargs)
 
     def get_noise_psd(
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
@@ -372,12 +417,14 @@ class _StationaryNoiseModel(FDNoiseModel):
 
 
 class _CacheNoiseModel(FDNoiseModel):
-    def __init__(self, noise_cache: data.FSData, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self, noise_cache: data.FSData, **kwargs: Unpack[IntegratorConfig]
+    ) -> None:
+        super().__init__(**kwargs)
         self.noise_cache = noise_cache
 
-    def create_new(self, integrator, cumulative_integrator):
-        return type(self)(self.noise_cache, integrator, cumulative_integrator)
+    def create_new(self, **kwargs: Unpack[IntegratorConfig]):
+        return type(self)(self.noise_cache, **kwargs)
 
     def get_noise_psd(
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
