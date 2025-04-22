@@ -23,7 +23,7 @@ Entities
 
 import abc
 import logging
-from typing import Protocol, overload
+from typing import Protocol, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -37,6 +37,7 @@ from .. import utils
 log = logging.getLogger(__name__)
 
 ChnName = str
+FSDataT = TypeVar("FSDataT", bound=data.FSData)
 
 
 def _collect_frequencies(data: data.FSData):
@@ -160,9 +161,7 @@ class FDNoiseModel(NoiseModel):
             chnname: self.integrator(series.entries, x=series.frequencies)
             for chnname, series in integrand.items()
         }
-        return arithdicts.ChannelDict(_dict)  # type: ignore
-        # Either I misleaded the type hint of np.trapezoid or it was wrong.
-        # It doesn't seem to create any problem in practice. To check later.
+        return arithdicts.ChannelDict(_dict)
 
     def get_cumulative_complex_scalar_product(
         self,
@@ -311,13 +310,7 @@ class FDNoiseModel(NoiseModel):
         }
         return arithdicts.ChannelDict(_dict)
 
-    @overload
-    def get_whitened(self, data: data.TimedFSData) -> data.TimedFSData: ...
-
-    @overload
-    def get_whitened(self, data: data.FSData) -> data.FSData: ...
-
-    def get_whitened(self, data: data.FSData):
+    def get_whitened(self, data: FSDataT) -> FSDataT:
         r"""Return the whitened data.
 
         Assuming the noise PSD is :math:`S_n(f)`, this method returns
