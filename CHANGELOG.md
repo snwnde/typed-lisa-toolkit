@@ -2,6 +2,23 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.7 - 2025-04-22
+#### Bug Fixes
+- make defaults private - (487d445) - Senwen Deng
+- type hinting - (391db11) - Senwen Deng
+#### Documentation
+- fix scipy crossref - (8e7456d) - Senwen Deng
+- noisemodel - (b38e153) - Senwen Deng
+- scipy crossref - (0cf71c5) - Senwen Deng
+#### Miscellaneous Chores
+- rewording - (8e2b070) - Senwen Deng
+- typo - (d40fa90) - Senwen Deng
+#### Refactoring
+- FDNoiseModel make - (5c1fb94) - Senwen Deng
+- remove unused - (d5b2350) - Senwen Deng
+
+- - -
+
 ## 0.3.6 - 2025-04-11
 #### Bug Fixes
 - wf typing - (8c0d181) - Senwen Deng
