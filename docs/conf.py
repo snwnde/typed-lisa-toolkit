@@ -74,7 +74,7 @@ intersphinx_mapping = {
     "python": (f"https://docs.python.org/{py_version}", None),
     "numpy": (f"https://numpy.org/doc/{np_version}/", None),
     "scipy": (
-        f"https://docs.scipy.org/doc/scipy-{scipy.version.version}/reference/",
+        f"https://docs.scipy.org/doc/scipy-{scipy.version.version}/",
         None,
     ),
 }
