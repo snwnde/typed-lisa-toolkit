@@ -97,13 +97,13 @@ class FDNoiseModel:
 
     """
 
-    DEFAULT_INTEGRATOR = scipy.integrate.trapezoid
-    DEFAULT_CUM_INTEGRATOR = scipy.integrate.cumulative_trapezoid
+    _DEFAULT_INTEGRATOR = scipy.integrate.trapezoid
+    _DEFAULT_CUM_INTEGRATOR = scipy.integrate.cumulative_trapezoid
 
     def __init__(
         self,
-        integrator: Integrator = DEFAULT_INTEGRATOR,
-        cumulative_integrator: CumIntegrator = DEFAULT_CUM_INTEGRATOR,
+        integrator: Integrator = _DEFAULT_INTEGRATOR,
+        cumulative_integrator: CumIntegrator = _DEFAULT_CUM_INTEGRATOR,
     ) -> None:
         self.integrator = integrator
         self.cumulative_integrator = cumulative_integrator
