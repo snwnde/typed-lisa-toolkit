@@ -9,6 +9,8 @@ space is a subspace.
 Types
 -----
 
+.. autoclass:: FSDataT
+.. autoclass:: NPNumT
 .. autoprotocol:: StationaryFDNoise
 .. autoprotocol:: Integrator
 .. autoprotocol:: CumIntegrator
@@ -63,11 +65,11 @@ class CumIntegrator(Protocol):
         __y: npt.NDArray[NPNumT],
         **kwargs,
     ) -> npt.NDArray[NPNumT]:
-        """Integrate the given data."""
+        """Integrate the given data cumulatively."""
 
 
 class IntegratorConfig(TypedDict):
-    """Kwargs for integrators."""
+    """Dictionary for integrator and cumulative integrator configuration."""
 
     integrator: Integrator
     cumulative_integrator: CumIntegrator
