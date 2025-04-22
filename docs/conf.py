@@ -62,16 +62,21 @@ napoleon_preprocess_types = True
 # We need to get the python version and the numpy version for intersphinx.
 import platform
 import numpy as np
+import scipy.version  # type: ignore[import]
 
 py_version_tuple = platform.python_version_tuple()
-py_version = f"{py_version_tuple[0]}.{py_version_tuple[1]}"
+py_version = "{}.{}".format(*py_version_tuple[:2])
 np_version_tuple = np.version.version.split(".")
-np_version = f"{np_version_tuple[0]}.{np_version_tuple[1]}"
+np_version = "{}.{}".format(*np_version_tuple[:2])
 
 
 intersphinx_mapping = {
     "python": (f"https://docs.python.org/{py_version}", None),
     "numpy": (f"https://numpy.org/doc/{np_version}/", None),
+    "scipy": (
+        f"https://docs.scipy.org/doc/scipy-{scipy.version.version}/reference/",
+        None,
+    ),
 }
 
 
