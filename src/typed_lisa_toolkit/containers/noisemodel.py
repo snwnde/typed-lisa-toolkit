@@ -111,7 +111,11 @@ class FDNoiseModel:
         self.cumulative_integrator = cumulative_integrator
 
     @abc.abstractmethod
-    def create_new(self, **kwargs: Unpack[IntegratorConfig]) -> Self:
+    def create_new(
+        self,
+        integrator: Integrator = _DEFAULT_INTEGRATOR,
+        cumulative_integrator: CumIntegrator = _DEFAULT_CUM_INTEGRATOR,
+    ) -> Self:
         """Return a new instance of the class with the given integrators."""
 
     @classmethod
@@ -403,8 +407,16 @@ class _StationaryNoiseModel(FDNoiseModel):
         super().__init__(**kwargs)
         self.fd_noise = fd_noise
 
-    def create_new(self, **kwargs: Unpack[IntegratorConfig]):
-        return type(self)(self.fd_noise, **kwargs)
+    def create_new(
+        self,
+        integrator: Integrator = FDNoiseModel._DEFAULT_INTEGRATOR,
+        cumulative_integrator: CumIntegrator = FDNoiseModel._DEFAULT_CUM_INTEGRATOR,
+    ):
+        return type(self)(
+            self.fd_noise,
+            integrator=integrator,
+            cumulative_integrator=cumulative_integrator,
+        )
 
     def get_noise_psd(
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
@@ -425,8 +437,16 @@ class _CacheNoiseModel(FDNoiseModel):
         super().__init__(**kwargs)
         self.noise_cache = noise_cache
 
-    def create_new(self, **kwargs: Unpack[IntegratorConfig]):
-        return type(self)(self.noise_cache, **kwargs)
+    def create_new(
+        self,
+        integrator: Integrator = FDNoiseModel._DEFAULT_INTEGRATOR,
+        cumulative_integrator: CumIntegrator = FDNoiseModel._DEFAULT_CUM_INTEGRATOR,
+    ):
+        return type(self)(
+            self.noise_cache,
+            integrator=integrator,
+            cumulative_integrator=cumulative_integrator,
+        )
 
     def get_noise_psd(
         self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
