@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.4.0 - 2025-04-23
+#### Bug Fixes
+- backward compatibility - (20357d3) - Senwen Deng
+#### Documentation
+- tapering - (62fc59d) - Senwen Deng
+#### Features
+- tapering - (d60dff2) - Senwen Deng
+
+- - -
+
 ## 0.3.7 - 2025-04-22
 #### Bug Fixes
 - make defaults private - (487d445) - Senwen Deng
