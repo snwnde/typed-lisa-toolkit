@@ -56,7 +56,7 @@ import numpy as np
 import numpy.typing as npt
 import h5py  # type: ignore
 
-from . import arithdicts, representations
+from . import arithdicts, representations, tapering
 
 if TYPE_CHECKING:
     from ..viz import plotters
@@ -227,7 +227,7 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         self,
         *,
         keep_times: Literal[False],
-        tapering: representations.Tapering | None = None,
+        tapering: tapering.Tapering | None = None,
     ) -> FSData: ...
 
     @overload
@@ -235,14 +235,14 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         self,
         *,
         keep_times: Literal[True] = True,
-        tapering: representations.Tapering | None = None,
+        tapering: tapering.Tapering | None = None,
     ) -> TimedFSData: ...
 
     def to_fsdata(
         self,
         *,
         keep_times: bool = True,
-        tapering: representations.Tapering | None = None,
+        tapering: tapering.Tapering | None = None,
     ):
         """Return the frequency series data.
 
@@ -269,7 +269,7 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
     def get_zero_padded(
         self,
         pad_time: tuple[float, float],
-        tapering: representations.Tapering | None = None,
+        tapering: tapering.Tapering | None = None,
     ) -> Self:
         """Return the zero-padded data."""
         pad_width = tuple(int(np.rint(time / self.dt)) for time in pad_time)
@@ -363,7 +363,7 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         self,
         times: npt.NDArray[np.floating],
         *,
-        tapering: representations.Tapering | None,
+        tapering: tapering.Tapering | None,
     ):
         """Return the time series data."""
         tsdict = {
@@ -419,7 +419,7 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
         """Drop the time grid."""
         return FSData(self.data)
 
-    def to_tsdata(self, *, tapering: representations.Tapering | None = None):  # type: ignore
+    def to_tsdata(self, *, tapering: tapering.Tapering | None = None):  # type: ignore
         # Indeed the signature of this subclass method is different from the superclass method.
         # This is intentional, as the subclass method is more specific. Ignoring the error.
         """Return the time series data."""

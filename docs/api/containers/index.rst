@@ -4,9 +4,11 @@ Containers
 .. toctree::
    :maxdepth: 2
 
-   representations
+   
    modes
+   tapering
    arithdicts
+   representations
    waveforms
    data
    noisemodel

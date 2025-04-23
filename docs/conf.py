@@ -26,6 +26,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
+    'sphinx.ext.extlinks',
     "myst_nb",
     "sphinx.ext.mathjax",
     "sphinx_toolbox.more_autodoc.autoprotocol",
@@ -52,6 +53,10 @@ autodoc_type_aliases = {
     "WaveformInChannel": "WaveformInChannel",
     "Waveform": "Waveform",
     "FormattedWaveform": "FormattedWaveform",
+}
+
+extlinks = {
+    'doi': ('https://dx.doi.org/%s', 'doi:%s'),
 }
 
 napoleon_use_admonition_for_notes = True
