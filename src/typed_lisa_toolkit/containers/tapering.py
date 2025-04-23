@@ -2,15 +2,18 @@
 Module for tapering functions.
 
 This module provides a function to create tapering functions compatible with
-the transformations defined in the :mod:`.representation` module, for the window functions
+the transformations defined in the :mod:`.representations` module, for the window functions
 from the :mod:`scipy.signal.windows` module. For this purpose, use the
-:func:`get_tapering_func` function. The module also provides ready-to-use
-tapering functions. Refer to the section "Tapering Functions" for a list.
+:func:`get_tapering_func` function.
+
+The module also provides custom tapering functions, ready to use upon
+choosing the parameters. Refer to the section "Tapering Functions" for a list.
 
 .. currentmodule:: typed_lisa_toolkit.containers.tapering
 
 Types
 -----
+.. autoclass:: P
 .. autoprotocol:: Tapering
 .. autoprotocol:: LenWindow
 
@@ -35,6 +38,7 @@ import scipy.special  # type: ignore[import]
 log = logging.getLogger(__name__)
 
 P = ParamSpec("P")
+"""ParamSpec for the window functions."""
 
 
 class Tapering(Protocol):
