@@ -138,7 +138,7 @@ class planck_window(Tapering):
         lgrid = grid[grid <= g_min + self.xl]
         rgrid = grid[grid >= g_max - self.xr]
         zl = self.xl * (1 / (lgrid[1:] - g_min) + 1 / (lgrid[1:] - g_min - self.xl))
-        zr = self.xr * (1 / (rgrid[:-1] - g_max) + 1 / (rgrid[:-1] - g_max + self.xr))
+        zr = -self.xr * (1 / (rgrid[:-1] - g_max) + 1 / (rgrid[:-1] - g_max + self.xr))
         scipy.special.expit(-zl, out=win[1 : len(lgrid)])
         scipy.special.expit(-zr, out=win[-len(rgrid) : -1])
         return win
