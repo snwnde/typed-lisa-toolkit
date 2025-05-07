@@ -222,12 +222,16 @@ class _Series(
             return self.create_like(self.entries / other.entries)
         return self.create_like(self.entries / other)
 
-    def add(self, other: Self, slice: slice) -> Self:
+    def add(self, other: Self, slice: slice, inplace: bool = False) -> Self:
         """Add another series on a sub-grid with known slice.
 
         This method adds another series on a sub-grid of the current series
         with a known slice, which is used to select the entries of the current
         series to be added with.
+
+        If `inplace` is True, the current series is modified in place
+        and returned. Otherwise, a new series is returned with the result
+        of the addition.
 
         See Also
         --------
@@ -236,10 +240,15 @@ class _Series(
         self._guard_binary_op(other)
         _slice = slice
         if np.array_equal(self.grid[_slice], other.grid):
-            _entries = self.entries.copy()
+            if inplace:
+                _entries = self.entries
+            else:
+                _entries = self.entries.copy()
             _entries[_slice] += other.entries  # type: ignore[misc]
             # We cannot currently correctly type `slice` with arguments
             # which leads to the type hinting issue above.
+            if inplace:
+                return self
             return self.create_like(_entries)
         raise ValueError(
             "The series to add is not on a sub-grid of `self`. "
@@ -272,7 +281,7 @@ class _Series(
         if len(self.grid) < len(other.grid):
             return other + self
         _slice = utils.get_subset_slice(self.grid, other.grid[0], other.grid[-1])
-        return self.add(other, _slice)
+        return self.add(other, _slice, inplace=False)
 
     def exp(self) -> Self:
         """Return the exponential of the series."""
