@@ -114,7 +114,6 @@ Interpolator = Callable[[npt.NDArray[NPFloatingT], npt.NDArray[NPFloatingT]], Ar
 _slice = slice  # Alias for slice
 
 
-
 class Representation(Generic[NPFloatingT, NPNumberT_co]):
     """A format in which detector data are displayed.
 
@@ -223,24 +222,57 @@ class _Series(
             return self.create_like(self.entries / other.entries)
         return self.create_like(self.entries / other)
 
+    def add(self, other: Self, slice: slice) -> Self:
+        """Add another series on a sub-grid with known slice.
+
+        This method adds another series on a sub-grid of the current series
+        with a known slice, which is used to select the entries of the current
+        series to be added with.
+
+        See Also
+        --------
+        :meth:`.__add__`
+        """
+        self._guard_binary_op(other)
+        _slice = slice
+        if np.array_equal(self.grid[_slice], other.grid):
+            _entries = self.entries.copy()
+            _entries[_slice] += other.entries  # type: ignore[misc]
+            # We cannot currently correctly type `slice` with arguments
+            # which leads to the type hinting issue above.
+            return self.create_like(_entries)
+        raise ValueError(
+            "The series to add is not on a sub-grid of `self`. "
+            "Expected `other.grid` to match `self.grid[_slice]`, but got:\n"
+            f"self.grid[_slice]: {self.grid[_slice]}\n"
+            f"other.grid: {other.grid}\n"
+            "You may want to first embed the series to super-grids before adding them,"
+            "if their grids are not compatible."
+        )
+
     def __add__(self, other: Self) -> Self:
         """Add two series.
 
-        Note
-        ----
         This method allows adding two series with different grids, as long as
         one grid is a subset of the other grid. The resulting series will have
         the grid of the longer series.
+
+        Note
+        ----
+        This method computes automatically the slice of the subgrid to apply
+        with a generic algorithm. This is not the most efficient in some cases.
+        If you have a specialised and more efficient way of computing the slice,
+        you should use the :meth:`.add` method instead.
+
+        See Also
+        --------
+        :meth:`.add`
         """
         self._guard_binary_op(other)
         if len(self.grid) < len(other.grid):
             return other + self
         _slice = utils.get_subset_slice(self.grid, other.grid[0], other.grid[-1])
-        if np.array_equal(self.grid[_slice], other.grid):
-            _entries = self.entries.copy()
-            _entries[_slice] += other.entries
-            return self.create_like(_entries)
-        raise ValueError("The grids of the two series are not compatible.")
+        return self.add(other, _slice)
 
     def exp(self) -> Self:
         """Return the exponential of the series."""
@@ -353,7 +385,9 @@ class FrequencySeries(
         return self.create_like(self._imag(self.entries))
 
     def irfft(
-        self, time_grid: npt.NDArray[np.floating], tapering: tapering.Tapering | None = None
+        self,
+        time_grid: npt.NDArray[np.floating],
+        tapering: tapering.Tapering | None = None,
     ):
         """Inverse real FFT of the series."""
         tapering_window = (
