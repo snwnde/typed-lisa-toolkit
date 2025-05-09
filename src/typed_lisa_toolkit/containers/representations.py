@@ -52,21 +52,21 @@ Entities
    :member-order: groupwise
    :undoc-members:
    :inherited-members:
-   :special-members: __add__
+   :special-members: __add__, __iadd__
 
 .. autoclass:: FrequencySeries
    :members:
    :member-order: groupwise
    :undoc-members:
    :inherited-members:
-   :special-members: __add__
+   :special-members: __add__, __iadd__
 
 .. autoclass:: Phasor
    :members:
    :member-order: groupwise
    :undoc-members:
    :inherited-members:
-   :special-members: __add__
+   :special-members: __add__, __iadd__
 
 .. autoclass:: TimeFrequency
     :members:
@@ -222,6 +222,31 @@ class _Series(
             return self.create_like(self.entries / other.entries)
         return self.create_like(self.entries / other)
 
+    def iadd(self, other: Self, slice: slice) -> Self:
+        """Add another series on a sub-grid with known slice in place.
+
+        See Also
+        --------
+        :meth:`.__iadd__`
+        :meth:`.add`
+        :meth:`.__add__`
+        """
+        self._guard_binary_op(other)
+        _slice = slice
+        if np.array_equal(self.grid[_slice], other.grid):
+            self.entries[_slice] += other.entries  # type: ignore[misc]
+            # We cannot currently correctly type `slice` with arguments
+            # which leads to the type hinting issue above.
+            return self
+        raise ValueError(
+            "The series to add, `other`, is not on a sub-grid of `self`. "
+            "Expected `other.grid` to match `self.grid[_slice]`, but got:\n"
+            f"self.grid[_slice]: {self.grid[_slice]}\n"
+            f"other.grid: {other.grid}\n"
+            "You may want to first embed the series instances to super-grids before "
+            "adding them, if their grids are not compatible."
+        )
+
     def add(self, other: Self, slice: slice, inplace: bool = False) -> Self:
         """Add another series on a sub-grid with known slice.
 
@@ -230,41 +255,55 @@ class _Series(
         series to be added with.
 
         If `inplace` is True, the current series is modified in place
-        and returned. Otherwise, a new series is returned with the result
-        of the addition.
+        and returned (equivalent to calling :meth:`.iadd`). Otherwise,
+        a new series is returned with the result of the addition.
+        Default is False.
 
         See Also
         --------
+        :meth:`.iadd`
+        :meth:`.__iadd__`
+        :meth:`.__add__`
+        """
+        if inplace:
+            return self.iadd(other, slice)
+        self_copy = self.create_like(self.entries.copy())
+        self_copy.iadd(other, slice)
+        return self_copy
+
+    def __iadd__(self, other: Self) -> Self:
+        """Add another series in place.
+
+        Note
+        ----
+        Compared to :meth:`.iadd`, this method computes automatically the slice
+        of the subgrid to apply with a generic algorithm. This is not the most
+        efficient in some cases. If you have a specialised and more efficient
+        way of computing the slice, you should use the :meth:`.iadd` method
+        instead.
+
+        See Also
+        --------
+        :meth:`.iadd`
+        :meth:`.add`
         :meth:`.__add__`
         """
         self._guard_binary_op(other)
-        _slice = slice
-        if np.array_equal(self.grid[_slice], other.grid):
-            if inplace:
-                _entries = self.entries
-            else:
-                _entries = self.entries.copy()
-            _entries[_slice] += other.entries  # type: ignore[misc]
-            # We cannot currently correctly type `slice` with arguments
-            # which leads to the type hinting issue above.
-            if inplace:
-                return self
-            return self.create_like(_entries)
-        raise ValueError(
-            "The series to add is not on a sub-grid of `self`. "
-            "Expected `other.grid` to match `self.grid[_slice]`, but got:\n"
-            f"self.grid[_slice]: {self.grid[_slice]}\n"
-            f"other.grid: {other.grid}\n"
-            "You may want to first embed the series to super-grids before adding them,"
-            "if their grids are not compatible."
-        )
+        if len(self.grid) < len(other.grid):
+            raise ValueError(
+                "In-place addition requires the series to add to "
+                "be a sub-grid of the current one. Expect `other.grid` "
+                "to be shorter than `self.grid`."
+            )
+        _slice = utils.get_subset_slice(self.grid, other.grid[0], other.grid[-1])
+        return self.iadd(other, slice=_slice)
 
     def __add__(self, other: Self) -> Self:
         """Add two series.
 
         This method allows adding two series with different grids, as long as
         one grid is a subset of the other grid. The resulting series will have
-        the grid of the longer series.
+        the grid of the longer one.
 
         Note
         ----
@@ -276,12 +315,15 @@ class _Series(
         See Also
         --------
         :meth:`.add`
+        :meth:`.iadd`
+        :meth:`.__iadd__`
         """
         self._guard_binary_op(other)
         if len(self.grid) < len(other.grid):
             return other + self
-        _slice = utils.get_subset_slice(self.grid, other.grid[0], other.grid[-1])
-        return self.add(other, _slice, inplace=False)
+        self_copy = self.create_like(self.entries.copy())
+        self_copy += other
+        return self_copy
 
     def exp(self) -> Self:
         """Return the exponential of the series."""
