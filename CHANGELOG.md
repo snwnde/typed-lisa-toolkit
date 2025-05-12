@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.4.2 - 2025-05-12
+#### Features
+- in-place addition - (5d6cd6b) - Senwen Deng
+- inplace addition for Series - (7d09fbc) - Senwen Deng
+#### Refactoring
+- add series - (772cc2f) - Senwen Deng
+
+- - -
+
 ## 0.4.1 - 2025-04-23
 #### Bug Fixes
 - plank - (32818fc) - Senwen Deng
