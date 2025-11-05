@@ -184,6 +184,71 @@ class ArithDict(UserDict[KT, ArithT], lib.mixins.NDArrayMixin):
                 ufunc(*unwrapped[k], **kwargs)
             return out_arg[0]
 
+    def _type_copy(self, other: object):
+        type_self = type(self)
+        type_other = type(other)
+        if isinstance(other, type_self):
+            return other
+        if isinstance(self, type_other):
+            return self
+        for base in type(self).__mro__:
+            if issubclass(ArithDict, base):
+                continue
+            if issubclass(type_other, base):
+                return base
+        raise TypeError(
+            f"Cannot determine common type for {type_self} and {type_other}."
+        )
+
+    def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
+        """Support arithmetic operations via numpy ufuncs."""
+        if method == "reduce":
+            return NotImplemented
+
+        if method == "accumulate":
+            return NotImplemented
+
+        if method == "outer":
+            return NotImplemented
+
+        if method == "reduceat":
+            return NotImplemented
+
+        if method == "at":
+            return NotImplemented
+
+        if method == "__call__":
+            unwrapped: dict[KT, list[object]] = {}
+            for_type = self
+            for k in self.keys():
+                unwrapped[k] = []
+                for inp in inputs:
+                    val, val_for_type = self._unwrap(inp, k)
+                    unwrapped[k].append(val)
+                    try:
+                        for_type = for_type._type_copy(val_for_type)
+                    except TypeError:
+                        # If no common type is found, we assume
+                        # val is a number or an array
+                        # and we keep common_type as is
+                        pass
+
+            # unwrapped = {
+            #     k: [self._unwrap(inp, k) for inp in inputs] for k in self.keys()
+            # }
+            out_arg = kwargs.get("out", None)
+            if out_arg is None:
+                new_data = {k: ufunc(*unwrapped[k], **kwargs) for k in self.keys()}
+                return for_type.create_new(new_data)
+
+            out_unwrapped = {
+                k: [self._unwrap(o, k)[0] for o in out_arg] for k in self.keys()
+            }
+            for k in self.keys():
+                kwargs["out"] = tuple(out_unwrapped[k])
+                ufunc(*unwrapped[k], **kwargs)
+            return out_arg[0]
+
     def _create_new(self, data: Mapping[KT, ArithTb]):
         """Create a new instance of the class."""
         return ArithDict(data)

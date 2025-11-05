@@ -579,6 +579,16 @@ class FrequencySeries(_Series):
         """The frequency spacing. Alias for :attr:`.resolution`."""
         return self.resolution
 
+    @property
+    def frequencies(self):
+        """The frequencies of the series. Alias for :attr:`.grid`."""
+        return self.grid
+
+    @property
+    def df(self):
+        """The frequency spacing. Alias for :attr:`.resolution`."""
+        return self.resolution
+
     def irfft(
         self,
         time_grid: npt.NDArray[np.floating],
