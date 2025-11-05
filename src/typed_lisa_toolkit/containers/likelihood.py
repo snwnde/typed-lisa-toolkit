@@ -19,7 +19,7 @@ Entities
 """
 
 import logging
-from typing import TypeVar, Protocol
+from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
@@ -31,20 +31,18 @@ from . import data as data_
 
 log = logging.getLogger(__name__)
 
-VT = TypeVar(
-    "VT",
-    npt.NDArray[np.floating],
-    arithdicts.ChannelDict[np.floating | npt.NDArray[np.floating]],
-)
+VT = arithdicts.ChannelDict[np.number] | npt.NDArray[np.floating] | float
 
 
 class Likelihood(Protocol):
     """Protocol for likelihoods."""
 
-    def get_log_likelihood(self, template) -> arithdicts.ChannelDict[np.floating]:
+    def get_log_likelihood(self, template) -> VT:  # pyright: ignore[reportReturnType]
         """Get the log likelihood."""
 
-    def get_log_likelihood_ratio(self, template) -> arithdicts.ChannelDict[np.floating]:
+    def get_log_likelihood_ratio(
+        self, template
+    ) -> VT:  # pyright: ignore[reportReturnType]
         """Get the log likelihood ratio."""
 
 
@@ -75,18 +73,16 @@ class WhittleLikelihood(Likelihood):
         self.data_square = self.noisemodel.get_scalar_product(data, data)
 
     @classmethod
-    def log_likelihood_ratio(cls, cross_product: VT, template_square: VT) -> VT:
+    def log_likelihood_ratio(cls, cross_product: VT, template_square: VT):
         """Compute the log likelihood ratio."""
         return cross_product - 0.5 * template_square
 
     @classmethod
-    def log_likelihood(cls, log_likelihood_ratio: VT, data_square: VT) -> VT:
+    def log_likelihood(cls, log_likelihood_ratio: VT, data_square: VT):
         """Compute the log likelihood."""
         return log_likelihood_ratio - 0.5 * data_square
 
-    def get_log_likelihood(
-        self, template: wf.FormattedWaveform
-    ) -> arithdicts.ChannelDict[np.floating]:
+    def get_log_likelihood(self, template: wf.FormattedWaveform):
         """Get the log likelihood."""
         return self.log_likelihood(
             self.get_log_likelihood_ratio(template), self.data_square
@@ -125,9 +121,10 @@ class WhittleLikelihood(Likelihood):
         """Process the template."""
         template_waveform = wf.to_fsdata(template)
         try:
+            freqs = np.array(template_waveform.frequencies)
             f_interval = (
-                template_waveform.frequencies[0],
-                template_waveform.frequencies[-1],
+                freqs[0],
+                freqs[-1],
             )
         except IndexError:
             f_interval = (0, 0)  # An empty interval

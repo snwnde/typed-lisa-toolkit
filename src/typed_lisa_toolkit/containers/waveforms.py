@@ -55,7 +55,6 @@ _ModeT = TypeVar(
     "_ModeT", tuple[int, int], tuple[int, int, int], modes.Harmonic, modes.QNM
 )
 _FModeT = TypeVar("_FModeT", bound=modes.Harmonic | modes.QNM)
-_PhasorT = TypeVar("_PhasorT", bound=reps.Phasor)
 
 WaveformInChannel = Mapping[_ModeT, WaveformInMode]
 Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[_ModeT, WaveformInMode]]
@@ -84,8 +83,8 @@ def format(
 
 
 def to_fsdata(
-    wf: Waveform[_ModeT, reps.FrequencySeries[NPFloatingT, NPNumberT]],
-) -> data.FSData[NPFloatingT, NPNumberT]:
+    wf: Waveform[_ModeT, reps.FrequencySeries],
+) -> data.FSData:
     """Convert :class:`.Waveform` to :class:`.data.FSData`.
 
     This function accepts an instance of :class:`.Waveform` with
@@ -105,7 +104,9 @@ class FSWaveformGen(Protocol):
 
     def __call__(
         self, *args, **kwargs
-    ) -> FormattedWaveform[modes.Harmonic | modes.QNM, reps.FrequencySeries]:
+    ) -> FormattedWaveform[
+        modes.Harmonic | modes.QNM, reps.FrequencySeries
+    ]:  # pyright: ignore[reportReturnType]
         """Get the frequency domain waveform at the given frequencies."""
 
 
@@ -139,8 +140,8 @@ def get_dense_maker(
         frequencies: npt.NDArray[np.floating],
         embed: bool = False,
     ):
-        def do(wf: _PhasorT):
-            fmin, fmax = wf.frequencies[0], wf.frequencies[-1]
+        def do(wf: reps.Phasor):
+            fmin, fmax = np.array(wf.frequencies)[0], np.array(wf.frequencies)[-1]
             freqs = frequencies[utils.get_subset_slice(frequencies, fmin, fmax)]
             nwf = wf.get_interpolated(freqs, interpolator)
             if not embed:

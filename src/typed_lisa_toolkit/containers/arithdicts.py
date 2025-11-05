@@ -44,7 +44,11 @@ from collections import UserDict
 from collections.abc import Mapping, Sequence
 import logging
 from typing import TypeVar, Protocol, Self, Generic, Callable, Union, cast
+import numbers
+import numpy as np
 import numpy.typing as npt
+
+from .. import lib
 
 
 log = logging.getLogger(__name__)
@@ -52,11 +56,21 @@ log = logging.getLogger(__name__)
 KT = TypeVar("KT")
 """Key type."""
 
-ArithT = TypeVar("ArithT", bound=Union["SupportsArithmetic", "ArithDict", npt.NDArray])
+# ArithT = TypeVar(
+#     "ArithT", bound=Union["SupportsArithmetic", npt.NDArray, numbers.Number]
+# )
+# """Arithmetic type."""
+
+ArithT = TypeVar("ArithT")
 """Arithmetic type."""
 
-ArithTb = TypeVar("ArithTb", bound=Union["SupportsArithmetic", "ArithDict", npt.NDArray])
+ArithTb = TypeVar("ArithTb")
 """Arithmetic type (bis)."""
+
+# ArithTb = TypeVar(
+#     "ArithTb", bound=Union["SupportsArithmetic", npt.NDArray, numbers.Number]
+# )
+# """Arithmetic type (bis)."""
 
 ModeT = TypeVar("ModeT", bound=tuple[int, ...])
 """Mode type."""
@@ -67,98 +81,98 @@ ChnName = str
 class SupportsArithmetic(Protocol):
     """A protocol for supporting arithmetic operations."""
 
-    def __add__(self: ArithT, other: ArithT, /) -> SupportsArithmetic: ...  # noqa: D105
-    def __sub__(self: ArithT, other: ArithT, /) -> ArithT: ...  # noqa: D105
-    def __mul__(self: ArithT, other: ArithT, /) -> ArithT: ...  # noqa: D105
-    def __truediv__(self: ArithT, other: ArithT, /) -> SupportsArithmetic: ...  # noqa: D105
-    def __neg__(self: ArithT) -> ArithT: ...  # noqa: D105
+    def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
+        """Support arithmetic operations via numpy ufuncs."""
 
 
-class _NullValue:
-    def __add__(self, other):
-        return other
-
-    def __neg__(self):
-        return self
-
-
-class ArithDict(UserDict[KT, ArithT]):
+class ArithDict(UserDict[KT, ArithT], lib.mixins.NDArrayMixin):
     """A dictionary of values that support arithmetic operations."""
 
-    NULL: ArithT = _NullValue()  # type: ignore[assignment]
-    """A null value for the value type of the dictionary."""
+    def _check_keys(self, other: ArithDict):
+        if set(other.keys()) != set(self.keys()):
+            raise ValueError("Cannot operate on two ArithDicts with different keys.")
+        return True
 
-    def __array__(self):  # noqa: D105
-        raise TypeError(f"""{self.__class__.__name__} can not be casted into an array. If you see this in a multiplication
-            between a numpy array and an ArithDict, most likely the numpy array is on the left side of the multiplication. Try to put it on the right side.""")
+    def _unwrap(self, x: object, k: KT):
+        try:
+            for_type = self._type_copy(x)
+            self._check_keys(cast(ArithDict, x))
+            return cast(ArithDict, x)[k], for_type
+        except TypeError:
+            return x, x
 
-    def create_new(self, data: Mapping[KT, ArithTb]):
+    def _type_copy(self, other: object):
+        type_self = type(self)
+        type_other = type(other)
+        if isinstance(other, type_self):
+            return other
+        if isinstance(self, type_other):
+            return self
+        for base in type(self).__mro__:
+            if issubclass(ArithDict, base):
+                continue
+            if issubclass(type_other, base):
+                return base
+        raise TypeError(
+            f"Cannot determine common type for {type_self} and {type_other}."
+        )
+
+    def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
+        """Support arithmetic operations via numpy ufuncs."""
+        if method == "reduce":
+            return NotImplemented
+
+        if method == "accumulate":
+            return NotImplemented
+
+        if method == "outer":
+            return NotImplemented
+
+        if method == "reduceat":
+            return NotImplemented
+
+        if method == "at":
+            return NotImplemented
+
+        if method == "__call__":
+            unwrapped: dict[KT, list[object]] = {}
+            for_type = self
+            for k in self.keys():
+                unwrapped[k] = []
+                for inp in inputs:
+                    val, val_for_type = self._unwrap(inp, k)
+                    unwrapped[k].append(val)
+                    try:
+                        for_type = for_type._type_copy(val_for_type)
+                    except TypeError:
+                        # If no common type is found, we assume
+                        # val is a number or an array
+                        # and we keep common_type as is
+                        pass
+
+            # unwrapped = {
+            #     k: [self._unwrap(inp, k) for inp in inputs] for k in self.keys()
+            # }
+            out_arg = kwargs.get("out", None)
+            if out_arg is None:
+                new_data = {k: ufunc(*unwrapped[k], **kwargs) for k in self.keys()}
+                return for_type.create_new(new_data)
+
+            out_unwrapped = {
+                k: [self._unwrap(o, k)[0] for o in out_arg] for k in self.keys()
+            }
+            for k in self.keys():
+                kwargs["out"] = tuple(out_unwrapped[k])
+                ufunc(*unwrapped[k], **kwargs)
+            return out_arg[0]
+
+    def _create_new(self, data: Mapping[KT, ArithTb]):
+        """Create a new instance of the class."""
+        return ArithDict(data)
+
+    def create_new(self, data: Mapping[KT, ArithT]) -> Self:
         """Create a new instance of the class."""
         return type(self)(data)
-
-    @property
-    def _cls_binary_op(self):
-        """Return the class to check before some binary operations."""
-        return type(self)
-
-    def __mul_arithdict__(self, other: ArithDict[KT, ArithTb]):
-        """Multiply two ArithDicts."""
-        return self.create_new({k: self[k] * other[k] for k in self.keys()})
-
-    def __mul_value__(self, value: ArithTb):
-        """Multiply a ArithDict by a value."""
-        return self.create_new({k: self[k] * value for k in self.keys()})
-
-    def __mul__(self, other: ArithTb):  # noqa: D105
-        if isinstance(other, self._cls_binary_op):
-            return self.__mul_arithdict__(other)
-        try:
-            return self.__mul_value__(other)
-        except TypeError as e:
-            raise TypeError(f"Cannot multiply {type(self)} by {type(other)}.") from e
-
-    def __rmul__(self, value: ArithTb):
-        """Multiply an arithmetic dictionary by an object of its value type."""
-        return self.__mul_value__(value)
-
-    def __truediv__(self, other: ArithTb):
-        """Divide an arithmetic dictionary by another arithmetic dictionary or an object of its value type."""
-        if isinstance(other, self._cls_binary_op):
-            return self.create_new({k: self[k] / other[k] for k in self.keys()})
-        try:
-            return self.create_new({k: self[k] / other for k in self.keys()})
-        except TypeError as e:
-            raise TypeError(f"Cannot divide {type(self)} by {type(other)}") from e
-
-    def __rtruediv__(self, value: ArithTb):
-        """Divide an arithmetic dictionary by an object of its value type."""
-        return self.create_new({k: value / self[k] for k in self.keys()})
-
-    def __add_arithdict__(self, other: ArithDict[KT, ArithTb]):
-        """Add two arithmetic dictionaries."""
-        return self.create_new({k: self[k] + other[k] for k in self.keys()})
-
-    def __add_value__(self, value: ArithTb):
-        """Add an arithmetic dictionary by an object of its value type."""
-        return self.create_new({k: self[k] + value for k in self.keys()})
-
-    def __add__(self, other: ArithTb):  # noqa: D105
-        if other is self.NULL:
-            return self
-        if isinstance(other, self._cls_binary_op):
-            return self.__add_arithdict__(other)
-        try:
-            return self.__add_value__(other)
-        except TypeError as e:
-            raise TypeError(f"Cannot add {type(self)} by {type(other)}.") from e
-
-    def __neg__(self):
-        """Negate an arithmetic dictionary."""
-        return self.create_new({k: -self[k] for k in self.keys()})
-
-    def __sub__(self, other: ArithTb):
-        """Subtract two arithmetic dictionaries."""
-        return self + (-other)
 
     def pass_through(self, func: Callable[[ArithT], ArithTb]):
         """Pass the dictionary through a function.
@@ -175,10 +189,10 @@ class ArithDict(UserDict[KT, ArithT]):
 
         def _func(v: ArithT) -> ArithTb:
             if isinstance(v, ArithDict):
-                return v.pass_through(func)
+                return v.pass_through(func)  # type: ignore[return-value]
             return func(v)
 
-        return self.create_new({k: _func(v) for k, v in self.items()})
+        return self._create_new({k: _func(v) for k, v in self.items()})
 
     def listify(self, keys: KT | Sequence[KT]) -> list[KT]:
         """Convert the keys to a list."""
@@ -193,6 +207,7 @@ class ArithDict(UserDict[KT, ArithT]):
         keys :
             The keys to keep. Either a single key or a sequence of keys.
         """
+        # pylint: disable=assignment-from-no-return, not-an-iterable
         keys = self.listify(keys)
         return self.create_new({key: self[key] for key in keys})
 
@@ -204,6 +219,7 @@ class ArithDict(UserDict[KT, ArithT]):
         keys :
             The keys to drop. Either a single key or a sequence of keys.
         """
+        # pylint: disable=assignment-from-no-return, unsupported-membership-test
         keys = self.listify(keys)
         return self.create_new(
             {key: self[key] for key in self.keys() if key not in keys}
@@ -211,16 +227,22 @@ class ArithDict(UserDict[KT, ArithT]):
 
     def sum(self) -> ArithT:
         """Return the sum of all the values in the dictionary."""
-        _sum = sum(self.values(), self.NULL)
-        return _sum
+        # TODO optimize the typing here
+        return sum(self.values())  # type: ignore[return-value,arg-type]
+
+    @property
+    def real(self):
+        """Return the real part of the dictionary values."""
+        return self.create_new({k: getattr(v, "real") for k, v in self.items()})
+
+    @property
+    def imag(self):
+        """Return the imaginary part of the dictionary values."""
+        return self.create_new({k: getattr(v, "imag") for k, v in self.items()})
 
 
 class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
     """A dictionary of modes."""
-
-    @property
-    def _cls_binary_op(self):
-        return ModeDict
 
     @property
     def modes(self) -> tuple[ModeT, ...]:
@@ -237,6 +259,9 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
         keys = cast(Sequence[ModeT], keys)
         return list(keys)
 
+    def _create_new(self, data: Mapping[ModeT, ArithTb]):
+        """Create a new instance of the class."""
+        return ModeDict(data)
 
 class ChannelDict(ArithDict[ChnName, ArithT], Generic[ArithT]):
     """A dictionary of channels."""
@@ -254,3 +279,7 @@ class ChannelDict(ArithDict[ChnName, ArithT], Generic[ArithT]):
         if isinstance(keys, ChnName):
             return [keys]
         return list(keys)
+
+    def _create_new(self, data: Mapping[ChnName, ArithTb]):
+        """Create a new instance of the class."""
+        return ChannelDict(data)

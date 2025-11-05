@@ -94,6 +94,7 @@ def extend_to(target_grid: npt.NDArray[np.floating]):
     array([0, 0, 1, 2, 3, 4, 5, 0, 0, 0])
 
     """
+
     # One might consider pre-allocate memory for extended_entries, i.e. designing
     # a class that stores extended_entries and reinitializes it with zeros before
     # each call to get_extension. This would accelerate the function, but I fail

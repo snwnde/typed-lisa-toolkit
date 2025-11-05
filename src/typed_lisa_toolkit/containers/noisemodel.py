@@ -53,7 +53,7 @@ class Integrator(Protocol):
         self,
         __y: npt.NDArray[NPNumT],
         **kwargs,
-    ) -> NPNumT:
+    ) -> NPNumT:  # pyright: ignore[reportReturnType]
         """Integrate the given data."""
 
 
@@ -64,7 +64,7 @@ class CumIntegrator(Protocol):
         self,
         __y: npt.NDArray[NPNumT],
         **kwargs,
-    ) -> npt.NDArray[NPNumT]:
+    ) -> npt.NDArray[NPNumT]:  # pyright: ignore[reportReturnType]
         """Integrate the given data cumulatively."""
 
 
@@ -86,7 +86,7 @@ class StationaryFDNoise(Protocol):
 
     def psd(
         self, frequencies: npt.NDArray[np.floating], option: ChnName
-    ) -> npt.NDArray[np.floating]:
+    ) -> npt.NDArray[np.floating]:  # pyright: ignore[reportReturnType]
         """Return the power spectral density (PSD)."""
 
 
@@ -104,8 +104,8 @@ class FDNoiseModel:
 
     def __init__(
         self,
-        integrator: Integrator = _DEFAULT_INTEGRATOR,
-        cumulative_integrator: CumIntegrator = _DEFAULT_CUM_INTEGRATOR,
+        integrator: Integrator = _DEFAULT_INTEGRATOR,  # pyright: ignore[reportArgumentType]
+        cumulative_integrator: CumIntegrator = _DEFAULT_CUM_INTEGRATOR,  # pyright: ignore[reportArgumentType]
     ) -> None:
         self.integrator = integrator
         self.cumulative_integrator = cumulative_integrator
@@ -113,8 +113,8 @@ class FDNoiseModel:
     @abc.abstractmethod
     def create_new(
         self,
-        integrator: Integrator = _DEFAULT_INTEGRATOR,
-        cumulative_integrator: CumIntegrator = _DEFAULT_CUM_INTEGRATOR,
+        integrator: Integrator = _DEFAULT_INTEGRATOR,  # pyright: ignore[reportArgumentType]
+        cumulative_integrator: CumIntegrator = _DEFAULT_CUM_INTEGRATOR,  # pyright: ignore[reportArgumentType]
     ) -> Self:
         """Return a new instance of the class with the given integrators."""
 
@@ -150,7 +150,7 @@ class FDNoiseModel:
 
     @abc.abstractmethod
     def get_noise_psd(
-        self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
+        self, frequencies: arithdicts.ChannelDict[reps.Linspace | npt.NDArray]
     ) -> data.FSData:
         """Return the noise PSD.
 
@@ -160,15 +160,9 @@ class FDNoiseModel:
 
     def get_integrand(
         self,
-        left: data.FSData[
-            data.NPFloatingT,
-            data.NPNumberT,
-        ],
-        right: data.FSData[
-            data.NPFloatingT,
-            data.NPNumberT,
-        ],
-    ) -> data.FSData[data.NPFloatingT, data.NPNumberT]:
+        left: data.FSData,
+        right: data.FSData,
+    ) -> data.FSData:
         r"""Return the integrand of the scalar product.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
@@ -183,15 +177,9 @@ class FDNoiseModel:
 
     def get_complex_scalar_product(
         self,
-        left: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
-        right: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
-    ) -> arithdicts.ChannelDict[np.complexfloating]:
+        left: data.FSData,
+        right: data.FSData,
+    ):
         r"""Return the complex scalar product.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
@@ -210,14 +198,8 @@ class FDNoiseModel:
 
     def get_cumulative_complex_scalar_product(
         self,
-        left: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
-        right: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
+        left: data.FSData,
+        right: data.FSData,
     ):
         r"""Return the cumulative complex scalar product.
 
@@ -231,9 +213,7 @@ class FDNoiseModel:
         """
         integrand = self.get_integrand(left, right)
 
-        def make_product(
-            chname: ChnName,
-        ) -> npt.NDArray[np.complexfloating]:
+        def make_product(chname: ChnName):
             series = integrand[chname]
 
             return self.cumulative_integrator(
@@ -245,14 +225,8 @@ class FDNoiseModel:
 
     def get_scalar_product(
         self,
-        left: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
-        right: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
+        left: data.FSData,
+        right: data.FSData,
     ):
         r"""Return the scalar product.
 
@@ -263,18 +237,12 @@ class FDNoiseModel:
 
             \left( d \middle| h \right) = 4 \Re \int_{f_\text{min}}^{f_\text{max}} \frac{d(f) h^*(f)}{S_n(f)} \, \mathrm{d} f.
         """
-        return self.get_complex_scalar_product(left, right).pass_through(np.real)
+        return self.get_complex_scalar_product(left, right).real
 
     def get_cumulative_scalar_product(
         self,
-        left: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
-        right: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
+        left: data.FSData,
+        right: data.FSData,
     ):
         r"""Return the cumulative scalar product.
 
@@ -292,15 +260,9 @@ class FDNoiseModel:
 
     def get_cross_correlation(
         self,
-        left: data.TimedFSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
-        right: data.FSData[
-            data.NPFloatingT,
-            np.complexfloating,
-        ],
-    ) -> arithdicts.ChannelDict[reps.TimeSeries[np.floating, np.complex128]]:
+        left: data.TimedFSData,
+        right: data.FSData,
+    ) -> arithdicts.ChannelDict[reps.TimeSeries]:
         r"""Return the cross correlation.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`, and the noise PSD is :math:`S_n(f)`,
@@ -327,12 +289,14 @@ class FDNoiseModel:
         that the input arrays :math:`d(f)` and :math:`h(f)` are one-sided, and the negative frequencies are
         populated by **zero** before the inverse Fourier transform.
         """
+        left_times = reps.Linspace.make(left.times)
         two_sided_freq = np.fft.fftshift(
-            np.fft.fftfreq(len(left.times), left.times[1] - left.times[0])
+            np.fft.fftfreq(len(left_times), left_times.step)
         )
         integrand = self.get_integrand(left, right)
+        integ_freqs = np.array(integrand.frequencies)
         inband_slice = utils.get_subset_slice(
-            two_sided_freq, integrand.frequencies[0], integrand.frequencies[-1]
+            two_sided_freq, integ_freqs[0], integ_freqs[-1]
         )
         # Note that we assumed all the channels have the same frequency grid.
 
@@ -409,8 +373,8 @@ class _StationaryNoiseModel(FDNoiseModel):
 
     def create_new(
         self,
-        integrator: Integrator = FDNoiseModel._DEFAULT_INTEGRATOR,
-        cumulative_integrator: CumIntegrator = FDNoiseModel._DEFAULT_CUM_INTEGRATOR,
+        integrator: Integrator = FDNoiseModel._DEFAULT_INTEGRATOR,  # pyright: ignore[reportArgumentType]
+        cumulative_integrator: CumIntegrator = FDNoiseModel._DEFAULT_CUM_INTEGRATOR,  # pyright: ignore[reportArgumentType]
     ):
         return type(self)(
             self.fd_noise,
@@ -419,10 +383,10 @@ class _StationaryNoiseModel(FDNoiseModel):
         )
 
     def get_noise_psd(
-        self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
+        self, frequencies: arithdicts.ChannelDict[reps.Linspace | npt.NDArray]
     ):
         def make_psd(chnname: ChnName):
-            freq = frequencies[chnname]
+            freq = np.array(frequencies[chnname])
             entries = self.fd_noise.psd(freq, option=chnname)
             return reps.FrequencySeries(freq, entries)
 
@@ -439,8 +403,8 @@ class _CacheNoiseModel(FDNoiseModel):
 
     def create_new(
         self,
-        integrator: Integrator = FDNoiseModel._DEFAULT_INTEGRATOR,
-        cumulative_integrator: CumIntegrator = FDNoiseModel._DEFAULT_CUM_INTEGRATOR,
+        integrator: Integrator = FDNoiseModel._DEFAULT_INTEGRATOR,  # pyright: ignore[reportArgumentType]
+        cumulative_integrator: CumIntegrator = FDNoiseModel._DEFAULT_CUM_INTEGRATOR,  # pyright: ignore[reportArgumentType]
     ):
         return type(self)(
             self.noise_cache,
@@ -449,9 +413,9 @@ class _CacheNoiseModel(FDNoiseModel):
         )
 
     def get_noise_psd(
-        self, frequencies: arithdicts.ChannelDict[npt.NDArray[data.NPFloatingT]]
+        self, frequencies: arithdicts.ChannelDict[reps.Linspace | npt.NDArray]
     ):
-        freq = next(iter(frequencies.values()))
+        freq = np.array(next(iter(frequencies.values())))
         try:
             interval = freq[0], freq[-1]
         except IndexError:

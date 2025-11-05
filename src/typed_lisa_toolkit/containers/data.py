@@ -1,7 +1,7 @@
 """Module for data containers.
 
 We model data containers as :class:`.arithdicts.ChannelDict` instances that encapsulate
-data (for now, :class:`.representations.TimeSeries` and :class:`.representations.FrequencySeries`). In this
+data (for now, :class:`.reps.TimeSeries` and :class:`.reps.FrequencySeries`). In this
 model, data are recorded instead of being generated, and for that reason we do not
 distinguish different modes in data containers.
 
@@ -56,7 +56,7 @@ import numpy as np
 import numpy.typing as npt
 import h5py  # type: ignore
 
-from . import arithdicts, representations, tapering
+from . import arithdicts, representations as reps, tapering
 
 if TYPE_CHECKING:
     from ..viz import plotters
@@ -72,10 +72,10 @@ NPFloatingTb = TypeVar("NPFloatingTb", bound=np.floating)
 NPNumberT = TypeVar("NPNumberT", bound=np.number)
 """Numpy dtype."""
 
-ValueT = TypeVar("ValueT", bound=representations.Representation)
+ValueT = TypeVar("ValueT", bound=reps.Representation)
 """Value type in the data container."""
 
-_SeriesT = TypeVar("_SeriesT", bound=representations._Series)
+_SeriesT = TypeVar("_SeriesT", bound=reps._Series)
 _ChnT = TypeVar("_ChnT", bound=arithdicts.ChannelDict)
 _DataT = TypeVar("_DataT", bound="_Data")
 
@@ -111,7 +111,7 @@ class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
     _series_type: type[_SeriesT]
 
     @property
-    def grid(self) -> npt.NDArray[NPFloatingT]:
+    def grid(self):
         """Return the grid."""
         return next(iter(self.values())).grid
 
@@ -195,30 +195,30 @@ class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
             additions = cls._additional_load(f)
             dict_ = {
                 chnname: cls._series_type(
-                    grid=f[chnname]["grid"][...], entries=f[chnname]["entries"][...]
+                    grid=f[chnname]["grid"][...], entries=f[chnname]["entries"][...]  # type: ignore
                 )
                 for chnname in f
                 if isinstance(f[chnname], h5py.Group)
             }
-        return cls(dict_, **additions)
+        return cls(dict_, **additions)  # pyright: ignore[reportArgumentType]
 
 
-class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]]):
+class TSData(_SeriesData[reps.TimeSeries]):
     """Dictionary data container of time series data."""
 
-    _series_type = representations.TimeSeries
+    _series_type = reps.TimeSeries
 
     @property
-    def times(self) -> npt.NDArray[NPFloatingT]:
+    def times(self):
         """Return the times."""
         return next(iter(self.values())).times
 
     @property
-    def dt(self) -> NPFloatingT:
+    def dt(self) -> float:
         """Return the time step."""
         return next(iter(self.values())).dt
 
-    def get_frequencies(self) -> npt.NDArray[NPFloatingT]:
+    def get_frequencies(self):
         """Return the frequencies grid matching the time grid."""
         return np.fft.rfftfreq(len(self.times), d=self.dt)
 
@@ -273,19 +273,20 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
     ) -> Self:
         """Return the zero-padded data."""
         pad_width = tuple(int(np.rint(time / self.dt)) for time in pad_time)
+        self_times = np.array(self.times)
         time_end_values = (
-            -self.dt * pad_width[0] + self.times[0],
-            self.dt * pad_width[1] + self.times[-1],
+            -self.dt * pad_width[0] + self_times[0],
+            self.dt * pad_width[1] + self_times[-1],
         )
         padded_time = np.pad(
-            self.times, pad_width, mode="linear_ramp", end_values=time_end_values
+            self_times, pad_width, mode="linear_ramp", end_values=time_end_values
         )
-        tapering_window = tapering(self.times) if tapering is not None else 1
+        tapering_window = tapering(self_times) if tapering is not None else 1
 
-        def get_padded_ts(chn: representations.TimeSeries):
-            signal = chn.entries * tapering_window
-            padded_signal = np.pad(signal, pad_width, mode="constant")
-            return representations.TimeSeries(grid=padded_time, entries=padded_signal)
+        def get_padded_ts(chn: reps.TimeSeries):
+            signal = chn * tapering_window
+            padded_signal = np.pad(signal.entries, pad_width, mode="constant")
+            return type(chn)(grid=padded_time, entries=padded_signal)
 
         tsdict = {chnname: get_padded_ts(chn) for chnname, chn in self.items()}
         return self.create_new(tsdict)
@@ -296,18 +297,18 @@ class TSData(_SeriesData[representations.TimeSeries[NPFloatingT, NPFloatingTb]])
         return plotters.TSDataPlotter
 
 
-class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]]):
+class FSData(_SeriesData[reps.FrequencySeries]):
     """Dictionary data container of frequency series data."""
 
-    _series_type = representations.FrequencySeries
+    _series_type = reps.FrequencySeries
 
     def __init__(
         self,
-        data: Mapping[str, representations.FrequencySeries[NPFloatingT, NPNumberT]],
+        data: Mapping[str, reps.FrequencySeries],
         name: str | None = None,
     ):
-        def sieve(chn: representations.FrequencySeries):
-            if isinstance(chn, representations.Phasor):
+        def sieve(chn: reps.FrequencySeries):
+            if isinstance(chn, reps.Phasor):
                 return chn.to_frequency_series()
             return chn
 
@@ -316,34 +317,18 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         super().__init__(dict_, name)
 
     @property
-    def frequencies(self) -> npt.NDArray[NPFloatingT]:
+    def frequencies(self):
         """Return the frequencies."""
         return next(iter(self.values())).frequencies
 
     @property
-    def df(self) -> NPFloatingT:
+    def df(self):
         """Return the frequency step."""
         return next(iter(self.values())).df
-
-    def conj(self):
-        """Return the conjugate of the data."""
-        return self.create_new({chnname: chn.conj() for chnname, chn in self.items()})
 
     def angle(self):
         """Return the angle of the data."""
         return self.create_new({chnname: chn.angle() for chnname, chn in self.items()})
-
-    def abs(self):
-        """Return the absolute value of the data."""
-        return self.create_new({chnname: chn.abs() for chnname, chn in self.items()})
-
-    def exp(self):
-        """Return the exponential of the data."""
-        return self.create_new({chnname: chn.exp() for chnname, chn in self.items()})
-
-    def sqrt(self):
-        """Return the square root of the data."""
-        return self.create_new({chnname: chn.sqrt() for chnname, chn in self.items()})
 
     @property
     def real(self):
@@ -361,13 +346,13 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
 
     def to_tsdata(
         self,
-        times: npt.NDArray[np.floating],
+        times: npt.NDArray[np.floating] | reps.Linspace,
         *,
         tapering: tapering.Tapering | None,
     ):
         """Return the time series data."""
         tsdict = {
-            chnname: chn.irfft(times, tapering=tapering)
+            chnname: chn.irfft(np.array(times), tapering=tapering)
             for chnname, chn in self.items()
         }
         return TSData(tsdict)
@@ -378,24 +363,24 @@ class FSData(_SeriesData[representations.FrequencySeries[NPFloatingT, NPNumberT]
         return plotters.FSDataPlotter
 
 
-class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT]):
+class TimedFSData(FSData):
     """Dictionary data container for frequency series data with time information."""
 
     def __init__(
         self,
-        data: Mapping[str, representations.FrequencySeries[NPFloatingT, NPNumberT]],
-        times: npt.NDArray[np.floating],
+        data: Mapping[str, reps.FrequencySeries],
+        times: reps.Linspace | npt.NDArray[np.floating],
     ):
         super().__init__(data)
-        self.times = times
-        self.dt: np.floating = times[1] - times[0]
+        self.times = reps.Linspace.make(times)
+        self.dt = self.times.step
 
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=self.times)
 
     @classmethod
     def _additional_load(cls, f: h5py.File):
-        return {"times": f["times"][...]}
+        return {"times": f["times"][...]}  # pyright: ignore[reportIndexIssue]
 
     def set_times(self, times: npt.NDArray[np.floating]):
         """Set the time grid.
@@ -407,7 +392,7 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
 
     def create_new(  # noqa: D102
         self,
-        data: Mapping[str, representations.FrequencySeries[NPNumberT]],  # type: ignore
+        data: Mapping[str, reps.FrequencySeries[NPNumberT]],  # type: ignore
     ):
         # Unless series.FrequencySeries is wrongly implemented so that it does not follow
         # the SupportsArithmetic protocol, there is no reason to think the type hint is wrong.
@@ -427,8 +412,8 @@ class TimedFSData(FSData[NPFloatingT, NPNumberT], Generic[NPFloatingT, NPNumberT
 
 
 class TFData(
-    _Data[representations.TimeFrequency[NPFloatingT, representations.NPNumberT_co]],
-    Generic[NPFloatingT, representations.NPNumberT_co],
+    _Data[reps.TimeFrequency],
+    Generic[NPFloatingT, reps.NPNumberT_co],
 ):
     """Dictionary data container of time-frequency data."""
 
@@ -500,7 +485,7 @@ def load_ldc_data(
         ]
         return X, Y, Z
 
-    def transform_channels(data: _DataT):
+    def transform_channels(data: _DataT):  # pyright: ignore[reportInvalidTypeVarUse]
         channel_names = tuple(name for name in channels)
         if set(channel_names).issubset(data.channel_names):
             return data.pick(channel_names)
@@ -524,7 +509,7 @@ def load_ldc_data(
         if domain == "t":
             tsdata = TSData(
                 {
-                    chnname: representations.TimeSeries(
+                    chnname: reps.TimeSeries(
                         grid=dataset[domain].squeeze(),
                         entries=dataset[chnname].squeeze(),
                     )

@@ -38,12 +38,12 @@ class TestModeDict(unittest.TestCase):
     def test_mul(self):
         coeff = 2
         array = np.ones(10)
-        with self.assertRaises(TypeError):
-            array * self.mode_dict
-        result = coeff * self.mode_dict * array
+        result = (coeff * self.mode_dict) * array
+        result2 = self.mode_dict * (array * coeff)
         expected = {k: v * coeff for k, v in self.data.items()}
         for k in result.keys():
             self.assertTrue(np.array_equal(result[k], expected[k]))
+            self.assertTrue(np.array_equal(result2[k], expected[k]))
 
     def test_truediv(self):
         result = self.mode_dict / 2
@@ -90,13 +90,13 @@ class TestChannelDict(unittest.TestCase):
     def test_mul(self):
         coeff = 2
         array = np.ones(10)
-        with self.assertRaises(TypeError):
-            array * self.channel_dict
-        result = coeff * self.channel_dict * array
+        result = (coeff * self.channel_dict) * array
+        result2 = self.channel_dict * (array * coeff)
         expected = {k: v * coeff for k, v in self.data.items()}
         for k in result.keys():
             for mode in result[k].keys():
                 self.assertTrue(np.array_equal(result[k][mode], expected[k][mode]))
+                self.assertTrue(np.array_equal(result2[k][mode], expected[k][mode]))
 
     def test_truediv(self):
         result = self.channel_dict / 2

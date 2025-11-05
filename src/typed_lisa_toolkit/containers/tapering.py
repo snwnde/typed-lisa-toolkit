@@ -44,7 +44,9 @@ P = ParamSpec("P")
 class Tapering(Protocol):
     """Protocol for tapering functions."""
 
-    def __call__(self, __array: npt.NDArray[np.number]) -> npt.NDArray[np.floating]:
+    def __call__(
+        self, __array: npt.NDArray[np.number]
+    ) -> npt.NDArray[np.floating]:  # pyright: ignore[reportReturnType]
         """Return the tapering window to apply on the array."""
 
 
@@ -128,7 +130,9 @@ class planck_window(Tapering):
         self.xl = left_margin
         self.xr = right_margin
 
-    def __call__(self, grid: npt.NDArray[np.number]):
+    def __call__(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, grid: npt.NDArray[np.number]
+    ):
         """Return the tapering window to apply on the array."""
         # https://arxiv.org/abs/1003.2939
         win = np.ones_like(grid)
@@ -139,6 +143,7 @@ class planck_window(Tapering):
         rgrid = grid[grid >= g_max - self.xr]
         zl = self.xl * (1 / (lgrid[1:] - g_min) + 1 / (lgrid[1:] - g_min - self.xl))
         zr = -self.xr * (1 / (rgrid[:-1] - g_max) + 1 / (rgrid[:-1] - g_max + self.xr))
+        # pylint: disable=no-member
         scipy.special.expit(-zl, out=win[1 : len(lgrid)])
         scipy.special.expit(-zr, out=win[-len(rgrid) : -1])
         return win
