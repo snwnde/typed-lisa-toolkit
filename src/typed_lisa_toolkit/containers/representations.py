@@ -602,7 +602,6 @@ class FrequencySeries(_Series):
             else np.ones_like(self.frequencies)
         )
         dt: np.floating = time_grid[1] - time_grid[0]
-
         nyquist_dt = 1 / (2 * self_frequencies[-1])
         if dt < nyquist_dt and not np.isclose(dt, nyquist_dt):
             # FIXME spurious warning for odd, small n
@@ -830,6 +829,13 @@ class Phasor(FrequencySeries):
         entries = self.entries[slice].copy() if copy else self.entries[slice]
         phases = self.phases[slice].copy() if copy else self.phases[slice]
         return type(self)(grid=self.grid[slice], entries=entries, phases=phases)
+
+    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
+        """Return the series embedded in a new grid."""
+        self_grid = np.array(self.grid)
+        entries = utils.extend_to(embedding_grid)(self_grid, self.entries)
+        phases = utils.extend_to(embedding_grid)(self_grid, self.phases)
+        return type(self)(grid=embedding_grid, entries=entries, phases=phases)
 
     @staticmethod
     def reim_to_cplx(
