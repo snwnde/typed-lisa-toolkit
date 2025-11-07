@@ -117,72 +117,98 @@ class ArithDict(UserDict[KT, ArithT], lib.mixins.NDArrayMixin):
             f"Cannot determine common type for {type_self} and {type_other}."
         )
 
-    def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
-        """Support arithmetic operations via numpy ufuncs."""
-        if method == "reduce":
-            return NotImplemented
+    def __xp__(self, api_version=None):  # noqa: D105
+        val = next(iter(self.values()))
+        try:
+            return val.__xp__(api_version=api_version)
+        except AttributeError:
+            try:
+                return val.__array_namespace__(api_version=api_version)
+            except AttributeError:
+                return np
 
-        if method == "accumulate":
-            return NotImplemented
+    def _binary_op(
+        self,
+        other,
+        op,
+        /,
+        reflected: bool = False,
+        inplace: bool = False,
+        **kwargs,
+    ) -> Self:
+        del kwargs
+        unwrapped: dict[KT, list[object]] = {}
+        for_type = self
+        for k in self.keys():
+            unwrapped[k] = []
+            for inp in (self, other) if not reflected else (other, self):
+                val, val_for_type = self._unwrap(inp, k)
+                unwrapped[k].append(val)
+                try:
+                    for_type = for_type._type_copy(val_for_type)
+                except TypeError:
+                    # If no common type is found, we assume
+                    # val is a number or an array
+                    # and we keep for_type as is
+                    pass
+        new_data = {k: op(*unwrapped[k]) for k in self.keys()}
+        if inplace:
+            self = for_type.create_new(self.data)
+        return for_type.create_new(new_data)
 
-        if method == "outer":
-            return NotImplemented
+    def _unary_op(self, op, /, **kwargs) -> Self:
+        del kwargs
+        new_data = {k: op(v) for k, v in self.items()}
+        return self.create_new(new_data)
 
-        if method == "reduceat":
-            return NotImplemented
+    # def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
+    #     """Support arithmetic operations via numpy ufuncs."""
+    #     if method == "reduce":
+    #         return NotImplemented
 
-        if method == "at":
-            return NotImplemented
+    #     if method == "accumulate":
+    #         return NotImplemented
 
-        if method == "__call__":
-            unwrapped: dict[KT, list[object]] = {}
-            for_type = self
-            for k in self.keys():
-                unwrapped[k] = []
-                for inp in inputs:
-                    val, val_for_type = self._unwrap(inp, k)
-                    unwrapped[k].append(val)
-                    try:
-                        for_type = for_type._type_copy(val_for_type)
-                    except TypeError:
-                        # If no common type is found, we assume
-                        # val is a number or an array
-                        # and we keep common_type as is
-                        pass
+    #     if method == "outer":
+    #         return NotImplemented
 
-            # unwrapped = {
-            #     k: [self._unwrap(inp, k) for inp in inputs] for k in self.keys()
-            # }
-            out_arg = kwargs.get("out", None)
+    #     if method == "reduceat":
+    #         return NotImplemented
 
-            if (
-                out_arg is not None
-                and len(out_arg) == 1
-                and out_arg[0] is self
-                and len(inputs) == 2
-                and inputs[0] is self
-                and ufunc in (np.add, np.subtract)
-            ):
-                other = inputs[1]
-                for k in self.keys():
-                    rhs, _ = self._unwrap(other, k)
-                    if ufunc is np.add:
-                        self[k] = self[k].__iadd__(rhs)  # type: ignore[attr-defined]
-                    else:
-                        self[k] = self[k].__iadd__(-rhs)  # type: ignore[attr-defined]
-                return self
+    #     if method == "at":
+    #         return NotImplemented
 
-            if out_arg is None:
-                new_data = {k: ufunc(*unwrapped[k], **kwargs) for k in self.keys()}
-                return for_type.create_new(new_data)
+    #     if method == "__call__":
+    #         unwrapped: dict[KT, list[object]] = {}
+    #         for_type = self
+    #         for k in self.keys():
+    #             unwrapped[k] = []
+    #             for inp in inputs:
+    #                 val, val_for_type = self._unwrap(inp, k)
+    #                 unwrapped[k].append(val)
+    #                 try:
+    #                     for_type = for_type._type_copy(val_for_type)
+    #                 except TypeError:
+    #                     # If no common type is found, we assume
+    #                     # val is a number or an array
+    #                     # and we keep common_type as is
+    #                     pass
 
-            out_unwrapped = {
-                k: [self._unwrap(o, k)[0] for o in out_arg] for k in self.keys()
-            }
-            for k in self.keys():
-                kwargs["out"] = tuple(out_unwrapped[k])
-                ufunc(*unwrapped[k], **kwargs)
-            return out_arg[0]
+    #         # unwrapped = {
+    #         #     k: [self._unwrap(inp, k) for inp in inputs] for k in self.keys()
+    #         # }
+    #         out_arg = kwargs.get("out", None)
+    #         if out_arg is None:
+    #             new_data = {k: ufunc(*unwrapped[k], **kwargs) for k in self.keys()}
+    #             return for_type.create_new(new_data)
+
+    #         out_unwrapped = {
+    #             k: [self._unwrap(o, k)[0] for o in out_arg] for k in self.keys()
+    #         }
+    #         for k in self.keys():
+    #             kwargs["out"] = tuple(out_unwrapped[k])
+    #             ufunc(*unwrapped[k], **kwargs)
+    #         return out_arg[0]
 
     def _type_copy(self, other: object):
         type_self = type(self)
@@ -345,6 +371,7 @@ class ModeDict(ArithDict[ModeT, ArithT], Generic[ModeT, ArithT]):
     def _create_new(self, data: Mapping[ModeT, ArithTb]):
         """Create a new instance of the class."""
         return ModeDict(data)
+
 
 class ChannelDict(ArithDict[ChnName, ArithT], Generic[ArithT]):
     """A dictionary of channels."""

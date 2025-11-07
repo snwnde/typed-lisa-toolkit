@@ -326,53 +326,91 @@ class _Series(lib.mixins.NDArrayMixin):
             )
         return flag
 
-    def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
-        cls = type(self)
+    def __xp__(self, api_version=None):
+        return self.entries.__array_namespace__(api_version=api_version)
 
-        def _unwrap(x):
-            if self._check_series(x, raise_error=False):
-                if self._check_grid(x, raise_error=True):
-                    return x.entries
-            return x
+    def _unwrap(self, x):
+        if self._check_series(x, raise_error=False):
+            if self._check_grid(x, raise_error=True):
+                return x.entries
+        return x
 
-        if method == "reduce":
-            return NotImplemented
+    def _binary_op(
+        self,
+        other,
+        op,
+        /,
+        reflected: bool = False,
+        inplace: bool = False,
+        **kwargs,
+    ):
+        del kwargs  # Unused
 
-        if method == "accumulate":
-            return NotImplemented
+        if not reflected:
+            entries = op(self.entries, self._unwrap(other))
+        else:
+            entries = op(self._unwrap(other), self.entries)
 
-        if method == "outer":
-            return NotImplemented
+        if inplace:
+            del entries
+            return self
 
-        if method == "reduceat":
-            if len(inputs) < 2:
-                return NotImplemented
-            assert inputs[0] is self, "What is going on?"
-            indices = inputs[1]
-            entries = ufunc.reduceat(self.entries, indices, *inputs[2:], **kwargs)
-            grid = np.array(self.grid)[indices]
-            return cls(grid, entries)
+        return self.create_like(entries)
 
-        if method == "at":
-            if len(inputs) < 2:
-                return NotImplemented
-            assert inputs[0] is self, "What is going on?"
-            indices = inputs[1]
-            ufunc.at(self.entries, indices, *inputs[2:], **kwargs)
-            return None
+    def _unary_op(self, op, /, **kwargs) -> Self:
+        out_arg = kwargs.get("out", None)
+        if out_arg is not None:
+            kwargs["out"] = self._unwrap(out_arg)
+        entries = op(self.entries, **kwargs)
+        return self.create_like(entries)
 
-        if method == "__call__":
-            unwrapped = [_unwrap(inp) for inp in inputs]
-            out_arg = kwargs.get("out", None)
-            if out_arg is None:
-                return cls(
-                    self.grid,
-                    ufunc(*unwrapped, **kwargs),
-                )
-            out_unwrapped = [_unwrap(o) for o in out_arg]
-            kwargs["out"] = tuple(out_unwrapped)
-            ufunc(*unwrapped, **kwargs)
-            return out_arg[0]
+    # def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
+    #     cls = type(self)
+
+    #     def _unwrap(x):
+    #         if self._check_series(x, raise_error=False):
+    #             if self._check_grid(x, raise_error=True):
+    #                 return x.entries
+    #         return x
+
+    #     if method == "reduce":
+    #         return NotImplemented
+
+    #     if method == "accumulate":
+    #         return NotImplemented
+
+    #     if method == "outer":
+    #         return NotImplemented
+
+    #     if method == "reduceat":
+    #         if len(inputs) < 2:
+    #             return NotImplemented
+    #         assert inputs[0] is self, "What is going on?"
+    #         indices = inputs[1]
+    #         entries = ufunc.reduceat(self.entries, indices, *inputs[2:], **kwargs)
+    #         grid = np.array(self.grid)[indices]
+    #         return cls(grid, entries)
+
+    #     if method == "at":
+    #         if len(inputs) < 2:
+    #             return NotImplemented
+    #         assert inputs[0] is self, "What is going on?"
+    #         indices = inputs[1]
+    #         ufunc.at(self.entries, indices, *inputs[2:], **kwargs)
+    #         return None
+
+    #     if method == "__call__":
+    #         unwrapped = [_unwrap(inp) for inp in inputs]
+    #         out_arg = kwargs.get("out", None)
+    #         if out_arg is None:
+    #             return cls(
+    #                 self.grid,
+    #                 ufunc(*unwrapped, **kwargs),
+    #             )
+    #         out_unwrapped = [_unwrap(o) for o in out_arg]
+    #         kwargs["out"] = tuple(out_unwrapped)
+    #         ufunc(*unwrapped, **kwargs)
+    #         return out_arg[0]
 
     def __getitem__(self, slice: _slice) -> Self:
         """Return the view of a subset of the series."""
@@ -1009,30 +1047,43 @@ class TimeFrequency(lib.mixins.NDArrayMixin):
             )
         return flag
 
-    def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
-        """Support arithmetic operations via numpy ufuncs."""
-        cls = type(self)
+    def __xp__(self):  # noqa: D105
+        return self.entries.__array_namespace__()
 
-        def _unwrap(x):
-            if self._check_representation(x, raise_error=False):
-                if self._check_grid(x, raise_error=True):
-                    return x.entries
-            return x
+    def _unwrap(self, x):
+        if self._check_representation(x, raise_error=False):
+            if self._check_grid(x, raise_error=True):
+                return x.entries
+        return x
 
-        if method == "reduce":
-            return NotImplemented
+    def _binary_op(
+        self,
+        other,
+        op,
+        /,
+        reflected: bool = False,
+        inplace: bool = False,
+        **kwargs,
+    ):
+        del kwargs  # Unused
 
-        if method == "accumulate":
-            return NotImplemented
+        if not reflected:
+            entries = op(self.entries, self._unwrap(other))
+        else:
+            entries = op(self._unwrap(other), self.entries)
 
-        if method == "outer":
-            return NotImplemented
+        if inplace:
+            del entries
+            return self
 
-        if method == "reduceat":
-            return NotImplemented
+        return self.create_like(entries)
 
-        if method == "at":
-            return NotImplemented
+    def _unary_op(self, op, /, **kwargs) -> Self:
+        out_arg = kwargs.get("out", None)
+        if out_arg is not None:
+            kwargs["out"] = self._unwrap(out_arg)
+        entries = op(self.entries, **kwargs)
+        return self.create_like(entries)
 
         if method == "__call__":
             unwrapped = [_unwrap(inp) for inp in inputs]
