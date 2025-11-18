@@ -21,7 +21,9 @@ In the first case, we implement data classes for the series
 where both the grid and the values are 1D arrays and stored in the
 instances. In the second case, we do not store the 2D grid directly
 to save memory, but we store the arrays of times, frequencies and
-the values for the time-frequency matrices (:class:`.TimeFrequency`).
+the values for the time-frequency matrices (:class:`.TimeFrequency`,
+:class:`.WDM`).
+
 We model these representations as immutable data classes that support
 arithmetic operations between them and with numeric values or arrays.
 We implement generic classes that accept a certain :class:`numpy.dtype`
@@ -41,6 +43,10 @@ Types
 Entities
 --------
 .. autoprotocol:: Representation
+
+..autoclass:: Linspace
+   :members:
+   :special-members:
 
 .. autoclass:: TimeSeries
    :members:
@@ -69,17 +75,52 @@ Entities
     :undoc-members:
     :inherited-members:
 
+.. autoclass:: WDM
+    :members:
+    :member-order: groupwise
+    :inherited-members:
+    :show-inheritance:
 """
 
 from __future__ import annotations
 from collections.abc import Callable
 import dataclasses as dc
 import logging
-from typing import TypeVar, Self, Protocol, TYPE_CHECKING
+from typing import TypeVar, Self, Protocol, TYPE_CHECKING, Any
 import warnings
 import numpy as np
 import numpy.typing as npt
 import scipy.signal  # type: ignore[import-untyped]
+
+from pywavelet.types import (  # type: ignore[import-untyped]
+    FrequencySeries as pywFS,
+    TimeSeries as pywTS,
+    Wavelet as pywWDM,
+)
+from pywavelet import set_backend as _pyw_set_backend  # type: ignore[import-untyped]
+from pywavelet.backend import (  # type: ignore[import-untyped]
+    cuda_is_available as _pyw_cuda_is_available,
+    jax_is_available as _pyw_jax_is_available,
+    set_precision as _pyw_set_precision,
+)
+from pywavelet.transforms import (  # type: ignore[import-untyped]
+    from_freq_to_wavelet as _pyw_f2w,
+    from_time_to_wavelet as _pyw_t2w,
+    from_wavelet_to_freq as _pyw_w2f,
+    from_wavelet_to_time as _pyw_w2t,
+)
+
+# NOTE We could also import the individual transformation routines from
+# pywavelet (written in numpy, cupy, jax) for finer control
+
+# disable pywavelet logging messages which can be verbose.
+pyw_logger = logging.getLogger("pywavelet")
+pyw_logger.disabled = True
+# temporary: force backend to be numpy. This should be removed when
+# tlt is updated to use multiple array backends.
+_pyw_set_backend("numpy", "float64")
+# pyw_set_precision("float64")  # by default pywavelet uses float32.
+
 
 from .. import utils, lib
 from . import tapering
@@ -113,8 +154,11 @@ class Representation(Protocol):
 
     entries: npt.NDArray
 
-    def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
+    def __array_ufunc__(
+        self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs
+    ) -> Any:
         """Support arithmetic operations via numpy ufuncs."""
+        ...
 
 
 class Linspace:
@@ -163,6 +207,7 @@ class Linspace:
         self.stop = start + step * (num - 1)
 
     def __eq__(self, other) -> bool:
+        """Check equality of start, step, num, shape and stop."""
         if not isinstance(other, Linspace):
             return False
         a1 = self.start == other.start
@@ -187,8 +232,10 @@ class Linspace:
         del copy  # Unused
         return self.start + self.step * np.arange(self.num, dtype=dtype)
 
-    def __getitem__(self, slice: _slice) -> Self:
+    def __getitem__(self, slice: _slice | int) -> Self:
         """Return a subset of the grid."""
+        if isinstance(slice, int):
+            return np.array(self)[slice]
         return self.from_array(np.array(self)[slice])
 
     @classmethod
@@ -332,7 +379,7 @@ class _Series(lib.mixins.NDArrayMixin):
             ufunc(*unwrapped, **kwargs)
             return out_arg[0]
 
-    def __getitem__(self, slice: slice) -> Self:
+    def __getitem__(self, slice: slice | int) -> Self:
         """Return the view of a subset of the series."""
         return self.get_subset(slice=slice, copy=False)
 
@@ -443,7 +490,7 @@ class _Series(lib.mixins.NDArrayMixin):
         self,
         *,
         interval: tuple[float, float] | None = None,
-        slice: slice | None = None,
+        slice: slice | int | None = None,
     ) -> slice:
         """Return the subset as a new instance."""
         if interval is None:
@@ -459,13 +506,13 @@ class _Series(lib.mixins.NDArrayMixin):
             slice = utils.get_subset_slice(
                 np.array(self.grid), interval[0], interval[1]
             )
-        return slice
+        return slice if isinstance(slice, _slice) else _slice(slice)
 
     def get_subset(
         self,
         *,
         interval: tuple[float, float] | None = None,
-        slice: slice | None = None,
+        slice: slice | int | None = None,
         copy: bool = True,
     ) -> Self:
         """Return the subset as a new instance."""
@@ -673,7 +720,7 @@ class Phasor(FrequencySeries):
         self,
         *,
         interval: tuple[float, float] | None = None,
-        slice: slice | None = None,
+        slice: slice | int | None = None,
         copy: bool = True,
     ) -> Self:
         """Return the subset as a new instance."""
@@ -769,12 +816,12 @@ class TimeFrequency(lib.mixins.NDArrayMixin):
 
     @property
     def dT(self) -> float:
-        """The time step."""
+        """Time resolution (ΔT) of the time-frequency grid."""
         return Linspace.get_step(self.times)
 
     @property
     def dF(self) -> float:
-        """The frequency spacing."""
+        """Frequency resolution (ΔF) of the time-frequency grid."""
         return Linspace.get_step(self.frequencies)
 
     # TODO for consistency with _Series: receive slices, receive copy bool arg
@@ -892,3 +939,311 @@ class TimeFrequency(lib.mixins.NDArrayMixin):
             kwargs["out"] = tuple(out_unwrapped)
             ufunc(*unwrapped, **kwargs)
             return out_arg[0]
+
+
+@dc.dataclass(slots=True, frozen=False)
+class WDM(TimeFrequency):
+    """
+    Wilson-Daubechies-Meyer (WDM) time-frequency representation.
+
+    This represents data using an evenly-spaced 2D grid in the
+    time-frequency plane with shape (Nf, Nt). Each "pixel" has size
+    ΔF ΔT = 1/2. The times range approximately from 0 to the final
+    observation time, while the frequencies range from 0 to the
+    Nyquist limit (half the sampling rate).
+
+    Currently, transformations to/from FrequencySeries are allowed,
+    but only for full series --- all frequencies and all times.
+    See :meth:`.from_freqseries` and :meth:`to_freqseries`.
+
+    Parameters
+    ----------
+    times: real 1D array
+        Array of evenly-spaced times with separation ΔT and size `Nt`.
+
+    frequencies: real 1D array
+        Array of evenly-spaced frequencies with separation ΔF and size `Nf`.
+
+    entries: real 2D array
+        Array of data entries, with shape `(Nf, Nt)`.
+    """
+
+    def __init__(
+        self,
+        times: npt.NDArray[np.floating] | Linspace,
+        frequencies: npt.NDArray[np.floating] | Linspace,
+        entries: npt.NDArray[np.floating],
+    ):
+        try:
+            Linspace.make(times)
+        except ValueError as e:
+            raise ValueError("times must be evenly sampled")
+
+        try:
+            Linspace.make(frequencies)
+        except ValueError as e:
+            raise ValueError("frequencies must be evenly sampled")
+
+        if not np.isreal(entries[0, 0]):
+            raise ValueError("complex entries are not supported, use real entries only")
+
+        self.times = times
+        self.frequencies = frequencies
+        self.entries = entries
+
+        if not self.is_critically_sampled():
+            raise ValueError("The product ΔT ΔF must be 1/2 for consistency")
+
+    def is_critically_sampled(self):
+        """Return True if :attr:`.dT` * :attr:`.dF` = 1/2."""
+        return np.isclose(self.dT * self.dF, 1 / 2)
+
+    @property
+    def Nt(self) -> int:
+        """Number of time bins."""
+        return len(self.times)
+
+    @property
+    def Nf(self) -> int:
+        """Number of frequency bins."""
+        return len(self.frequencies)
+
+    @property
+    def ND(self) -> int:
+        """Total number of data points :attr:`Nf` * :attr:`Nt`."""
+        return self.Nt * self.Nf
+
+    @property
+    def duration(self) -> float:
+        """Total signal duration."""
+        return float(self.Nt * self.dT)
+
+    @property
+    def dt(self) -> float:
+        """
+        Time resolution of a TimeSeries corresponding to this WDM.
+
+        Smaller than the wavelet time bin :attr:`dT`.
+        """
+        return float(self.duration / self.ND)
+
+    @property
+    def df(self) -> float:
+        """
+        Frequency resolution of a FrequencySeries corresponding to this WDM.
+
+        Smaller than the wavelet frequency bin :attr:`dF`.
+        """
+        return 1 / self.duration
+
+    @property
+    def t0(self) -> float:
+        """Initial time point of the wavelet grid."""
+        # FIXME: t0 != is completely untested and bad things may happen
+        return float(np.array(self.times)[0])
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        """Shape (:attr:`.Nf`, :attr:`.Nt`) of the wavelet grid."""
+        return self.entries.shape
+
+    @property
+    def sampling_rate(self) -> float:
+        """Sampling rate 1/:attr:`.dt`."""
+        return 1 / self.dt
+
+    fs = sampling_rate
+    """Alias for :attr:`.sampling_rate`."""
+
+    @property
+    def nyquist(self) -> float:
+        """Nyquist frequency (half the sampling rate)."""
+        return self.sampling_rate / 2
+
+    @classmethod
+    def from_freqseries(
+        cls,
+        freqseries: FrequencySeries,
+        /,
+        *,
+        Nf: int | None = None,
+        Nt: int | None = None,
+        nx: float = 4.0,
+    ) -> Self:
+        """
+        Transform frequency-domain data to wavelet-domain data.
+
+        This function performs a forward wavelet transform, converting a
+        frequency-domain signal into a wavelet-domain representation.
+
+        At least one of the shape parameters ``(Nf, Nt)`` must be passed.
+
+        .. warning::
+            The WDM transform on discrete-time or discrete-frequency data
+            is inherently lossy, since WDM is a Wilson basis conceived for
+            continuous-time functions. The smaller ``(Nf, Nt)`` are, the
+            worse the errors become. You must make sure they are acceptable
+            in your use case. Use a round-trip transformation with
+            :meth:`.to_freqseries` to quantify the errors. Even numbers are
+            recommended.
+
+        :param freqseries: Input frequency-domain data, represented as a
+            :class:`.FrequencySeries` object.
+        :type freqseries: FrequencySeries
+
+        :param Nf: number of frequency bins for the wavelet transform, defaults to None
+        :type Nf: int | None, optional
+
+        :param Nt: number of time bins for the wavelet transform, defaults to None
+        :type Nt: int | None, optional
+
+        :param nx: shape parameter controlling the width of the wavelets, defaults to 4.0
+        :type nx: float, optional
+
+        :return: the transformed wavelet-domain data.
+        :rtype: WDM
+
+        :raises NotImplementedError: if the frequency grid does not start with 0.
+        :raises ValueError: if neither ``Nf`` nor ``Nt`` was passed.
+        """
+        Nf, Nt, dF, _ = cls._preprocess_bins(freqseries, Nf, Nt)
+
+        if not np.isclose(freqseries.grid[0], 0):
+            raise NotImplementedError(
+                "not yet possible to use f0 != 0, embed freqseries in full grid first"
+            )
+
+        pywfs = cls._fseries_to_pywFS(freqseries)
+        pywwv = _pyw_f2w(pywfs, Nf, Nt, nx)
+        return cls._from_pywWDM(pywwv, precise_dF=dF)
+
+    def to_freqseries(
+        self, *, nx: float = 4.0, mask: npt.NDArray[np.bool] | None = None
+    ) -> FrequencySeries:
+        """
+        Perform an inverse wavelet transform to the frequency domain.
+
+        This function converts a wavelet-domain signal into a frequency-domain
+        signal using the inverse wavelet transform algorithm.
+
+        :param nx: shape parameter controlling the width of the wavelets, defaults to 4.0
+        :type nx: float, optional
+
+        :param mask: mask to apply on the frequencies and entries of the result, useful
+            to avoid singularities. Defaults to None
+        :type mask: npt.NDArray[np.bool] | None, optional
+
+        :return: the signal transformed into the frequency domain.
+        :rtype: FrequencySeries
+        """
+        pywwv = self._to_pywWDM()
+        pywfs = _pyw_w2f(pywwv, self.dt, nx)
+        return self._pywFS_to_fseries(pywfs, mask)
+
+    # TODO add conversion from/to TimeSeries
+
+    @classmethod
+    def _preprocess_bins(
+        cls,
+        data: TimeSeries | FrequencySeries,
+        Nf: int | None = None,
+        Nt: int | None = None,
+    ) -> tuple[int, int, float, float]:
+        """Preprocess the bins."""
+        # get data length
+        if isinstance(data, TimeSeries):
+            ND = len(data.grid)
+            dt = data.dt
+            duration = ND * dt
+            df = 1 / duration
+        elif isinstance(data, FrequencySeries):
+            # len(d) =  N // 2 + 1
+            ND = 2 * (len(data.grid) - 1)
+            df = data.df
+            duration = 1 / df
+            dt = duration / ND
+        else:
+            raise TypeError(
+                f"data must be a TimeSeries or FrequencySeries, not {type(data)}"
+            )
+
+        # find its relation to Nf, Nt
+        if Nt is not None and Nf is None:
+            assert 2 <= Nt <= ND, f"Nt={Nt} must be between 2 and N={ND}"
+            Nf = ND // Nt
+
+        elif Nf is not None and Nt is None:
+            assert 2 <= Nf <= ND, f"Nf={Nf} must be between 2 and N={ND}"
+            Nt = ND // Nf
+
+        elif Nf is None and Nt is None:
+            raise ValueError("At least one of (Nf, Nt) must be passed")
+
+        else:
+            assert isinstance(Nf, int) and isinstance(Nt, int)
+            _N = Nf * Nt
+            if _N > ND:
+                raise ValueError(f"{(Nf,Nt)=} too large for {ND=}")
+
+        # find dF, dT
+        dT = Nf * dt
+        dF = 1 / (2 * dT)
+
+        return Nf, Nt, dF, dT
+
+    ############ Methods for interface with pywavelet ##########
+    @staticmethod
+    def _fseries_to_pywFS(freqseries: FrequencySeries, /) -> pywFS:
+        """Convert FrequencySeries to pywFS."""
+        Tobs = 1 / freqseries.df
+        ND = 2 * (len(freqseries.grid) - 1)
+        dt = Tobs / ND
+        # NOTE pywFS means the DFT of a time series, not the continuous-time Fourier transform.
+        # So we have to scale by dt when converting FrequencySeries <-> pywFS.
+        return pywFS(data=freqseries.entries / dt, freq=np.array(freqseries.grid), t0=0)
+
+    @staticmethod
+    def _pywFS_to_fseries(pywfs: pywFS, mask=None) -> FrequencySeries:
+        """Convert pywFS to FrequencySeries."""
+        freqs = pywfs.freq
+        entries = pywfs.data * pywfs.dt
+        if mask is not None:
+            freqs = np.ma.masked_where(mask, freqs)
+            entries = np.ma.masked_where(mask, entries)
+        return FrequencySeries(freqs, entries)
+
+    @staticmethod
+    def _tseries_to_pywTS(timeseries: TimeSeries) -> pywTS:
+        """Convert TimeSeries to pywTS."""
+        return pywTS(data=timeseries.entries, time=np.array(timeseries.grid))
+
+    @staticmethod
+    def _pywTS_to_tseries(pywts: pywTS) -> TimeSeries:
+        """Convert pywTS to TimeSeries."""
+        return TimeSeries(pywts.time, pywts.data)
+
+    @classmethod
+    def _from_pywWDM(cls, pywwv: pywWDM, /, *, precise_dF: float | None = None) -> Self:
+        """Convert a pywWDM object to a WDM."""
+        entries = pywwv.data
+
+        fgrid_ = pywwv.freq  # this is evenly spaced, but to very low precision
+        tgrid_ = pywwv.time  # same
+        fdiff = np.diff(fgrid_)
+        assert np.allclose(fdiff, fdiff[0], atol=0, rtol=1e-2)
+        tdiff = np.diff(tgrid_)
+        assert np.allclose(tdiff, tdiff[0], atol=0, rtol=1e-2)
+
+        # we need more precision so that Linspace.from_array won't complain
+        dF = pywwv.delta_F
+        if precise_dF:
+            dF = precise_dF
+        fgrid = dF * np.arange(len(fgrid_))
+        dT = 1/(2*dF)
+        tgrid = dT * np.arange(len(tgrid_))
+
+        return cls(times=tgrid, frequencies=fgrid, entries=entries)
+
+    def _to_pywWDM(self) -> pywWDM:
+        """Convert self to a pywWDM object."""
+        return pywWDM(data=self.entries, time=self.times, freq=self.frequencies)

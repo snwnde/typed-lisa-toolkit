@@ -1,11 +1,14 @@
 """Module for data containers.
 
 We model data containers as :class:`.arithdicts.ChannelDict` instances that encapsulate
-data (for now, :class:`.reps.TimeSeries` and :class:`.reps.FrequencySeries`). In this
-model, data are recorded instead of being generated, and for that reason we do not
-distinguish different modes in data containers.
+data as time series (:class:`.TSData`), frequency series (:class:`.FSData` and
+:class:`.TimedFSData`) or WDM wavelets (:class:`.WDMData`).
+
+In this model, data are recorded instead of being generated, and for that reason we do
+not distinguish different modes in data containers.
 
 .. currentmodule:: typed_lisa_toolkit.containers.data
+
 
 Types
 -----
@@ -37,6 +40,13 @@ Entities
    :undoc-members:
    :inherited-members: UserDict
    :show-inheritance:
+
+.. autoclass:: WDMData
+   :members:
+   :member-order: groupwise
+   :exclude-members: listify
+   :undoc-members:
+   :inherited-members: UserDict
 
 Functions
 ---------
@@ -76,9 +86,20 @@ ValueT = TypeVar("ValueT", bound=reps.Representation)
 """Value type in the data container."""
 
 _SeriesT = TypeVar("_SeriesT", bound=reps._Series)
+_TimeFreqT = TypeVar("_TimeFreqT", bound=reps.TimeFrequency)
 _ChnT = TypeVar("_ChnT", bound=arithdicts.ChannelDict)
 _DataT = TypeVar("_DataT", bound="_Data")
 
+def zeros_like(d: _DataT, /, *, name: str | None = None) -> _DataT:
+    """Make zero-filled data in the format of another.
+
+    :param d: data to use for format
+    :type d: _Data
+    :return: zero-filled data.
+    :rtype: _Data
+    """
+    kvdict = {k: 0*v for k,v in d.items()}
+    return type(d)(kvdict, name=name)
 
 class _Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
     """Dictionary data container."""
@@ -411,10 +432,7 @@ class TimedFSData(FSData):
         return super().to_tsdata(self.times, tapering=tapering)
 
 
-class TFData(
-    _Data[reps.TimeFrequency],
-    Generic[NPFloatingT, reps.NPNumberT_co],
-):
+class TFData(_Data[_TimeFreqT], Generic[_TimeFreqT]):
     """Dictionary data container of time-frequency data."""
 
     def get_subset(
@@ -445,6 +463,56 @@ class TFData(
         return plotters.TFDataPlotter(
             self.get_subset(time_interval=time_interval, freq_interval=freq_interval)
         ).draw(**kwargs)
+
+
+class WDMData(TFData[reps.WDM]):
+    """Dictionary data container of WDM time-frequency data."""
+
+    # TODO add conversion to/from TSData
+
+    @classmethod
+    def from_fsdata(cls, data: FSData, /, *, Nf=None, Nt=None, nx=4):
+        """Convert from FSData.
+
+        See :py:meth:`.representations.WDM.from_freqseries`."""
+        wdmdict = {
+            chnname: reps.WDM.from_freqseries(chn, Nf=Nf, Nt=Nt, nx=nx)
+            for chnname, chn in data.items()
+        }
+        return cls(wdmdict)
+
+    def to_fsdata(self, *, nx: float = 4.0, mask=None):
+        """Convert to FSData.
+
+        See :py:meth:`.representations.WDM.to_freqseries`."""
+        fsdict = {
+            chnname: chn.to_freqseries(nx=nx, mask=mask)
+            for chnname, chn in self.items()
+        }
+        return FSData(fsdict)
+
+    def check_consistency(self):
+        """Check if the grids for all channels are consistent.
+
+        :raises ValueError: if not consistent.
+        """
+        keys = list(self.keys())
+        if len(keys) < 2:
+            return
+
+        tgrid_ref = self[keys[0]].times
+        fgrid_ref = self[keys[0]].frequencies
+
+        consistency = {}
+        for chnname, chn in self.items():
+            consistency[chnname + "_time"] = np.allclose(tgrid_ref, chn.times)
+            consistency[chnname + "_freq"] = np.allclose(fgrid_ref, chn.frequencies)
+
+        if not all(consistency.values()):
+            raise ValueError(
+                f"the following grids are inconsistent with reference channel {keys[0]}: "
+                f"{(k for k,v in consistency if not v)}"
+            )
 
 
 def load_data(file_path: str | pathlib.Path):

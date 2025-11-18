@@ -1,13 +1,13 @@
 import unittest
 import numpy as np
-from typed_lisa_toolkit.containers.representations import TimeSeries, FrequencySeries
+from typed_lisa_toolkit.containers.representations import (
+    TimeSeries,
+    FrequencySeries,
+    WDM,
+)
 import tempfile
 import os
-from typed_lisa_toolkit.containers.data import (
-    TSData,
-    FSData,
-    TimedFSData,
-)
+from typed_lisa_toolkit.containers.data import TSData, FSData, TimedFSData, WDMData
 
 
 class TestDataContainers(unittest.TestCase):
@@ -25,6 +25,16 @@ class TestDataContainers(unittest.TestCase):
             grid=self.frequencies, entries=self.frequency_entries
         )
         self.fsdata = FSData({"channel1": self.frequency_series})
+
+        # TODO test data containers with two channels, not just one
+        self.Nf, self.Nt = 10, 10
+        self.wdmdata = WDMData.from_fsdata(self.fsdata, Nf=self.Nf, Nt=self.Nt)
+        self.wdm_tgrid = self.wdmdata["channel1"].times
+        self.wdm_fgrid = self.wdmdata["channel1"].frequencies
+        self.wdmdata2 = self.wdmdata.copy()
+        self.wdmdata2["channel2"] = WDM.from_freqseries(
+            self.frequency_series, Nf=self.Nf, Nt=self.Nt
+        )
 
     def test_tsdata_times(self):
         self.assertTrue(np.array_equal(self.tsdata.times, self.times))
@@ -128,6 +138,15 @@ class TestDataContainers(unittest.TestCase):
                 )
             )
         os.remove(tmpfile.name)
+
+    def test_wdmdata_conversion(self):
+        # just test that these don't error out, and basic consistency
+        self.wdmdata.to_fsdata()
+        self.wdmdata2.to_fsdata()
+
+    def test_wdmdata_consistency(self):
+        self.wdmdata.check_consistency()
+        self.wdmdata2.check_consistency()
 
 
 if __name__ == "__main__":

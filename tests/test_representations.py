@@ -9,6 +9,7 @@ from typed_lisa_toolkit.containers.representations import (
     Phasor,
     Linspace,
     TimeFrequency,
+    WDM,
 )
 from typed_lisa_toolkit.viz.plotters import FSPlotter, TSPlotter, TimeFrequencyPlotter
 from typed_lisa_toolkit.containers.tapering import ldc_window, planck_window
@@ -19,13 +20,13 @@ TAPERING_WINDOWS = [ldc_window(), planck_window()]
 class MixinTestUtils(unittest.TestCase):
     "common test utilities"
 
-    def assertAllClose(self, x, y: NDArray, /):
+    def assertAllClose(self, x, y: NDArray | Linspace, /, **kwargs):
         "This won't work if the second argument is a _Series!"
         # that's because allclose will call asanyarray on y, and _Series is
         # not a subclass of ndarray, meaning it will get converted to an
         # array of dtype object, containing your series as the only element.
         # this will subsequently fail isfinite().
-        self.assertTrue(np.allclose(x, y), msg=f"first = {x}, second = {y}")
+        self.assertTrue(np.allclose(x, y, **kwargs), msg=f"first = {x}, second = {y}")
 
     def assertArrayEq(self, x, y, /):
         self.assertTrue(np.array_equal(x, y), msg=f"first = {x}, second = {y}")
@@ -749,6 +750,162 @@ class TestTimeFrequency(MixinTestUtils, unittest.TestCase):
     def test_get_plotter(self):
         p = self.series2.get_plotter()
         self.assertIsInstance(p, TimeFrequencyPlotter)
+
+    def test_arithmetic_ops(self):
+        entries1, entries2 = self.entries1, self.entries2
+        series1, series2 = self.series1, self.series2
+        self.assertArrayEq((series1 + series2).entries, entries1 + entries2)
+        self.assertArrayEq((series1 - series2).entries, entries1 - entries2)
+        self.assertArrayEq((series1 * series2).entries, entries1 * entries2)
+        self.assertArrayEq((series1 / series2).entries, entries1 / entries2)
+        self.assertArrayEq((series1 * 2).entries, entries1 * 2)
+        self.assertArrayEq((2 * series1).entries, entries1 * 2)
+        self.assertArrayEq((series1 / 2).entries, entries1 / 2)
+        self.assertArrayEq((2 / series2).entries, 2 / entries2)
+
+    def test_unary_ops(self):
+        entries_positive = self.entries1
+        series_positive = self.series1
+        entries = self.entries2  # complex
+        series = self.series2
+
+        # the following all come from lib.mixins.NDArrayMixin
+        self.assertArrayEq((-series).entries, -entries)
+        self.assertArrayEq((series.square()).entries, np.square(entries))
+        self.assertArrayEq((series.exp()).entries, np.exp(entries))
+        self.assertArrayEq((series_positive.sqrt()).entries, np.sqrt(entries_positive))
+        self.assertArrayEq((series.conj()).entries, np.conj(entries))
+        self.assertArrayEq((series.abs()).entries, np.abs(entries))
+
+    def test_ufunc_call(self):
+        entries0, entries1, entries2 = self.entries0, self.entries1, self.entries2
+        series0, series1, series2 = self.series0, self.series1, self.series2
+
+        # binary ops
+        for ufunc in [np.fmod, np.greater, np.maximum, np.copysign]:
+            self.assertArrayEq(
+                (ufunc(series0, series1)).entries, ufunc(entries0, entries1)
+            )
+
+        # unary ops
+        for ufunc in [np.exp, np.isfinite]:
+            self.assertArrayEq(ufunc(series0).entries, ufunc(entries0))
+            self.assertArrayEq(ufunc(series2).entries, ufunc(entries2))
+
+
+class TestWDM(MixinTestUtils, unittest.TestCase):
+    def setUp(self):
+        # We use relatively big (and even) numbers because WDM breaks down
+        # at small values of Nt and Nf, and this implementation has issues
+        # with odd numbers
+        self.Nt, self.Nf = 20, 16
+
+        # WDM must be critically sampled: dF * dT = 1/2
+        self.dT = 0.12891289
+        self.dF = 1 / (2 * self.dT)
+        self.tgrid = self.dT * np.arange(self.Nt)  # t0 is zero!
+        self.fgrid = self.dF * np.arange(self.Nf)  # f0 is zero!
+
+        self.entries0 = np.zeros((self.Nf, self.Nt))
+        self.entries1 = np.ones((self.Nf, self.Nt))
+        self.entries2 = (
+            np.outer(
+                np.ones_like(self.fgrid), np.where(self.tgrid == self.dT, 1.0, 0.0)
+            )
+            + 0.01
+        )
+        self.entries3 = np.outer(
+            np.where(self.fgrid == self.dF, 1.0, 0.0), np.ones_like(self.tgrid)
+        )
+        self.entries4 = np.outer(np.cos(self.fgrid), np.sin(self.tgrid))
+
+        self.series0 = WDM(self.tgrid, self.fgrid, self.entries0)
+        self.series1 = WDM(self.tgrid, self.fgrid, self.entries1)
+        self.series2 = WDM(self.tgrid, self.fgrid, self.entries2)
+        self.series3 = WDM(self.tgrid, self.fgrid, self.entries3)
+        self.series4 = WDM(self.tgrid, self.fgrid, self.entries4)
+        self.serieslist = [
+            self.series0,
+            self.series1,
+            self.series2,
+            self.series3,
+            self.series4,
+        ]
+
+    def test_init(self):
+        # must accept grid and entries as positional or kw arguments
+        series1 = WDM(times=self.tgrid, frequencies=self.fgrid, entries=self.entries1)
+        series2 = WDM(self.tgrid, self.fgrid, self.entries1)
+
+        # the results should match
+        self.assertArrayEq(series1.times, self.tgrid)
+        self.assertArrayEq(series1.times, series2.times)
+        self.assertArrayEq(series1.frequencies, self.fgrid)
+        self.assertArrayEq(series1.frequencies, series2.frequencies)
+        self.assertArrayEq(series1.entries, self.entries1)
+        self.assertArrayEq(series1.entries, series2.entries)
+
+        # there are no other kwargs
+        with self.assertRaises(TypeError):
+            # pylint: disable=unexpected-keyword-arg
+            WDM(self.tgrid, self.fgrid, self.entries1, other=None)  # type: ignore
+
+    # NOTE very slow test
+    def test_roundtrip(self):
+        # to frequencyseries and back
+        for wdm in self.serieslist:
+            fseries = wdm.to_freqseries()
+            new_wdm = WDM.from_freqseries(fseries, Nf=self.Nf, Nt=self.Nt)
+            self.assertAllClose(wdm.times, new_wdm.times)
+            self.assertAllClose(wdm.frequencies, new_wdm.frequencies)
+            self.assertAllClose(wdm.entries, new_wdm.entries, atol=1e-7, rtol=1e-7)
+
+    def test_properties(self):
+        s, e, dF, dT, Nf, Nt = (
+            self.series2,
+            self.entries2,
+            self.dF,
+            self.dT,
+            self.Nf,
+            self.Nt,
+        )
+        self.assertAlmostEqual(s.dT, dT)
+        self.assertAlmostEqual(s.dF, dF)
+        self.assertAlmostEqual(s.Nf, e.shape[0])
+        self.assertAlmostEqual(s.Nt, e.shape[1])
+        self.assertAlmostEqual(s.ND, Nf * Nt)
+        self.assertAlmostEqual(s.duration, Nt * dT)
+        self.assertAlmostEqual(s.duration, Nt * Nf * s.dt)
+        self.assertAlmostEqual(s.df, 1 / s.duration)
+        self.assertAlmostEqual(s.t0, self.tgrid[0])
+        self.assertAlmostEqual(s.sampling_rate, s.fs)
+        self.assertAlmostEqual(s.fs, 1 / s.dt)
+        self.assertAlmostEqual(s.nyquist, s.fs / 2)
+        self.assertEqual(s.shape, e.shape)
+
+    def test_get_subset(self):
+        big = self.series2
+
+        # we can generate a subset using (min, max) interval in the grid
+        assert self.Nt > 2 and self.Nf > 3
+        tmin, tmax = 0.99 * self.dT, 2.01 * self.dT
+        fmin, fmax = 0.99 * self.dF, 3.01 * self.dF
+        expected_subtgrid = self.tgrid[1:3]
+        expected_subfgrid = self.fgrid[1:4]
+        small = big.get_subset(time_interval=(tmin, tmax), freq_interval=(fmin, fmax))
+
+        self.assertEqual(small.entries.shape, (3, 2))
+        self.assertArrayEq(small.times, expected_subtgrid)
+        self.assertArrayEq(small.frequencies, expected_subfgrid)
+
+    def test_create_like(self):
+        old = self.series1
+        new_entries = 2 * self.entries1
+        new = old.create_like(new_entries)
+
+        self.assertArrayEq(old.times, new.times)
+        self.assertArrayEq(old.frequencies, new.frequencies)
+        self.assertArrayEq(new_entries, new.entries)
 
     def test_arithmetic_ops(self):
         entries1, entries2 = self.entries1, self.entries2
