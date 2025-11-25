@@ -71,8 +71,8 @@ class CumIntegrator(Protocol):
 class IntegratorConfig(TypedDict):
     """Dictionary for integrator and cumulative integrator configuration."""
 
-    integrator: Integrator
-    cumulative_integrator: CumIntegrator
+    integrator: NotRequired[Integrator]
+    cumulative_integrator: NotRequired[CumIntegrator]
 
 
 def _collect_frequencies(data: data.FSData):
