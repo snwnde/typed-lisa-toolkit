@@ -246,7 +246,7 @@ class Linspace:
                 "Array must have at least two elements to create Linspace."
             )
         diff = np.diff(array)
-        if not np.allclose(diff, diff[0], rtol=1e-10, atol=0):
+        if not np.allclose(diff, diff[0], rtol=1e-8, atol=0):
             raise ValueError("Array must have uniform spacing to create Linspace.")
         return cls(start=array[0], step=diff[0], num=len(array))
 
