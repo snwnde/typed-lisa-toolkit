@@ -90,16 +90,6 @@ _TimeFreqT = TypeVar("_TimeFreqT", bound=reps.TimeFrequency)
 _ChnT = TypeVar("_ChnT", bound=arithdicts.ChannelDict)
 _DataT = TypeVar("_DataT", bound="_Data")
 
-def zeros_like(d: _DataT, /, *, name: str | None = None) -> _DataT:
-    """Make zero-filled data in the format of another.
-
-    :param d: data to use for format
-    :type d: _Data
-    :return: zero-filled data.
-    :rtype: _Data
-    """
-    kvdict = {k: 0*v for k,v in d.items()}
-    return type(d)(kvdict, name=name)
 
 class _Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
     """Dictionary data container."""
@@ -216,7 +206,8 @@ class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
             additions = cls._additional_load(f)
             dict_ = {
                 chnname: cls._series_type(
-                    grid=f[chnname]["grid"][...], entries=f[chnname]["entries"][...]  # type: ignore
+                    grid=f[chnname]["grid"][...],
+                    entries=f[chnname]["entries"][...],  # type: ignore
                 )
                 for chnname in f
                 if isinstance(f[chnname], h5py.Group)
@@ -383,6 +374,16 @@ class FSData(_SeriesData[reps.FrequencySeries]):
 
         return plotters.FSDataPlotter
 
+    def to_WDMdata(self, Nf=None, Nt=None, nx=4):
+        """Return the WDM data.
+
+        See :py:meth:`.representations.FrequencySeries.to_WDM`
+        """
+        wdmdict = {
+            chnname: chn.to_WDM(Nf=Nf, Nt=Nt, nx=nx) for chnname, chn in self.items()
+        }
+        return WDMData(wdmdict)
+
 
 class TimedFSData(FSData):
     """Dictionary data container for frequency series data with time information."""
@@ -403,12 +404,12 @@ class TimedFSData(FSData):
     def _additional_load(cls, f: h5py.File):
         return {"times": f["times"][...]}  # pyright: ignore[reportIndexIssue]
 
-    def set_times(self, times: npt.NDArray[np.floating]):
+    def set_times(self, times: npt.NDArray[np.floating] | reps.Linspace):
         """Set the time grid.
 
         This method returns `self` to allow for fluent method chaining.
         """
-        self.times = times
+        self.times = reps.Linspace.make(times)
         return self
 
     def create_new(  # noqa: D102
@@ -470,49 +471,16 @@ class WDMData(TFData[reps.WDM]):
 
     # TODO add conversion to/from TSData
 
-    @classmethod
-    def from_fsdata(cls, data: FSData, /, *, Nf=None, Nt=None, nx=4):
-        """Convert from FSData.
-
-        See :py:meth:`.representations.WDM.from_freqseries`."""
-        wdmdict = {
-            chnname: reps.WDM.from_freqseries(chn, Nf=Nf, Nt=Nt, nx=nx)
-            for chnname, chn in data.items()
-        }
-        return cls(wdmdict)
-
     def to_fsdata(self, *, nx: float = 4.0, mask=None):
         """Convert to FSData.
 
-        See :py:meth:`.representations.WDM.to_freqseries`."""
+        See :py:meth:`.representations.WDM.to_freqseries`.
+        """
         fsdict = {
             chnname: chn.to_freqseries(nx=nx, mask=mask)
             for chnname, chn in self.items()
         }
         return FSData(fsdict)
-
-    def check_consistency(self):
-        """Check if the grids for all channels are consistent.
-
-        :raises ValueError: if not consistent.
-        """
-        keys = list(self.keys())
-        if len(keys) < 2:
-            return
-
-        tgrid_ref = self[keys[0]].times
-        fgrid_ref = self[keys[0]].frequencies
-
-        consistency = {}
-        for chnname, chn in self.items():
-            consistency[chnname + "_time"] = np.allclose(tgrid_ref, chn.times)
-            consistency[chnname + "_freq"] = np.allclose(fgrid_ref, chn.frequencies)
-
-        if not all(consistency.values()):
-            raise ValueError(
-                f"the following grids are inconsistent with reference channel {keys[0]}: "
-                f"{(k for k,v in consistency if not v)}"
-            )
 
 
 def load_data(file_path: str | pathlib.Path):

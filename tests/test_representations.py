@@ -33,7 +33,6 @@ class MixinTestUtils(unittest.TestCase):
 
 
 class TestLinspace(MixinTestUtils, unittest.TestCase):
-
     def make_array(self, start, step, num):
         "make array following same interface as Linspace.__init__"
         return start + step * np.arange(num)
@@ -531,7 +530,6 @@ class TestFS(MixinTestUtils, unittest.TestCase):
 
 
 class TestTS(MixinTestUtils, unittest.TestCase):
-
     def test_aliases(self):
         grid = np.linspace(0, 1, 5)
         entries = np.sin(grid)
@@ -628,7 +626,6 @@ class TestTSFSConsistency(MixinTestUtils, unittest.TestCase):
 
 
 class TestPhasor(unittest.TestCase):
-
     def setUp(self):
         self.frequencies = np.array([1.0, 2.0, 3.0])
         self.amplitudes = np.arange(1, 4) * np.exp(1j * np.pi / 4)
@@ -855,7 +852,7 @@ class TestWDM(MixinTestUtils, unittest.TestCase):
         # to frequencyseries and back
         for wdm in self.serieslist:
             fseries = wdm.to_freqseries()
-            new_wdm = WDM.from_freqseries(fseries, Nf=self.Nf, Nt=self.Nt)
+            new_wdm = fseries.to_WDM(Nf=self.Nf, Nt=self.Nt)
             self.assertAllClose(wdm.times, new_wdm.times)
             self.assertAllClose(wdm.frequencies, new_wdm.frequencies)
             self.assertAllClose(wdm.entries, new_wdm.entries, atol=1e-7, rtol=1e-7)
@@ -877,8 +874,7 @@ class TestWDM(MixinTestUtils, unittest.TestCase):
         self.assertAlmostEqual(s.duration, Nt * dT)
         self.assertAlmostEqual(s.duration, Nt * Nf * s.dt)
         self.assertAlmostEqual(s.df, 1 / s.duration)
-        self.assertAlmostEqual(s.t0, self.tgrid[0])
-        self.assertAlmostEqual(s.sampling_rate, s.fs)
+        self.assertAlmostEqual(s.sample_rate, s.fs)
         self.assertAlmostEqual(s.fs, 1 / s.dt)
         self.assertAlmostEqual(s.nyquist, s.fs / 2)
         self.assertEqual(s.shape, e.shape)
