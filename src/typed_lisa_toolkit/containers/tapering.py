@@ -169,6 +169,11 @@ def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwa
         return lambda x: window(len(x), *args, **kwargs)
     try:
         winfunc = _windows._win_equiv[window]
+    except AttributeError:
+        try:
+            winfunc = _windows._WIN_FUNCS[window][0]
+        except KeyError as e:
+            raise ValueError("Unknown window type.") from e
     except KeyError as e:
         raise ValueError("Unknown window type.") from e
     return get_tapering_func(winfunc, *args, **kwargs)

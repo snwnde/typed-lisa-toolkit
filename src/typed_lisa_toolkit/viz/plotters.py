@@ -201,6 +201,8 @@ class TSPlotter(_SeriesPlotter):
         representations.TimeSeries
     )
 
+    # FIXME confusing default behavior, time axis not labeled
+    # and not in seconds
     def plot(
         self,
         ax: matplotlib.axes.Axes,

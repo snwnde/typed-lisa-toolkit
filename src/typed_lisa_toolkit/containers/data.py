@@ -1,11 +1,14 @@
 """Module for data containers.
 
 We model data containers as :class:`.arithdicts.ChannelDict` instances that encapsulate
-data (for now, :class:`.reps.TimeSeries` and :class:`.reps.FrequencySeries`). In this
-model, data are recorded instead of being generated, and for that reason we do not
-distinguish different modes in data containers.
+data as time series (:class:`.TSData`), frequency series (:class:`.FSData` and
+:class:`.TimedFSData`) or WDM wavelets (:class:`.WDMData`).
+
+In this model, data are recorded instead of being generated, and for that reason we do
+not distinguish different modes in data containers.
 
 .. currentmodule:: typed_lisa_toolkit.containers.data
+
 
 Types
 -----
@@ -37,6 +40,13 @@ Entities
    :undoc-members:
    :inherited-members: UserDict
    :show-inheritance:
+
+.. autoclass:: WDMData
+   :members:
+   :member-order: groupwise
+   :exclude-members: listify
+   :undoc-members:
+   :inherited-members: UserDict
 
 Functions
 ---------
@@ -76,6 +86,7 @@ ValueT = TypeVar("ValueT", bound=reps.Representation)
 """Value type in the data container."""
 
 _SeriesT = TypeVar("_SeriesT", bound=reps._Series)
+_TimeFreqT = TypeVar("_TimeFreqT", bound=reps.TimeFrequency)
 _ChnT = TypeVar("_ChnT", bound=arithdicts.ChannelDict)
 _DataT = TypeVar("_DataT", bound="_Data")
 
@@ -195,7 +206,8 @@ class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
             additions = cls._additional_load(f)
             dict_ = {
                 chnname: cls._series_type(
-                    grid=f[chnname]["grid"][...], entries=f[chnname]["entries"][...]  # type: ignore
+                    grid=f[chnname]["grid"][...],
+                    entries=f[chnname]["entries"][...],  # type: ignore
                 )
                 for chnname in f
                 if isinstance(f[chnname], h5py.Group)
@@ -362,6 +374,16 @@ class FSData(_SeriesData[reps.FrequencySeries]):
 
         return plotters.FSDataPlotter
 
+    def to_WDMdata(self, Nf=None, Nt=None, nx=4):
+        """Return the WDM data.
+
+        See :py:meth:`.representations.FrequencySeries.to_WDM`
+        """
+        wdmdict = {
+            chnname: chn.to_WDM(Nf=Nf, Nt=Nt, nx=nx) for chnname, chn in self.items()
+        }
+        return WDMData(wdmdict)
+
 
 class TimedFSData(FSData):
     """Dictionary data container for frequency series data with time information."""
@@ -382,12 +404,12 @@ class TimedFSData(FSData):
     def _additional_load(cls, f: h5py.File):
         return {"times": f["times"][...]}  # pyright: ignore[reportIndexIssue]
 
-    def set_times(self, times: npt.NDArray[np.floating]):
+    def set_times(self, times: npt.NDArray[np.floating] | reps.Linspace):
         """Set the time grid.
 
         This method returns `self` to allow for fluent method chaining.
         """
-        self.times = times
+        self.times = reps.Linspace.make(times)
         return self
 
     def create_new(  # noqa: D102
@@ -411,10 +433,7 @@ class TimedFSData(FSData):
         return super().to_tsdata(self.times, tapering=tapering)
 
 
-class TFData(
-    _Data[reps.TimeFrequency],
-    Generic[NPFloatingT, reps.NPNumberT_co],
-):
+class TFData(_Data[_TimeFreqT], Generic[_TimeFreqT]):
     """Dictionary data container of time-frequency data."""
 
     def get_subset(
@@ -445,6 +464,23 @@ class TFData(
         return plotters.TFDataPlotter(
             self.get_subset(time_interval=time_interval, freq_interval=freq_interval)
         ).draw(**kwargs)
+
+
+class WDMData(TFData[reps.WDM]):
+    """Dictionary data container of WDM time-frequency data."""
+
+    # TODO add conversion to/from TSData
+
+    def to_fsdata(self, *, nx: float = 4.0, mask=None):
+        """Convert to FSData.
+
+        See :py:meth:`.representations.WDM.to_freqseries`.
+        """
+        fsdict = {
+            chnname: chn.to_freqseries(nx=nx, mask=mask)
+            for chnname, chn in self.items()
+        }
+        return FSData(fsdict)
 
 
 def load_data(file_path: str | pathlib.Path):

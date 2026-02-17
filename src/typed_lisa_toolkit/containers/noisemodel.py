@@ -4,6 +4,9 @@ A noise model carries the knowledge of noise properties in the data.
 It determines the geometry of the data space, of which the template
 space is a subspace.
 
+Currently available models are :class:`.FDNoiseModel` and
+:class:`.WDMWhittleNoise`.
+
 .. currentmodule:: typed_lisa_toolkit.containers.noisemodel
 
 Types
@@ -24,11 +27,27 @@ Entities
    :member-order: groupwise
    :inherited-members:
 
+.. autoclass:: WDMWhittleNoise
+   :members:
+   :member-order: groupwise
+   :undoc-members:
 """
 
 import abc
 import logging
-from typing import Protocol, TypeVar, TypedDict, Unpack, Self
+from typing import (
+    Protocol,
+    TypeVar,
+    TypedDict,
+    Unpack,
+    Self,
+    NotRequired,
+    Literal,
+    KeysView,
+    Any,
+    Mapping,
+    overload,
+)
 
 import numpy as np
 import numpy.typing as npt
@@ -71,8 +90,8 @@ class CumIntegrator(Protocol):
 class IntegratorConfig(TypedDict):
     """Dictionary for integrator and cumulative integrator configuration."""
 
-    integrator: Integrator
-    cumulative_integrator: CumIntegrator
+    integrator: NotRequired[Integrator]
+    cumulative_integrator: NotRequired[CumIntegrator]
 
 
 def _collect_frequencies(data: data.FSData):
@@ -423,15 +442,154 @@ class _CacheNoiseModel(FDNoiseModel):
         noise_psd = self.noise_cache.get_subset(interval=interval)
         if log.isEnabledFor(logging.DEBUG):
             try:
-                assert np.array_equal(
-                    noise_psd.frequencies, freq
-                ), f"The frequencies {noise_psd.frequencies} and {freq} are not exactly equal."
+                assert np.array_equal(noise_psd.frequencies, freq), (
+                    f"The frequencies {noise_psd.frequencies} and {freq} are not exactly equal."
+                )
             except AssertionError as e:
                 log.debug(e)
                 try:
-                    assert np.allclose(
-                        noise_psd.frequencies, freq
-                    ), f"The frequencies {noise_psd.frequencies} and {freq} are not close."
+                    assert np.allclose(noise_psd.frequencies, freq), (
+                        f"The frequencies {noise_psd.frequencies} and {freq} are not close."
+                    )
                 except AssertionError as exc:
                     log.debug(exc)
         return noise_psd
+
+
+class TFNoiseModel:
+    """Time-frequency Gaussian noise model.
+
+    This model is a Gaussian noise model suitable for non-stationary noise.
+    The covariance matrix is diagonal in the chosen time-frequency representation.
+    The model allows correlations between TDI channels. In other words, we have a 3x3
+    symmetric matrix at each location in the time-frequency plane.
+
+    Parameters
+    ----------
+    invevsdm: The inverse evolutionary spectral density matrix of
+        shape (n_time, n_freq, n_channels, n_channels).
+        The last two dimensions are symmetric and represent the correlations
+        between TDI channels.
+        The first two dimensions represent the time-frequency plane. The number
+        of TDI channels is at most 3.
+
+    channel_order: list of strings specifying both the TDI channels and their order.
+        For example, ["X", "Y", "Z"].
+
+    invert_sdm: if True, invert the passed spectral density matrix before storing it.
+        This is a convenience flag to be used when you have the evolutionary spectral
+        density rather than its inverse. For performance, it could be useful to perform the inversion
+        yourself before passing it here (see :meth:`invert_sdm`). Defaults to False.
+    """
+
+    def __init__(
+        self,
+        invevsdm: Any,  # Plain array ## TODO type hinting
+        *,
+        channel_order: list[str],
+        invert_sdm: bool = False,
+    ):
+        _ = self.is_valid_sdm(
+            invevsdm,
+            raise_exception=True,
+            channel_order=channel_order,
+        )
+        self.channel_order = channel_order
+        self.invevsdm = invevsdm
+        if invert_sdm:
+            self.invevsdm = self.invert_sdm(invevsdm)
+
+    @staticmethod
+    def is_valid_sdm(
+        _evsdm_or_invevsdm: Any,
+        /,
+        *,
+        channel_order: list[str],
+        raise_exception=False,
+    ):
+        """Check validity of the (inverse) evolutionary spectral density matrix."""
+        _d = _evsdm_or_invevsdm
+        # Check if channel_order is valid.
+        if len(channel_order) != len(set(channel_order)):
+            if raise_exception:
+                raise ValueError(
+                    f"Received channel_order {channel_order} with duplicate channels."
+                )
+            else:
+                return False
+        # Check if the shape is correct.
+        if len(_d.shape) != 4 or _d.shape[-2:] != (len(channel_order), len(channel_order)):
+                if raise_exception:
+                    raise ValueError(
+                        "Expected (inverse) evolutionary spectral density matrix",
+                        "to have shape (n_time, n_freq, n_channels, n_channels), ",
+                        f"but got shape {_d.shape} instead.",
+                    )
+                else:
+                    return False
+
+    def _tfdata_to_array(self, data: data.WDMData):
+        xp = np  # TODO allow for other array libraries
+        # TODO if we augment TFData in a way it internally stores the data as a big plain array
+        # we will not need to do this stacking and we just need a view.
+        return xp.stack([data[chn] for chn in self.channel_order], axis=-1)
+
+    def get_scalar_product(self, left: data.WDMData, right: data.WDMData, /) -> float:
+        """Compute the inner product of data in WDM form."""
+        # NOTE it might be better to normalize the invevsdm differently later.
+        # for now its elements directly correspond to inverse covariance matrix elements.
+
+        # Turn WDMData into array of shape (n_time, n_freq, n_channels).
+        _left = self._tfdata_to_array(left)
+        _right = self._tfdata_to_array(right)
+        xp = np  # TODO: match with your array library choice
+        temp = xp.einsum('...i,...ij,...j', _left, self.invevsdm, _right.conj()) # conj or not?
+        return xp.sum(temp).real # Do I need to take the real part here?
+    
+    inner = get_scalar_product
+    """Alias for :meth:`get_scalar_product`."""
+
+    @staticmethod
+    def invert_sdm(_evsdm_or_invevsdm: Any, /) -> Any:
+        """Invert the spectral density matrix."""
+        xp = np  # TODO allow for other array libraries
+        return xp.linalg.inv(_evsdm_or_invevsdm)
+
+    def evsdm(self):
+        """Return the evolutionary spectral density matrix."""
+        return self.invert_sdm(self.invevsdm)
+
+    def get_whitening_matrix(self, kind: Literal["cholesky"] = "cholesky"):
+        """Get matrix W such that W^T @ W = invevsdm.
+
+        The whitening matrix represents a linear transformation that
+        yields unit variance white noise when applied to noise that
+        follows this model. This is useful in detecting deviations from the model.
+
+        Currently only supports Cholesky decomposition:
+        invevsdm = L @ L^T, W = L^T. W is an upper triangular matrix.
+        It therefore does not treat TDI channels symmetrically.
+
+        Parameters
+        ----------
+        kind: the kind of whitening matrix. Currently only supports "cholesky". Defaults to "cholesky".
+
+        Returns
+        -------
+        W: the whitening matrix.
+        """
+        if kind != "cholesky":
+            raise NotImplementedError(f"Unsupported whitening matrix kind {kind}.")
+        xp = np  # TODO allow for other array libraries
+        L = xp.linalg.cholesky(self.invevsdm)
+        return xp.swapaxes(L, -2, -1)  # Transpose only the last two dimensions
+
+    def whiten(self, _data: data.WDMData, /, kind: Literal["cholesky"] = "cholesky"):
+        """Whiten the data according to the noise model."""
+        wmat = self.get_whitening_matrix(kind=kind)
+        _data_array = self._tfdata_to_array(_data)
+        whitened_array = _data_array @ wmat
+        data_type = type(_data)
+        return data_type(
+            {chn: whitened_array[..., i] for i, chn in enumerate(self.channel_order)}
+        )
