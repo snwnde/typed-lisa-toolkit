@@ -2,6 +2,20 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.4.3 - 2026-02-19
+#### Features
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>WDM representation and WDM Whittle noise model - (8749eb1) - Solano Sousa Felicio
+#### Bug Fixes
+- Linspace from array too strict for TS.rfft - (4128612) - Solano Sousa Felicio
+- type checks unpacking kwargs into IntegratorConfig - (8f8ed49) - Solano Sousa Felicio
+#### Refactoring
+- TF noisemodel and WDM representation - (2b9c8d1) - Senwen Deng
+- simplify typing - (eaefe27) - Senwen Deng
+#### Miscellaneous Chores
+- cog config - (65d325e) - Senwen Deng
+
+- - -
+
 ## 0.4.2 - 2025-05-12
 #### Features
 - in-place addition - (5d6cd6b) - Senwen Deng
