@@ -33,21 +33,21 @@ class NDArrayMixin:
     """
 
     @abc.abstractmethod
-    def __xp__(self, api_version=None): ...
+    def __xp__(self, api_version: str | None = None) -> Any: ...
 
     @abc.abstractmethod
     def _binary_op(
         self,
-        other,
-        op,
+        other: object,
+        op: Any,
         /,
         reflected: bool = False,
         inplace: bool = False,
-        **kwargs,
-    ): ...
+        **kwargs: Any,
+    ) -> Self: ...
 
     @abc.abstractmethod
-    def _unary_op(self, op, /, *args, **kwargs) -> Self: ...
+    def _unary_op(self, op: Any, /, *args: Any, **kwargs: Any) -> Self: ...
 
     @property
     def xp(self):
@@ -196,17 +196,32 @@ class NDArrayMixin:
         return self._unary_op(operator.invert)
 
     # convenience elementwise methods that delegate to the array namespace
-    def square(self, **kwargs) -> Self:
+    def square(self, **kwargs: Any) -> Self:
         return self._unary_op(self.xp.square, **kwargs)
 
-    def exp(self, **kwargs) -> Self:
+    def exp(self, **kwargs: Any) -> Self:
         return self._unary_op(self.xp.exp, **kwargs)
 
-    def sqrt(self, **kwargs) -> Self:
+    def sqrt(self, **kwargs: Any) -> Self:
         return self._unary_op(self.xp.sqrt, **kwargs)
 
-    def conj(self, **kwargs) -> Self:
-        return self._unary_op(self.xp.conj, **kwargs)
+    @property
+    def conj(self) -> Self:
+        return self._unary_op(self.xp.conj)
 
-    def abs(self, **kwargs) -> Self:
+    @property
+    def real(self) -> Self:
+        return self._unary_op(self.xp.real)
+
+    @property
+    def imag(self) -> Self:
+        return self._unary_op(self.xp.imag)
+
+    def abs(self, **kwargs: Any) -> Self:
         return self._unary_op(self.xp.abs, **kwargs)
+
+    def angle(self, **kwargs: Any) -> Self:
+        return self._unary_op(self.xp.angle, **kwargs)
+
+    def unwrap(self, **kwargs: Any) -> Self:
+        return self._unary_op(self.xp.unwrap, **kwargs)

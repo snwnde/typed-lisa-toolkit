@@ -1,15 +1,10 @@
-[build-system]
-requires = ["setuptools>=64", "wheel", "setuptools_scm>=8.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "typed-lisa-toolkit"
-authors = [
-    {name = "Sen-wen Deng", email = "deng@apc.in2p3.fr"},
-]
+dynamic = ["version"]
+authors = [{ name = "Sen-wen Deng", email = "deng@apc.in2p3.fr" }]
 description = "Fully typed interfaces for LISA data analysis"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -19,20 +14,58 @@ dependencies = [
     "scipy >= 1.12.0",
     "pywavelet == 0.2.8",
     "h5py",
+    "array-api-compat >= 1.13.0",
+    "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@54c789fe0a2bd5fb5e2230d23c3e7663dd734334",
 ]
-dynamic = ["version"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[dependency-groups]
+jax = ["jax"]
+jax-dev = [{ include-group = "jax" }, "quadax"]
+doc = [
+    "sphinx>=8.2.3",
+    "sphinx-autodoc-typehints>=3.5.2",
+    "sphinx-copybutton>=0.5.2",
+    "sphinxcontrib-bibtex>=2.6.5",
+    "sphinxcontrib-mermaid>=1.2.3",
+    "furo",
+    "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git"
+]
+dev = [
+    { include-group = "jax-dev" },
+    { include-group = "doc" },
+    "ruff",
+    "h5py-stubs>=0.1.2",
+    "isort>=7.0.0",
+    "mypy>=1.19.1",
+    "myst-nb>=1.3.0",
+    "nb-clean>=4.0.1",
+    "pre-commit>=4.5.1",
+    "pylint>=4.0.4",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "uv-dynamic-versioning>=0.12.0",
+]
 
-[tool.setuptools.package-data]
-"typed_lisa_toolkit" = ["py.typed"]
+[tool.hatch.metadata]
+allow-direct-references = true
 
-[tool.setuptools_scm]
-version_file = "_version.py"
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
 
-[tool.flit.module]
-name = "typed_lisa_toolkit"
+[tool.hatch.build.targets.wheel]
+packages = ["src/typed_lisa_toolkit"]
+
+[tool.uv-dynamic-versioning]
+enable = true
+style = "semver"
+vcs = "git"
+pattern = "default-unprefixed"
+
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning"]
+build-backend = "hatchling.build"
+
 
 [tool.ruff.lint]
 select = ["D"]
@@ -43,3 +76,9 @@ convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/typed_lisa_toolkit/py.typed" = "typed_lisa_toolkit/py.typed"

@@ -18,5 +18,6 @@ also provides implementations for some common high-level operations.
    :titlesonly:
 
    api/containers/index
+   api/consumers/index
    api/viz/index
    api/utils

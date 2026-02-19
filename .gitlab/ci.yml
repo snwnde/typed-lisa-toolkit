@@ -7,6 +7,9 @@ variables:
 pages:
   stage: docs
   image: ghcr.io/sphinx-doc/sphinx:$SPHINX_VERSION
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
   script:
     - apt-get update
     - apt-get -y --no-install-recommends install git gcc libc-dev

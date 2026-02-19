@@ -1,113 +1,74 @@
-"""
-Module for representations.
+"""Module for representations.
 
-A representation is a format in which detector data are displayed.
-The most natural representation for LISA data is a set of time series
-obtained upon postprocessing the beat-note signals. Besides, we also
-need to wrap waveform templates in a compatible representation with
-the data representation, so that we can compare them and perform
-operations between them.
+**Multi-Backend Support:**
 
-In this module, we consider representations for data or signals in a
-single channel (and a single mode, if applicable). For the combination
-of multiple channels or modes, we use arithmetic dictionaries (see
-:mod:`.arithdicts`, :mod:`.data` and :mod:`.waveforms`).
-
-We have two main types of representations, either in a single domain
-(time or frequency) or in both domains. Conceptually, we can think of
-a grid (1D or 2D) and values loaded on the grid.
-In the first case, we implement data classes for the series
-(:class:`.TimeSeries`, :class:`.FrequencySeries` and :class:`.Phasor`),
-where both the grid and the values are 1D arrays and stored in the
-instances. In the second case, we do not store the 2D grid directly
-to save memory, but we store the arrays of times, frequencies and
-the values for the time-frequency matrices (:class:`.TimeFrequency`,
-:class:`.WDM`).
-
-We model these representations as immutable data classes that support
-arithmetic operations between them and with numeric values or arrays.
-We implement generic classes that accept a certain :class:`numpy.dtype`
-as type parameter. This allows us to specify and keep track of the data
-type of the values in the representation.
+The underlying arrays can be from any array library that supports the Python "Array" API standard,
+including NumPy and JAX.
 
 .. currentmodule:: typed_lisa_toolkit.containers.representations
 
-Types
------
-.. autoclass:: Numeric
-.. autoclass:: NPNumberT_co
-.. autoclass:: NPFloatingT
-.. autoclass:: NPTBitT
-.. autoclass:: Interpolator
-
-Entities
---------
-.. autoprotocol:: Representation
-
-..autoclass:: Linspace
+.. autoclass:: Linspace
    :members:
-   :special-members:
+   :special-members: __eq__, __len__, __array__, __getitem__
 
 .. autoclass:: TimeSeries
    :members:
-   :member-order: groupwise
-   :undoc-members:
-   :inherited-members:
-   :special-members: __mul__, __rmul__, __add__, __sub__, __truediv__, __rtruediv__, __neg__, __add__, __iadd__
+   :member-order: bysource
 
 .. autoclass:: FrequencySeries
    :members:
-   :member-order: groupwise
-   :undoc-members:
+   :member-order: bysource
    :inherited-members:
-   :special-members: __add__, __iadd__
 
 .. autoclass:: Phasor
    :members:
-   :member-order: groupwise
-   :undoc-members:
+   :member-order: bysource
    :inherited-members:
-   :special-members: __add__, __iadd__
 
-.. autoclass:: TimeFrequency
+.. autoclass:: STFT
     :members:
-    :member-order: groupwise
-    :undoc-members:
+    :member-order: bysource
     :inherited-members:
 
 .. autoclass:: WDM
     :members:
-    :member-order: groupwise
+    :member-order: bysource
     :inherited-members:
-    :show-inheritance:
 """
 
 from __future__ import annotations
 from collections.abc import Callable
-import dataclasses as dc
 import logging
-from typing import TypeVar, Self, Protocol, TYPE_CHECKING, Any
+from typing import Self, Union, TYPE_CHECKING, Any, Literal, cast
 import warnings
 import numpy as np
-import numpy.typing as npt
 import scipy.signal  # type: ignore[import-untyped]
+import array_api_compat as xpc
+
+from l2d_interface.contract import LinspaceLike
+
+if TYPE_CHECKING:
+    from .. import utils
+
+    import numpy.typing as npt
+
+    Array = utils.Array
+    Axis = Union[Array, "Linspace"]
+    Grid1D = tuple[Axis]
+    Grid2D = tuple[Axis, Axis]
+    Domain = Literal["time", "frequency", "time-frequency"]
+    Grid = Grid1D | Grid2D
+
+    from types import ModuleType
 
 from pywavelet.types import (  # type: ignore[import-untyped]
     FrequencySeries as pywFS,
-    TimeSeries as pywTS,
     Wavelet as pywWDM,
 )
 from pywavelet import set_backend as _pyw_set_backend  # type: ignore[import-untyped]
-from pywavelet.backend import (  # type: ignore[import-untyped]
-    cuda_is_available as _pyw_cuda_is_available,
-    jax_is_available as _pyw_jax_is_available,
-    set_precision as _pyw_set_precision,
-)
 from pywavelet.transforms import (  # type: ignore[import-untyped]
     from_freq_to_wavelet as _pyw_f2w,
-    from_time_to_wavelet as _pyw_t2w,
     from_wavelet_to_freq as _pyw_w2f,
-    from_wavelet_to_time as _pyw_w2t,
 )
 
 # NOTE We could also import the individual transformation routines from
@@ -128,91 +89,67 @@ if TYPE_CHECKING:
     from ..viz import plotters
 
 
-PyNum = int | float | complex  # Union[int, float, complex]
-Numeric = PyNum | np.number | npt.NDArray[np.number]
-
-NPNumberT_co = TypeVar("NPNumberT_co", bound=np.number, covariant=True)
-"""Covariant numpy number data type."""
-
-NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
-"""Numpy floating data type."""
-
-NPTBitT = TypeVar("NPTBitT", bound=npt.NBitBase)
-"""Numpy bit data type."""
-
-ArrayFunc = Callable[[npt.NDArray[NPFloatingT]], npt.NDArray[NPFloatingT]]
-Interpolator = Callable[[npt.NDArray[NPFloatingT], npt.NDArray[NPFloatingT]], ArrayFunc]
-
 _slice = slice  # Alias for slice
 
 
-class Representation(Protocol):
-    """A format in which a GW signal is represented."""
-
-    entries: npt.NDArray
-
-    def __array_ufunc__(
-        self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs
-    ) -> Any:
-        """Support arithmetic operations via numpy ufuncs."""
-        ...
-
-
 class Linspace:
-    """Class for a uniform grid defined by linspace."""
+    """Class for a uniform grid.
 
-    # FIXME confusing interface: semantics differ from np.linspace (step not stop)
-    # Either change this or rename the class
+    .. note::
+
+        This class is designed to represent a uniform grid by
+        three numbers. It does not try to implement the full
+        interface of an array, but only a subset of it that is
+        relevant for our use cases.
+    """
+
     def __init__(self, start: float, step: float, num: int):
-        """Initialize a uniform grid.
-
-        Attention: this does not work like `numpy.linspace`.
-
-        Parameters
-        ----------
-        start : float
-            The start of the grid.
-        step : float
-            The step of the grid.
-        num : int
-            The number of points in the grid.
-
-        Attributes
-        ----------
-        start : float
-            The start of the grid.
-
-        step : float
-            The step of the grid.
-
-        num : int
-            The number of points in the grid.
-
-        shape : tuple[int]
-            The shape of the grid.
-
-        stop : float
-            The stop of the grid.
-        """
         if num <= 0:
             raise ValueError("num must be at least 1")
         num = int(num)
-        self.start = start
-        self.step = step
-        self.num = num
-        self.shape = (num,)
-        self.stop = start + step * (num - 1)
+        # The float conversion is necessary to avoid issues with JAX scalars
+        self._start = float(start)
+        self._step = float(step)
+        self._num = num
+        self._shape = (num,)
+        self._stop = self.start + self.step * (num - 1)
 
-    def __eq__(self, other) -> bool:
-        """Check equality of start, step, num, shape and stop."""
-        if not isinstance(other, Linspace):
+    @property
+    def start(self) -> float:
+        """The start of the grid."""
+        return self._start
+
+    @property
+    def step(self) -> float:
+        """The step of the grid."""
+        return self._step
+
+    @property
+    def num(self) -> int:
+        """The number of points in the grid."""
+        return self._num
+
+    @property
+    def shape(self) -> tuple[int]:
+        """The shape of the grid."""
+        return self._shape
+
+    @property
+    def stop(self) -> float:
+        """The stop of the grid."""
+        return self._stop
+
+    def __eq__(self, other: object) -> bool:
+        """Check if two Linspace instances are equal."""
+        if not isinstance(other, LinspaceLike):
+            raise TypeError(f"Cannot compare Linspace with {type(other)}.")
+        if not self.start == other.start:
             return False
-        a1 = self.start == other.start
-        a2 = self.step == other.step
-        a3 = self.num == other.num
-        a4 = self.shape == other.shape
-        a5 = self.stop == other.stop
-        return a1 and a2 and a3 and a4 and a5
+        if not self.step == other.step:
+            return False
+        if not len(self) == len(other):
+            return False
+        return True
 
     def __len__(self) -> int:
         """Return the length of the grid."""
@@ -223,126 +160,224 @@ class Linspace:
         return f"Linspace(start={self.start}, step={self.step}, num={self.num})"
 
     def __array__(
-        self, dtype: npt.DTypeLike | None = None, copy: bool = True
+        self, dtype: npt.DTypeLike | None = None, copy: bool | None = None
     ) -> npt.NDArray[np.floating]:
         """Return the grid as a numpy array."""
-        del copy  # Unused
-        return self.start + self.step * np.arange(self.num, dtype=dtype)
+        grid = self.start + self.step * np.arange(self.num, dtype=dtype)
+        if copy is False:
+            return grid
+        return np.array(grid, copy=True)
 
-    def __getitem__(self, slice: _slice) -> Self:
+    def __getitem__(self, slice: object) -> Self:
         """Return a subset of the grid."""
-        return self.from_array(np.array(self)[slice])
+        if not isinstance(slice, _slice):
+            raise TypeError(f"Invalid index type: expected slice, got {type(slice)}.")
+        slice_idx = slice.indices(self.num)
+        start = self.start + self.step * slice_idx[0]
+        step = self.step * slice_idx[2]
+        num = len(range(*slice_idx))
+        return type(self)(start=start, step=step, num=num)
 
     @classmethod
-    def from_array(cls, array: npt.NDArray[np.floating]) -> Self:
-        """Create a Linspace from a numpy array."""
+    def from_array(cls, array: "Array") -> Self:
+        """Create a Linspace from an array."""
+        xp = xpc.get_namespace(array)
         if len(array) < 2:
             raise ValueError(
                 "Array must have at least two elements to create Linspace."
             )
-        diff = np.diff(array)
-        if not np.allclose(diff, diff[0], rtol=1e-8, atol=0):
+        diff = xp.diff(array)
+        if not xp.allclose(diff, diff[0], rtol=1e-8, atol=0):
             raise ValueError("Array must have uniform spacing to create Linspace.")
-        return cls(start=array[0], step=diff[0], num=len(array))
+        return cls(start=float(array[0]), step=float(diff[0]), num=len(array))
 
     @classmethod
-    def make(cls, array: Self | npt.NDArray[np.floating]):
+    def make(cls, array: "Array | LinspaceLike") -> "Linspace":
         """Create a Linspace from a numpy array or return the input if already Linspace."""
         if isinstance(array, Linspace):
             return array
+        if isinstance(array, LinspaceLike):
+            return Linspace(start=array.start, step=array.step, num=len(array))
         return cls.from_array(array)
 
     @classmethod
-    def get_step(cls, grid: "Linspace" | npt.NDArray[np.floating]) -> float:
+    def get_step(cls, grid: "Array | LinspaceLike") -> float:
         """Return the step of the uniform grid."""
-        if isinstance(grid, Linspace):
+        if isinstance(grid, LinspaceLike):
             return grid.step
         return cls.from_array(grid).step
 
 
-@dc.dataclass(slots=True, frozen=False)
-class _Series(lib.mixins.NDArrayMixin):
-    """A series of numbers on a grid."""
+def _get_entry_grid_shape(entries: "Array") -> tuple[int, ...]:
+    return entries.shape[4:]  # Remove batch, channels, harmonics, features dimensions
 
-    grid: "Linspace" | npt.NDArray[np.floating]
-    """ The grid of the representation. """
-    entries: npt.NDArray[np.number]
-    """ The values loaded on the grid. """
 
-    def __init__(
+def _check_entry_grid_compatibility(grid: Grid, entries: "Array") -> None:
+    grid_shape = tuple(len(g) for g in grid)
+    entry_grid_shape = _get_entry_grid_shape(entries)
+    if grid_shape != entry_grid_shape:
+        raise ValueError(
+            f"Incompatible grid and entries shapes: expected {grid_shape}, got {entry_grid_shape}."
+        )
+
+
+def _get_full_slice(grid_slices: tuple[_slice, ...]) -> tuple[_slice, ...]:
+    """Return the slice tuple for the canonical entries array given the grid slices."""
+    return (
+        slice(None),
+    ) * 4 + grid_slices  # batch, channels, harmonics, features stay intact
+
+
+def _take_subset[GridT: "Grid1D" | "Grid2D"](
+    grid: GridT,
+    entries: "Array",
+    grid_slices: tuple[_slice, ...],
+) -> tuple[GridT, "Array"]:
+    if len(grid) != len(grid_slices):
+        raise ValueError(
+            f"Number of slices {len(grid_slices)} does not match number of grid dimensions {len(grid)}."
+        )
+    _check_entry_grid_compatibility(grid, entries)
+    # Slice each grid dimension
+    _grid = tuple(
+        g[s] if isinstance(g, LinspaceLike) else cast("Axis", np.asarray(g)[s])
+        for g, s in zip(grid, grid_slices)
+    )
+    entries_sliced = entries[_get_full_slice(grid_slices)]
+    return cast(GridT, _grid), entries_sliced
+
+
+def _get_subset_slice(
+    grid1d: "Axis",
+    *,
+    interval: tuple[float, float] | None = None,
+    slice: _slice | None = None,
+) -> _slice:
+    _grid1d = grid1d if not isinstance(grid1d, LinspaceLike) else np.array(grid1d)
+    if interval is None:
+        # Note that slice(None) is not None
+        if slice is None:
+            return _slice(None)
+        # Otherwise we use the input slice
+    else:
+        if slice is not None:
+            raise ValueError("Only one of `interval` and `slice` should be provided.")
+        slice = utils.get_subset_slice(_grid1d, interval[0], interval[1])
+    # slice is always a slice object at this point
+    return slice
+
+
+def _set_value(entries: "Array", slice: _slice, value: Any) -> None:
+    try:
+        entries[slice] = value
+    except TypeError:
+        entries = cast("Array", entries.at[slice].set(value))  # type: ignore[assignment, union-attr]
+
+
+def to_array(ary: Axis, xp: ModuleType = np) -> "Array":
+    """Convert an axis to an array if it is a Linspace, otherwise return it as is."""
+    if isinstance(ary, LinspaceLike):
+        return xp.array(Linspace.make(ary))
+    return ary
+
+
+def _to_linspace_if_possible(ary: Union["Array", LinspaceLike]):
+    try:
+        return Linspace.make(ary)
+    except ValueError:
+        return ary
+
+
+def _get_axis_onset(axis: Axis) -> float:
+    try:
+        return axis.start  # type: ignore[union-attr]
+    except AttributeError:
+        return float(axis[0])  # type: ignore[union-index, arg-type]
+
+
+def _get_axis_end(axis: Axis) -> float:
+    try:
+        return axis.stop  # type: ignore[union-attr]
+    except AttributeError:
+        return float(axis[-1])  # type: ignore[union-index, arg-type]
+
+
+class _Subset1DMixin:
+    grid: "Grid1D"
+    entries: "Array"
+
+    def __init__(self, grid: "Grid1D", entries: "Array") -> None:
+        del grid, entries
+        raise NotImplementedError("This mixin should not be instantiated directly.")
+
+    def get_subset(
         self,
-        grid: "Linspace" | npt.NDArray[np.floating],
-        entries: npt.NDArray[np.number],
-    ):
-        """Initialize the series.
+        *,
+        interval: tuple[float, float] | None = None,
+        slice: _slice | None = None,
+        copy: bool = True,
+    ) -> Self:
+        """Return the subset as a new instance."""
+        _slice = _get_subset_slice(self.grid[0], interval=interval, slice=slice)
+        grid, entries = _take_subset(self.grid, self.entries, (_slice,))
+        entries = entries.copy() if copy else entries
+        return type(self)(grid=grid, entries=entries)
 
-        Parameters
-        ----------
-        grid :
-            The grid of the representation.
-        entries :
-            The values loaded on the grid.
-        """
-        self.entries = entries
-        self.grid = Linspace.make(grid)
+    def __getitem__(self, slice: _slice) -> Self:
+        """Return the view of a subset of the series."""
+        return self.get_subset(slice=slice, copy=False)
 
-    def is_consistent(self) -> bool:
-        """Check if the grid and entries have the same shape."""
-        return self.grid.shape == self.entries.shape
+    def __setitem__(self, slice: _slice, value: Any) -> None:
+        """Set entries at slice location."""
+        # NOTE this method does not check the compatibility of the grids,
+        # and assumes that the slice is correct.
+        _set_value(self.entries, slice, value)
 
-    def create_like(self, entries: npt.NDArray[np.number]):
-        """Create a new series with the same grid as the current one."""
-        return type(self)(grid=self.grid, entries=entries)
 
-    @property
-    def resolution(self) -> float:
-        """The resolution of the grid."""
-        return Linspace.get_step(self.grid)
+class _EmbedMixin[GridT: "Grid1D" | "Grid2D"]:
+    grid: GridT
+    entries: "Array"
 
-    def _check_series(self, other: object, raise_error: bool = False) -> bool:
-        """Check if the other series is of the same type."""
-        if type(other) is type(self):
-            return True
-        if raise_error:
-            if isinstance(other, _Series):
-                raise TypeError(
-                    f"Cannot operate between different series types: {type(self)} and {type(other)}."
-                )
-            raise TypeError(
-                f"Cannot operate between series and non-series types: {type(self)} and {type(other)}."
-            )
-        return False
+    def __init__(self, grid: GridT, entries: "Array") -> None:
+        del grid, entries
+        raise NotImplementedError("This mixin should not be instantiated directly.")
 
-    def _check_grid(self, other: _Series, raise_error: bool = False) -> bool:
-        """Check if the other series has the same grid."""
-        flag = np.array_equal(self.grid, other.grid)
-        if not raise_error:
-            return flag
-        if not flag:
-            raise ValueError(
-                "Series grid mismatch: expected {}, got {}".format(
-                    self.grid, other.grid
-                )
-            )
-        return flag
+    def get_embedded(
+        self, embedding_grid: "Grid1D" | "Grid2D" | Axis | Linspace
+    ) -> Self:
+        """Return the series embedded in a new grid."""
+        if not isinstance(embedding_grid, tuple):
+            embedding_grid = (embedding_grid,)
 
-    def __xp__(self, api_version=None):
-        return self.entries.__array_namespace__(api_version=api_version)
+        _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
+        _self_grid = tuple(to_array(sg) for sg in self.grid)
+        entries = utils.extend_to(_embedding_grid)(_self_grid, self.entries)
+        __embedding_grid = cast(GridT, _embedding_grid)  # type: ignore[assignment]
+        # This cast is necessary for two reasons:
+        # 1. the static type checker does not want to determine the length of tuple(... for ...)
+        # 2. NDArray is not yet inferred as xpt."Array" by the static type checker
+        return type(self)(grid=__embedding_grid, entries=entries)
 
-    def _unwrap(self, x):
-        if self._check_series(x, raise_error=False):
-            if self._check_grid(x, raise_error=True):
-                return x.entries
-        return x
+
+class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin):
+    entries: "Array"
+
+    def create_like(self, entries: Any) -> Self:
+        del entries
+        raise NotImplementedError("This method must be implemented by subclass.")
+
+    def _unwrap(self, other: object) -> object:
+        del other
+        raise NotImplementedError("This method must be implemented by subclass.")
 
     def _binary_op(
         self,
-        other,
-        op,
+        other: object,
+        op: Callable[[Any, Any], Any],
         /,
         reflected: bool = False,
         inplace: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
         del kwargs  # Unused
 
@@ -357,68 +392,113 @@ class _Series(lib.mixins.NDArrayMixin):
 
         return self.create_like(entries)
 
-    def _unary_op(self, op, /, **kwargs) -> Self:
+    def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
         out_arg = kwargs.get("out", None)
         if out_arg is not None:
             kwargs["out"] = self._unwrap(out_arg)
         entries = op(self.entries, **kwargs)
         return self.create_like(entries)
 
-    # def __array_ufunc__(self, ufunc: np.ufunc, method: lib.MethodT, *inputs, **kwargs):
-    #     cls = type(self)
 
-    #     def _unwrap(x):
-    #         if self._check_series(x, raise_error=False):
-    #             if self._check_grid(x, raise_error=True):
-    #                 return x.entries
-    #         return x
+class _InitMixin[GridT: Grid]:
+    _domain: Domain
+    _kind: str | None = None
+    grid: GridT
+    entries: "Array"
 
-    #     if method == "reduce":
-    #         return NotImplemented
+    def __init__(
+        self,
+        grid: GridT,
+        entries: "Array",
+    ):
+        self.grid = cast(GridT, tuple(_to_linspace_if_possible(g) for g in grid))
+        self.entries = entries
 
-    #     if method == "accumulate":
-    #         return NotImplemented
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(grid={self.grid!r}, entries={self.entries!r}, {self.entries.dtype!r})"
 
-    #     if method == "outer":
-    #         return NotImplemented
+    @property
+    def domain(self) -> Domain:
+        """Physical domain of the representation."""
+        return self._domain
 
-    #     if method == "reduceat":
-    #         if len(inputs) < 2:
-    #             return NotImplemented
-    #         assert inputs[0] is self, "What is going on?"
-    #         indices = inputs[1]
-    #         entries = ufunc.reduceat(self.entries, indices, *inputs[2:], **kwargs)
-    #         grid = np.array(self.grid)[indices]
-    #         return cls(grid, entries)
+    @property
+    def kind(self) -> str | None:
+        """Optional semantic kind of representation."""
+        return self._kind
 
-    #     if method == "at":
-    #         if len(inputs) < 2:
-    #             return NotImplemented
-    #         assert inputs[0] is self, "What is going on?"
-    #         indices = inputs[1]
-    #         ufunc.at(self.entries, indices, *inputs[2:], **kwargs)
-    #         return None
+    @property
+    def n_batches(self) -> int:
+        """Return the number of batches."""
+        return self.entries.shape[0]
 
-    #     if method == "__call__":
-    #         unwrapped = [_unwrap(inp) for inp in inputs]
-    #         out_arg = kwargs.get("out", None)
-    #         if out_arg is None:
-    #             return cls(
-    #                 self.grid,
-    #                 ufunc(*unwrapped, **kwargs),
-    #             )
-    #         out_unwrapped = [_unwrap(o) for o in out_arg]
-    #         kwargs["out"] = tuple(out_unwrapped)
-    #         ufunc(*unwrapped, **kwargs)
-    #         return out_arg[0]
+    @property
+    def n_channels(self) -> int:
+        """Return the number of channels."""
+        return self.entries.shape[1]
 
-    def __getitem__(self, slice: _slice) -> Self:
-        """Return the view of a subset of the series."""
-        return self.get_subset(slice=slice, copy=False)
+    @property
+    def n_harmonics(self) -> int:
+        """Return the number of harmonics."""
+        return self.entries.shape[2]
 
-    def __setitem__(self, slice: _slice, value: Self) -> None:
-        # NOTE this does NOT check whether the grids match
-        self.entries[slice] = value.entries
+    @property
+    def n_features(self) -> int:
+        """Return the number of features."""
+        return self.entries.shape[3]
+
+    @property
+    def grid_shape(self) -> tuple[int, ...]:
+        """Return the shape of the grid dimensions."""
+        return _get_entry_grid_shape(self.entries)
+
+
+class _ArithmeticReprOnGrid[GridT: "Grid1D" | "Grid2D"](
+    _BinaryUnaryOpMixin, _EmbedMixin[GridT]
+):
+    # Provides implementations for arithmetic operations
+
+    def create_like(self, entries: "Array"):
+        """Create a new instance with the same grid as the current one."""
+        return type(self)(grid=self.grid, entries=entries)
+
+    def __xp__(self, api_version: str | None = None):
+        return xpc.get_namespace(self.entries, api_version=api_version)
+
+    @property
+    def xp(self):
+        return self.__xp__()
+
+    def _check_grid_compatibility(self, other: object) -> bool:
+        if not hasattr(other, "grid"):
+            return False
+        other = cast(_ArithmeticReprOnGrid[GridT], other)
+        other_grid = other.grid
+        if len(self.grid) != len(other_grid):
+            return False
+        for g1, g2 in zip(self.grid, other_grid):
+            if isinstance(g1, Linspace) and isinstance(g2, Linspace):
+                if g1 != g2:
+                    return False
+            else:
+                xp = xpc.get_namespace(g1)
+                if not xp.array_equal(g1, g2):
+                    return False
+        return True
+
+    def _unwrap(self, other: object):
+        if hasattr(other, "grid") and hasattr(other, "entries"):
+            other = cast(_ArithmeticReprOnGrid[GridT], other)
+            if self._check_grid_compatibility(other):
+                return other.entries
+            raise ValueError(f"Grid mismatch: expected {self.grid}, got {other.grid}.")
+        return other
+
+    @property
+    def resolution(self) -> float:
+        if isinstance(self.grid[0], Linspace):
+            return self.grid[0].step
+        raise NotImplementedError("Resolution is only implemented for Linspace grids.")
 
     def add(self, other: Self, slice: _slice, inplace: bool = False) -> Self:
         """Add another series on a sub-grid with known slice.
@@ -435,20 +515,6 @@ class _Series(lib.mixins.NDArrayMixin):
         See Also
         --------
         :meth:`.iadd`
-        :meth:`.__iadd__`
-        :meth:`.__add__`
-
-        Note
-        ----
-        It is also possible to perform the addition using numpy syntax:
-
-        ```python
-        series[slice] + other
-        ```
-
-        where `slice` is the slice of the sub-grid to add on,
-        and `other` is either a series defined on the sub-grid
-        or a numeric value or array compatible with the sub-grid.
         """
         if inplace:
             return self.iadd(other, slice)
@@ -461,24 +527,10 @@ class _Series(lib.mixins.NDArrayMixin):
 
         See Also
         --------
-        :meth:`.__iadd__`
         :meth:`.add`
-        :meth:`.__add__`
-
-        Note
-        ----
-        It is also possible to perform the in-place addition using numpy syntax:
-
-        ```python
-        series[slice] += other
-        ```
-
-        where `slice` is the slice of the sub-grid to add on,
-        and `other` is either a series defined on the sub-grid
-        or a numeric value or array compatible with the sub-grid.
         """
         try:
-            self.entries[slice] += other.entries  # type: ignore[misc]
+            _set_value(self.entries, slice, self.entries[slice] + other.entries)
         except ValueError as e:
             raise ValueError(
                 "You may want to first embed the series instances to super-grids before "
@@ -504,10 +556,11 @@ class _Series(lib.mixins.NDArrayMixin):
         :meth:`.__add__`
         """
         if isinstance(other, type(self)):
-            if isinstance(other.grid, Linspace):
-                start, stop = other.grid.start, other.grid.stop
+            other_grid_1d = other.grid[0]
+            if isinstance(other_grid_1d, LinspaceLike):
+                start, stop = other_grid_1d.start, other_grid_1d.stop
             else:
-                start, stop = other.grid[0], other.grid[-1]
+                start, stop = float(other_grid_1d[0]), float(other_grid_1d[-1])
 
             if len(self.grid) < len(other.grid):
                 raise ValueError(
@@ -515,145 +568,77 @@ class _Series(lib.mixins.NDArrayMixin):
                     "be a sub-grid of the current one. Expect `other.grid` "
                     "to be shorter than `self.grid`."
                 )
-            _slice = utils.get_subset_slice(np.array(self.grid), start, stop)
+            _slice = utils.get_subset_slice(to_array(self.grid[0]), start, stop)
             return self.iadd(other, slice=_slice)
         return super().__iadd__(other)
 
-    def _get_subset_slice(
-        self,
-        *,
-        interval: tuple[float, float] | None = None,
-        slice: _slice | None = None,
-    ) -> slice:
-        """Return the subset as a new instance."""
-        if interval is None:
-            # Note that slice(None) is not None
-            if slice is None:
-                return _slice(None)
-            # Otherwise we use the input slice
-        else:
-            if slice is not None:
-                raise ValueError(
-                    "Only one of `interval` and `slice` should be provided."
-                )
-            slice = utils.get_subset_slice(
-                np.array(self.grid), interval[0], interval[1]
-            )
-        return slice
 
-    def get_subset(
-        self,
-        *,
-        interval: tuple[float, float] | None = None,
-        slice: _slice | None = None,
-        copy: bool = True,
-    ) -> Self:
-        """Return the subset as a new instance."""
-        slice = self._get_subset_slice(interval=interval, slice=slice)
-        entries = self.entries[slice].copy() if copy else self.entries[slice]
-        return type(self)(grid=self.grid[slice], entries=entries)
-
-    def get_embedded(self, embedding_grid: Linspace | npt.NDArray[np.floating]) -> Self:
-        """Return the series embedded in a new grid."""
-        entries = utils.extend_to(np.array(embedding_grid))(
-            np.array(self.grid), self.entries
-        )
-        return type(self)(grid=embedding_grid, entries=entries)
-
-    def get_plotter(self):
-        """Return the plotter for the series."""
-        raise NotImplementedError("This method needs to be implemented in subclasses.")
-
-
-@dc.dataclass(slots=True, frozen=False)
-class FrequencySeries(_Series):
+class FrequencySeries(
+    _InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1DMixin
+):
     """A series of numbers on a frequency grid."""
 
-    @staticmethod
-    def _angle(
-        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
-    ) -> npt.NDArray[np.floating[NPTBitT]]:
-        return np.unwrap(np.angle(complex_numbers), period=2 * np.pi)
+    @property
+    def domain(self) -> Literal["frequency"]:
+        """The physical domain of the representation."""
+        return "frequency"
 
-    @staticmethod
-    def _real(
-        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
-    ) -> npt.NDArray[np.floating[NPTBitT]]:
-        return np.real(complex_numbers)
+    @property
+    def kind(self) -> None:
+        """The semantic kind of the representation."""
+        return None
 
-    @staticmethod
-    def _imag(
-        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
-    ) -> npt.NDArray[np.floating[NPTBitT]]:
-        return np.imag(complex_numbers)
-
-    def angle(self):
+    def angle(self, **kwargs: Any):
         """Return the angle of the series."""
-        return self.create_like(
-            self._angle(self.entries)  # pyright: ignore[reportArgumentType]
-        )
+        return super().angle(**kwargs).unwrap(period=2 * self.xp.pi)
 
     @property
-    def real(self):
-        """Return the real part of the series."""
-        return self.create_like(
-            self._real(self.entries)  # pyright: ignore[reportArgumentType]
-        )
-
-    @property
-    def imag(self):
-        """Return the imaginary part of the series."""
-        return self.create_like(
-            self._imag(self.entries)  # pyright: ignore[reportArgumentType]
-        )
-
-    @property
-    def frequencies(self):
-        """The frequencies of the series. Alias for :attr:`.grid`."""
-        return self.grid
-
-    @property
-    def df(self):
+    def df(self) -> float:
         """The frequency spacing. Alias for :attr:`.resolution`."""
         return self.resolution
 
     @property
-    def frequencies(self):
-        """The frequencies of the series. Alias for :attr:`.grid`."""
-        return self.grid
+    def frequencies(self) -> Axis | Linspace:
+        """The frequencies of the series."""
+        return self.grid[0]
 
     @property
-    def df(self):
-        """The frequency spacing. Alias for :attr:`.resolution`."""
-        return self.resolution
+    def f_min(self) -> float:
+        """The minimum frequency of the series."""
+        return _get_axis_onset(self.frequencies)
+
+    @property
+    def f_max(self) -> float:
+        """The maximum frequency of the series."""
+        return _get_axis_end(self.frequencies)
 
     def irfft(
         self,
-        time_grid: npt.NDArray[np.floating],
+        time_grid: "Array",
         tapering: tapering.Tapering | None = None,
     ):
         """Inverse real FFT of the series."""
-        self_frequencies = np.array(self.frequencies)
-        tapering_window = (
-            tapering(self_frequencies)
-            if tapering is not None
-            else np.ones_like(self.frequencies)
-        )
-        dt: np.floating = time_grid[1] - time_grid[0]
+        self_frequencies = to_array(self.frequencies)
+        tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
+        dt = float(time_grid[1] - time_grid[0])
         nyquist_dt = 1 / (2 * self_frequencies[-1])
-        if dt < nyquist_dt and not np.isclose(dt, nyquist_dt):
+        if dt < nyquist_dt and not self.xp.isclose(dt, nyquist_dt):
             # FIXME spurious warning for odd, small n
             # probably related to the (n-1)/2 in the last frequency in rfftfreq
             warnings.warn("The time grid is denser than the Nyquist limit.")
 
         return TimeSeries(
-            grid=time_grid,
-            entries=np.fft.irfft(self.entries * tapering_window / dt, n=len(time_grid)),
+            grid=(time_grid,),
+            entries=self.xp.fft.irfft(
+                self.entries * tapering_window / dt, n=len(time_grid)
+            ),
         )
 
-    def get_time_shifted(self, shift: float):
+    def get_time_shifted(self, shift: float) -> Self:
         """Shift the series in time."""
-        return self * np.exp(-2j * np.pi * np.array(self.frequencies) * shift)
+        return self * self.xp.exp(
+            -2j * self.xp.pi * self.xp.array(self.frequencies) * shift
+        )
 
     def get_plotter(self) -> plotters.FSPlotter:
         """Return the plotter for the series."""
@@ -668,7 +653,7 @@ class FrequencySeries(_Series):
         Nf: int | None = None,
         Nt: int | None = None,
         nx: float = 4.0,
-    ):
+    ) -> WDM:
         """Transform the frequency series to a WDM representation.
 
         This method performs a forward wavelet transform, converting a
@@ -707,34 +692,61 @@ class FrequencySeries(_Series):
         """
         ndof = 2 * (len(self.frequencies) - 1)  # pywavelet's convention
         dt = 1 / (ndof * self.df)
-        fs = pywFS(data=self.entries / dt, freq=np.array(self.frequencies), t0=0.0)
+        fs = pywFS(data=self.entries / dt, freq=self.xp.array(self.frequencies), t0=0.0)
         return WDM.from_pywWDM(_pyw_f2w(fs, Nf=Nf, Nt=Nt, nx=nx))
 
 
-@dc.dataclass(slots=True, frozen=False)
-class TimeSeries(_Series):
+class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1DMixin):
     """A series of numbers on a time grid."""
 
     @property
-    def times(self):
-        """The times of the series. Alias for :attr:`.grid`."""
-        return self.grid
+    def domain(self) -> Literal["time"]:
+        """The physical domain of the representation."""
+        return "time"
 
     @property
-    def dt(self):
+    def kind(self) -> None:
+        """The semantic kind of the representation."""
+        return None
+
+    @property
+    def times(self) -> Axis | Linspace:
+        """The times of the series. Alias for :attr:`.grid`."""
+        return self.grid[0]
+
+    @property
+    def t_start(self) -> float:
+        """The onset time of the series."""
+        return _get_axis_onset(self.times)
+
+    @property
+    def t_end(self) -> float:
+        """The end time of the series."""
+        return _get_axis_end(self.times)
+
+    @property
+    def dt(self) -> float:
         """The time step. Alias for :attr:`.resolution`."""
         return self.resolution
 
-    # TODO why is there no frequency grid parameter here? (symmetry with irfft)
     def rfft(self, tapering: tapering.Tapering | None = None):
-        """Fast Fourier transform of the series."""
-        self_times = np.array(self.times)
+        """Fast Fourier transform of the series.
+
+        .. note::
+            Unlike the inverse transform :meth:`.FrequencySeries.irfft`, this method does
+            not allow taking a frequency grid as input. Time series are considered as
+            primary representations for DATA, in the sense that they are the most directly
+            related to what we measure.
+        """
+        self_times = self.xp.array(self.times)
         tapering_window = (
-            tapering(self_times) if tapering is not None else np.ones_like(self_times)
+            tapering(self_times)
+            if tapering is not None
+            else self.xp.ones_like(self_times)
         )
         return FrequencySeries(
-            grid=np.fft.rfftfreq(n=len(self.times), d=self.dt),
-            entries=np.fft.rfft(self.entries * tapering_window * self.dt),
+            grid=(self.xp.fft.rfftfreq(n=len(self.times), d=self.dt),),
+            entries=self.xp.fft.rfft(self.entries * tapering_window * self.dt),
         )
 
     def get_plotter(self) -> plotters.TSPlotter:
@@ -748,10 +760,13 @@ class TimeSeries(_Series):
     def stfft(self, win: npt.NDArray[np.floating], hop: int):
         """Short-time Fourier transform of the series."""
         SFT = scipy.signal.ShortTimeFFT(win=win, hop=hop, fs=1 / self.dt)
-        times = SFT.t(len(self.entries)) + np.array(self.times)[0]
+        times = SFT.t(len(self.times)) + np.asarray(self.times)[0]
         freqs = SFT.f
-        Sx = SFT.stft(self.entries * self.dt)
-        return TimeFrequency(times=times, frequencies=freqs, entries=Sx)
+        Sx = SFT.stft(np.asarray(self.entries) * self.dt)
+        return STFT(
+            grid=(times, freqs),
+            entries=Sx,
+        )
 
     # def to_WDM(
     #     self,
@@ -802,9 +817,8 @@ class TimeSeries(_Series):
     #     return WDM.from_pywWDM(_pyw_t2w(fs, Nf=Nf, Nt=Nt, nx=nx, mult=mult))
 
 
-@dc.dataclass(slots=True, frozen=False)
-class Phasor(FrequencySeries):
-    """Phasor representation. Subclass of :class:`.FrequencySeries`.
+class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
+    """Phasor representation.
 
     A phasor is a couple of amplitude and phase that represent a complex number.
     This class encapsulates a sequence of phasors at different frequencies, which
@@ -816,120 +830,83 @@ class Phasor(FrequencySeries):
     and imaginary parts of the amplitudes. This is crucial for the interpolation
     to work properly.
 
-    Note
-    ----
-
-    The so-called amplitude is itself complex number in general.
-    The attribute :attr:`.amplitudes` gives the complex amplitudes,
-    while the method :meth:`.abs` gives the absolute values of the amplitudes.
-    Similarly, the attribute :attr:`.phases` gives the phases of the phasors
-    as input, while the method :meth:`.angle` gives the angles of the full
-    complex numbers as their argument.
+    .. note:: The so-called amplitude is itself complex number in general.
     """
 
-    phases: npt.NDArray[np.floating]
+    @property
+    def domain(self) -> Literal["frequency"]:
+        """The physical domain of the representation."""
+        return "frequency"
+
+    @property
+    def kind(self):
+        """The semantic kind of the representation."""
+        return "phasor"
+
+    @property
+    def phases(self) -> "Array":
+        """The phases of the phasors."""
+        return self.entries[..., 1, :, :]
+
+    @property
+    def amplitudes(self) -> "Array":
+        """The amplitudes of the phasors."""
+        return self.entries[..., 0, :, :]
+
+    @property
+    def frequencies(self) -> Axis | Linspace:
+        """The frequencies of the phasors. Alias for :attr:`.grid`."""
+        return self.grid[0]
+
+    @property
+    def f_min(self) -> float:
+        """The minimum frequency of the series."""
+        return _get_axis_onset(self.frequencies)
+
+    @property
+    def f_max(self) -> float:
+        """The maximum frequency of the series."""
+        return _get_axis_end(self.frequencies)
 
     @classmethod
     def make(
         cls,
-        frequencies: npt.NDArray[NPFloatingT],
-        amplitudes: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
-        phases: npt.NDArray[np.floating[NPTBitT]],
+        frequencies: "Array",
+        amplitudes: "Array",
+        phases: "Array",
     ) -> Phasor:
         """Create a phasor from amplitudes and phases."""
-        entries = cls.phasor_to_cplx(amplitudes, phases)
-        return cls(grid=frequencies, entries=entries, phases=phases)
+        xp = xpc.get_namespace(amplitudes, phases)
+        return cls(grid=(frequencies,), entries=xp.stack((amplitudes, phases), axis=-1))
 
-    def _guard_binary_op(self, other):
-        if isinstance(other, Phasor):
-            raise ValueError("Binary operations between phasors are not supported.")
-
-    def __setitem__(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self, slice: _slice, value: Self
-    ) -> None:
+    def __setitem__(self, slice: _slice, value: Any) -> None:
         """Set the entries and phases of a subset of the phasor."""
-        self.entries[slice] = value.entries
-        self.phases[slice] = value.phases
+        _set_value(self.entries, slice, value)
 
-    def create_like(self, entries: npt.NDArray[np.number]):
+    def create_like(self, entries: "Array"):
         """Create a new series with the same grid as the current one."""
-        return type(self)(grid=self.grid, entries=entries, phases=self.phases)
-
-    def get_subset(
-        self,
-        *,
-        interval: tuple[float, float] | None = None,
-        slice: _slice | None = None,
-        copy: bool = True,
-    ) -> Self:
-        """Return the subset as a new instance."""
-        slice = self._get_subset_slice(interval=interval, slice=slice)
-        entries = self.entries[slice].copy() if copy else self.entries[slice]
-        phases = self.phases[slice].copy() if copy else self.phases[slice]
-        return type(self)(grid=self.grid[slice], entries=entries, phases=phases)
-
-    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
-        """Return the series embedded in a new grid."""
-        self_grid = np.array(self.grid)
-        entries = utils.extend_to(embedding_grid)(self_grid, self.entries)
-        phases = utils.extend_to(embedding_grid)(self_grid, self.phases)
-        return type(self)(grid=embedding_grid, entries=entries, phases=phases)
-
-    @staticmethod
-    def reim_to_cplx(
-        real_parts: npt.NDArray[np.floating[NPTBitT]],
-        imag_parts: npt.NDArray[np.floating[NPTBitT]],
-    ) -> npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]]:
-        """Convert real and imaginary parts to complex numbers."""
-        return real_parts + 1j * imag_parts
-
-    @staticmethod
-    def cplx_to_reim(
-        complex_numbers: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
-    ) -> tuple[npt.NDArray[np.floating[NPTBitT]], npt.NDArray[np.floating[NPTBitT]]]:
-        """Convert complex numbers to real and imaginary parts."""
-        return np.real(complex_numbers), np.imag(complex_numbers)
-
-    @staticmethod
-    def phasor_to_cplx(
-        amplitudes: npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]],
-        phases: npt.NDArray[np.floating[NPTBitT]],
-    ) -> npt.NDArray[np.complexfloating[NPTBitT, NPTBitT]]:
-        """Convert phasors to complex numbers."""
-        return amplitudes * np.exp(1j * phases)
-
-    @property
-    def amplitudes(self):
-        """The amplitudes of the phasors.
-
-        Note
-        ----
-
-        The amplitudes are complex numbers in general.
-        """
-        return self.entries * np.exp(-1j * self.phases)
+        return type(self)(grid=self.grid, entries=entries)
 
     def get_interpolated(
         self,
-        frequencies: npt.NDArray[NPFloatingT],
-        interpolator: Interpolator,
+        frequencies: "Array",
+        interpolator: Callable[[Any, Any], Callable[[Any], Any]],
     ):
         """Get the phasors interpolated to the given frequencies."""
-        self_freq = np.array(self.frequencies)
-        amp_real, amp_imag = self.cplx_to_reim(
-            self.amplitudes  # pyright: ignore[reportArgumentType]
-        )
+        self_freq = to_array(self.frequencies)
+        amp_real = self.amplitudes.real
+        amp_imag = self.amplitudes.imag
         amplitudes_real = interpolator(self_freq, amp_real)(frequencies)
         amplitudes_imag = interpolator(self_freq, amp_imag)(frequencies)
-        amplitudes = self.reim_to_cplx(amplitudes_real, amplitudes_imag)
+        amplitudes = amplitudes_real + 1j * amplitudes_imag
         phases = interpolator(self_freq, self.phases)(frequencies)
         return type(self).make(frequencies, amplitudes, phases)
 
     def to_frequency_series(self) -> FrequencySeries:
         """Get the :class:`.FrequencySeries` representation of the waveform."""
         return FrequencySeries(
-            self.frequencies,
-            self.entries,
+            (self.frequencies,),
+            self.amplitudes * np.exp(1j * self.phases),
         )
 
     def get_plotter(self) -> plotters.PhasorPlotter:
@@ -938,39 +915,43 @@ class Phasor(FrequencySeries):
 
         return plotters.PhasorPlotter(self)
 
+    
 
-@dc.dataclass(slots=True, frozen=False)
-class TimeFrequency(lib.mixins.NDArrayMixin):
-    """Time-frequency representation.
 
-    The entries are stored in a 2D array, where the first axis corresponds to
-    the frequencies and the second axis corresponds to the times. The time and
-    frequency grids are stored as 1D arrays.
-
-    The time-frequency representation could contain the spectrogram or the
-    scalogram of a signal, depending on how the entries are computed.
-    """
-
-    times: "Linspace" | npt.NDArray[np.floating]
-    """ The time grid of the time-frequency representation. """
-
-    frequencies: "Linspace" | npt.NDArray[np.floating]
-    """ The frequency grid of the time-frequency representation. """
-
-    entries: npt.NDArray
-    """ The data values in the time-frequency representation. """
+class STFT(_InitMixin["Grid2D"], _ArithmeticReprOnGrid["Grid2D"]):
+    """Time-frequency representation."""
 
     @property
-    def dT(self) -> float:
-        """Time resolution (ΔT) of the time-frequency grid."""
-        return Linspace.get_step(self.times)
+    def domain(self) -> Literal["time-frequency"]:
+        """The physical domain of the representation."""
+        return "time-frequency"
 
     @property
-    def dF(self) -> float:
-        """Frequency resolution (ΔF) of the time-frequency grid."""
-        return Linspace.get_step(self.frequencies)
+    def kind(self) -> str:
+        """The semantic kind of the representation."""
+        return "stft"
 
-    # TODO for consistency with _Series: receive slices, receive copy bool arg
+    @property
+    def times(self) -> Axis | Linspace:
+        """The time grid of the time-frequency representation."""
+        return self.grid[1]
+
+    @property
+    def frequencies(self) -> Axis | Linspace:
+        """The frequency grid of the time-frequency representation."""
+        return self.grid[0]
+
+    @classmethod
+    def make(
+        cls,
+        times: "Array",
+        frequencies: "Array",
+        entries: "Array",
+    ) -> Self:
+        """Create a time-frequency representation from time and frequency grids and entries."""
+        return cls(grid=(times, frequencies), entries=entries)
+
+    # TODO for consistency: receive slices, receive copy bool arg
     def get_subset(
         self,
         *,
@@ -980,128 +961,30 @@ class TimeFrequency(lib.mixins.NDArrayMixin):
         """Return the subset as a new instance."""
         if time_interval is not None:
             time_slice = utils.get_subset_slice(
-                np.array(self.times), time_interval[0], time_interval[1]
+                to_array(self.times, xp=self.xp), time_interval[0], time_interval[1]
             )
         else:
             time_slice = _slice(None)
         if freq_interval is not None:
             freq_slice = utils.get_subset_slice(
-                np.array(self.frequencies), freq_interval[0], freq_interval[1]
+                to_array(self.frequencies, xp=self.xp),
+                freq_interval[0],
+                freq_interval[1],
             )
         else:
             freq_slice = _slice(None)
+        time_grid_sliced = to_array(self.times, xp=self.xp)[time_slice]
+        freq_grid_sliced = to_array(self.frequencies, xp=self.xp)[freq_slice]
         return type(self)(
-            times=self.times[time_slice],
-            frequencies=self.frequencies[freq_slice],
-            entries=self.entries[freq_slice, time_slice],
+            grid=(freq_grid_sliced, time_grid_sliced),
+            entries=self.entries[_get_full_slice((freq_slice, time_slice))],
         )
 
-    def create_like(self, entries: npt.NDArray[np.number]):
-        """Create a new series with different entries but the same grid."""
-        return type(self)(
-            times=self.times,
-            frequencies=self.frequencies,
-            entries=entries,
-        )
 
-    def get_plotter(self) -> plotters.TimeFrequencyPlotter:
-        """Return the plotter for the time-frequency representation."""
-        from ..viz import plotters
-
-        return plotters.TimeFrequencyPlotter(self)
-
-    def _check_representation(self, other: object, raise_error: bool = False) -> bool:
-        """Check if the other representation is of the same type."""
-        if type(other) is type(self):
-            return True
-        if raise_error:
-            if isinstance(other, TimeFrequency):
-                raise TypeError(
-                    "Cannot operate between different time-frequency"
-                    f"representation types: {type(self)} and {type(other)}."
-                )
-            raise TypeError(
-                "Cannot operate between time-frequency and non time-frequency"
-                f"representation types: {type(self)} and {type(other)}."
-            )
-        return False
-
-    def _check_grid(self, other: TimeFrequency, raise_error: bool = False) -> bool:
-        """Check if the other representation has the same grid."""
-        time_flag = np.array_equal(self.times, other.times)
-        freq_flag = np.array_equal(self.frequencies, other.frequencies)
-        flag = time_flag and freq_flag
-        if not raise_error:
-            return flag
-        if not time_flag:
-            raise ValueError(
-                "Time-frequency representation time grid mismatch: expected {}, got {}".format(
-                    self.times, other.times
-                )
-            )
-        if not freq_flag:
-            raise ValueError(
-                "Time-frequency representation frequency grid mismatch: expected {}, got {}".format(
-                    self.frequencies, other.frequencies
-                )
-            )
-        return flag
-
-    def __xp__(self):  # noqa: D105
-        return self.entries.__array_namespace__()
-
-    def _unwrap(self, x):
-        if self._check_representation(x, raise_error=False):
-            if self._check_grid(x, raise_error=True):
-                return x.entries
-        return x
-
-    def _binary_op(
-        self,
-        other,
-        op,
-        /,
-        reflected: bool = False,
-        inplace: bool = False,
-        **kwargs,
-    ):
-        del kwargs  # Unused
-
-        if not reflected:
-            entries = op(self.entries, self._unwrap(other))
-        else:
-            entries = op(self._unwrap(other), self.entries)
-
-        if inplace:
-            del entries
-            return self
-
-        return self.create_like(entries)
-
-    def _unary_op(self, op, /, **kwargs) -> Self:
-        out_arg = kwargs.get("out", None)
-        if out_arg is not None:
-            kwargs["out"] = self._unwrap(out_arg)
-        entries = op(self.entries, **kwargs)
-        return self.create_like(entries)
-
-        if method == "__call__":
-            unwrapped = [_unwrap(inp) for inp in inputs]
-            out_arg = kwargs.get("out", None)
-            if out_arg is None:
-                return cls(
-                    self.times,
-                    self.frequencies,
-                    ufunc(*unwrapped, **kwargs),
-                )
-            out_unwrapped = [_unwrap(o) for o in out_arg]
-            kwargs["out"] = tuple(out_unwrapped)
-            ufunc(*unwrapped, **kwargs)
-            return out_arg[0]
+UniformGrid2D = tuple[Linspace, Linspace]
 
 
-@dc.dataclass(slots=True, frozen=False)
-class WDM(TimeFrequency):
+class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
     """
     Wilson-Daubechies-Meyer (WDM) time-frequency representation.
 
@@ -1126,33 +1009,62 @@ class WDM(TimeFrequency):
     Parameters
     ----------
     times: real 1D array
-        Array of evenly-spaced times with separation ΔT and size `Nt`.
+        "Array" of evenly-spaced times with separation ΔT and size `Nt`.
 
     frequencies: real 1D array
-        Array of evenly-spaced frequencies with separation ΔF and size `Nf`.
+        "Array" of evenly-spaced frequencies with separation ΔF and size `Nf`.
 
     entries: real 2D array
-        Array of data entries, with shape `(Nf, Nt)`.
+        "Array" of data entries, with shape `(Nf, Nt)`.
     """
 
-    times: "Linspace"
-    frequencies: "Linspace"
+    @property
+    def domain(self) -> Literal["time-frequency"]:
+        """The physical domain of the representation."""
+        return "time-frequency"
 
-    def __init__(
-        self,
-        times: npt.NDArray[np.floating] | Linspace,
-        frequencies: npt.NDArray[np.floating] | Linspace,
-        entries: npt.NDArray[np.floating],
+    @property
+    def kind(self) -> str:
+        """The semantic kind of the representation."""
+        return "WDM"
+
+    @property
+    def times(self) -> Linspace:
+        """The time grid of the time-frequency representation."""
+        return self.grid[1]
+
+    @property
+    def frequencies(self) -> Linspace:
+        """The frequency grid of the time-frequency representation."""
+        return self.grid[0]
+
+    @property
+    def dT(self) -> float:
+        """Time resolution (ΔT) of the time-frequency grid."""
+        return self.times.step
+
+    @property
+    def dF(self) -> float:
+        """Frequency resolution (ΔF) of the time-frequency grid."""
+        return self.frequencies.step
+
+    @classmethod
+    def make(
+        cls,
+        times: Union["Array", Linspace],
+        frequencies: Union["Array", Linspace],
+        entries: "Array",
     ):
-        self.times = Linspace.make(times)
-        self.frequencies = Linspace.make(frequencies)
-        self.entries = entries
+        """Create a WDM representation from time and frequency grids and entries."""
+        return cls(
+            grid=(Linspace.make(times), Linspace.make(frequencies)), entries=entries
+        )
 
     def is_critically_sampled(self):
         """Return True if :attr:`.dT` * :attr:`.dF` = 1/2."""
         # I don't like how this method is implemented,
         # but I don't see a better way for now.
-        return np.isclose(self.dT * self.dF, 1 / 2)
+        return self.xp.isclose(self.dT * self.dF, 1 / 2)
 
     @property
     def Nt(self) -> int:
@@ -1186,7 +1098,8 @@ class WDM(TimeFrequency):
         """Total signal duration."""
         # return self.times.stop - self.times.start
         # Given that a grid of N points has N bins in this class
-        return len(self.times) * self.times.step
+        times = self.times
+        return len(times) * times.step
 
     @property
     def sample_interval(self) -> float:
@@ -1212,7 +1125,7 @@ class WDM(TimeFrequency):
     @property
     def shape(self) -> tuple[int, int]:
         """Shape (:attr:`.Nf`, :attr:`.Nt`) of the wavelet grid."""
-        return self.entries.shape
+        return self.Nf, self.Nt
 
     @property
     def sample_rate(self) -> float:
@@ -1226,7 +1139,7 @@ class WDM(TimeFrequency):
     """Alias for :attr:`.sample_rate`."""
 
     def to_freqseries(
-        self, *, nx: float = 4.0, mask: npt.NDArray[np.bool] | None = None
+        self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
     ) -> FrequencySeries:
         """Perform an inverse wavelet transform to the frequency domain.
 
@@ -1241,15 +1154,15 @@ class WDM(TimeFrequency):
         pywwv = self._to_pywWDM()
         # Is there a reason why pywavelet accepts the time step
         # instead of computing it from the WDM representation itself?
-        pywfs = _pyw_w2f(pywwv, self.dt, nx) 
+        pywfs = cast(Any, _pyw_w2f(pywwv, self.dt, nx))
         freqs = pywfs.freq
         entries = pywfs.data * pywfs.dt
         # To see if we keep or not
         # https://gitlab.in2p3.fr/lisa-apc/typed-lisa-toolkit/-/merge_requests/4#note_576666
         if mask is not None:
-            freqs = np.ma.masked_where(mask, freqs)
-            entries = np.ma.masked_where(mask, entries)
-        return FrequencySeries(freqs, entries)
+            freqs = np.ma.masked_where(mask, freqs)  # type: ignore
+            entries = np.ma.masked_where(mask, entries)  # type: ignore
+        return FrequencySeries((freqs,), entries)  # type: ignore
 
     @property
     def nyquist(self) -> float:
@@ -1260,17 +1173,64 @@ class WDM(TimeFrequency):
     @classmethod
     def from_pywWDM(cls, pywwv: pywWDM, /) -> Self:
         """Convert a pywWDM object to a WDM."""
-        entries = pywwv.data
-        times = Linspace(pywwv.time[0], pywwv.time[1] - pywwv.time[0], len(pywwv.time))
-        frequencies = Linspace(
-            pywwv.freq[0], pywwv.freq[1] - pywwv.freq[0], len(pywwv.freq)
+        pywwv_any = cast(Any, pywwv)
+        entries = pywwv_any.data
+        times = Linspace(
+            pywwv_any.time[0],
+            pywwv_any.time[1] - pywwv_any.time[0],
+            len(pywwv_any.time),
         )
-        return cls(times=times, frequencies=frequencies, entries=entries)
+        frequencies = Linspace(
+            pywwv_any.freq[0],
+            pywwv_any.freq[1] - pywwv_any.freq[0],
+            len(pywwv_any.freq),
+        )
+        return cls.make(times=times, frequencies=frequencies, entries=entries)
 
     def _to_pywWDM(self) -> pywWDM:
         """Convert self to a pywWDM object."""
+        xp = xpc.get_namespace(self.entries)
         return pywWDM(
             data=self.entries,
-            time=np.array(self.times),
-            freq=np.array(self.frequencies),
+            time=xp.array(self.times),
+            freq=xp.array(self.frequencies),
+        )
+
+    def get_plotter(self) -> plotters.WDMPlotter:
+        """Return the plotter for the WDM representation."""
+        from ..viz import plotters
+
+        return plotters.WDMPlotter(self)
+
+    # TODO for consistency: receive slices, receive copy bool arg
+    def get_subset(
+        self,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+    ) -> Self:
+        """Return the subset as a new instance."""
+        if time_interval is not None:
+            time_slice = utils.get_subset_slice(
+                to_array(self.times, xp=self.xp), time_interval[0], time_interval[1]
+            )
+        else:
+            time_slice = _slice(None)
+        if freq_interval is not None:
+            freq_slice = utils.get_subset_slice(
+                to_array(self.frequencies, xp=self.xp),
+                freq_interval[0],
+                freq_interval[1],
+            )
+        else:
+            freq_slice = _slice(None)
+        time_grid_sliced = Linspace.from_array(
+            to_array(self.times, xp=self.xp)[time_slice]
+        )
+        freq_grid_sliced = Linspace.from_array(
+            to_array(self.frequencies, xp=self.xp)[freq_slice]
+        )
+        return type(self)(
+            grid=(freq_grid_sliced, time_grid_sliced),
+            entries=self.entries[_get_full_slice((freq_slice, time_slice))],
         )

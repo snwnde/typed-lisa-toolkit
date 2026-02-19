@@ -1,27 +1,15 @@
-"""Module for waveform representation.
-
-The module provides formatting and transformation functions, as well as
-a protocol for waveform templates.
+"""Module for waveform containers.
 
 .. currentmodule:: typed_lisa_toolkit.containers.waveforms
 
-Types
------
-
-.. autoclass:: NPFloatingT
-.. autoclass:: NPNumberT
-.. autoclass:: WaveformInMode
-.. autoclass:: WaveformInChannel
-.. autoclass:: Waveform
-.. autoclass:: FormattedWaveform
-.. autoclass:: FrequencyModeDict
-.. autoprotocol:: FSWaveformGen
+.. autoclass:: HarmonicWaveform
+.. autoclass:: ProjectedWaveform
+.. autoclass:: HarmonicProjectedWaveform
 
 Functions
 ---------
 
-.. autofunction:: format
-.. autofunction:: to_fsdata
+.. autofunction:: sum_harmonics
 .. autofunction:: get_dense_maker
 
 """
@@ -29,95 +17,158 @@ Functions
 from __future__ import annotations
 from collections.abc import Mapping
 import logging
-from typing import TypeVar, Protocol
+from typing import TYPE_CHECKING, Self, Any, Iterator
+import array_api_compat as xpc
 
-import numpy as np
-import numpy.typing as npt
+from . import representations as reps, data, modes
 
-from . import representations as reps, arithdicts, modes, data
+
+Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
+Mode = modes.Harmonic | modes.QNM
+
 from .. import utils
+
+if TYPE_CHECKING:
+    Array = reps.Array
 
 log = logging.getLogger(__name__)
 
-NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
-"""Numpy floating dtype."""
 
-NPNumberT = TypeVar("NPNumberT", bound=np.number)
-"""Numpy dtype."""
+class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
+    """Mixin for picking a single mode from a waveform."""
 
-WaveformInMode = TypeVar("WaveformInMode", bound=reps.Representation)
-"""Invariant type variable for either :class:`.series.FrequencySeries`,
-:class:`.series.TimeSeries`, or :class:`.PhasorSequence`. Instances of
-this type are used to represent the signal of a waveform in a specific
-mode."""
+    def __init__(self, mapping: Mapping[ModeT, VT]):
+        self._mapping = mapping
 
-_ModeT = TypeVar(
-    "_ModeT", tuple[int, int], tuple[int, int, int], modes.Harmonic, modes.QNM
-)
-_FModeT = TypeVar("_FModeT", bound=modes.Harmonic | modes.QNM)
+    # Implement Mapping protocol
+    def __getitem__(self, key: ModeT) -> VT:
+        """Get a channel by name as a view with preserved channel dimension (size 1)."""
+        return self._mapping[key]
 
-WaveformInChannel = Mapping[_ModeT, WaveformInMode]
-Waveform = Mapping[arithdicts.ChnName, WaveformInChannel[_ModeT, WaveformInMode]]
-FormattedWaveformInChannel = arithdicts.ModeDict[_FModeT, WaveformInMode]
-FormattedWaveform = arithdicts.ChannelDict[
-    FormattedWaveformInChannel[_FModeT, WaveformInMode]
-]
-FrequencyModeDict = arithdicts.ModeDict[_FModeT, npt.NDArray[np.floating]]
+    def __iter__(self) -> Iterator[ModeT]:
+        """Iterate over harmonic modes."""
+        return iter(self.harmonics)
+
+    def __len__(self) -> int:
+        """Return the number of harmonic modes."""
+        return len(self.harmonics)
+
+    def __repr__(self):
+        items = {key: self[key] for key in self}
+        return f"{self.__class__.__name__}({items!r})"
+
+    def pick(self, modes: ModeT | tuple[ModeT, ...]) -> Self:
+        """Pick specific modes.
+
+        Parameters
+        ----------
+        modes : Mode or tuple[Mode, ...]
+            Mode(s) to pick.
+
+        Returns
+        -------
+        Self
+            New instance with only the specified mode(s).
+        """
+        try:
+            return self._pick(modes)  # type: ignore[arg-type]
+        except KeyError:
+            return self._pick((modes,))  # type: ignore[arg-type]
+
+    def _pick(self, modes: tuple[ModeT, ...]) -> Self:
+        new_mapping = {mode: self[mode] for mode in modes}
+        return type(self)(new_mapping)
+
+    @property
+    def harmonics(self):
+        """All harmonic modes and their order."""
+        return tuple(self.keys())
 
 
-def _format_waveform_in_channel(wf: WaveformInChannel[_ModeT, WaveformInMode]):
-    return arithdicts.ModeDict({modes.cast_mode(k): v for k, v in wf.items()})
+class HarmonicWaveform[ModeT: Mode, RepT: Reps](_ModeMapping[ModeT, RepT]):
+    """Waveform in different modes.
 
-
-def format(
-    wf: Waveform[_ModeT, WaveformInMode],
-):
-    """Format a waveform.
-
-    This function converts :class:`.Waveform` to :class:`.arithdicts.ChannelDict`
-    of :class:`.arithdicts.ModeDict`.
+    This class is a mapping from modes to representations.
     """
-    return arithdicts.ChannelDict(
-        {k: _format_waveform_in_channel(v) for k, v in wf.items()}
-    )
+
+    def __xp__(self, api_version: str | None = None):
+        """Get the array API namespace of the entries."""
+        return xpc.get_namespace(next(iter(self.values())), api_version=api_version)
+
+    @property
+    def domain(self):
+        """Physical domain shared by all harmonics."""
+        return self[next(iter(self))].domain
 
 
-def to_fsdata(
-    wf: Waveform[_ModeT, reps.FrequencySeries],
-) -> data.FSData:
-    """Convert :class:`.Waveform` to :class:`.data.FSData`.
+class ProjectedWaveform[RepT: Reps](data._ChannelMapping[RepT]):  # pyright: ignore[reportPrivateUsage]
+    """Projected waveform in a single mode or all modes summed together.
 
-    This function accepts an instance of :class:`.Waveform` with
-    signal represented as :class:`.series.FrequencySeries` and
-    returns an instance of :class:`.data.FSData`.
+    This class is a mapping from channel names to representations. It is
+    used to represent the detector response of a single harmonic waveform in different
+    channels.
     """
 
-    def _sum_modes(wf: WaveformInChannel[_ModeT, WaveformInMode]):
-        # Sum the contributions of all modes in each channel
-        return _format_waveform_in_channel(wf).sum()
 
-    return data.FSData({k: _sum_modes(v) for k, v in wf.items()})
-
-
-class FSWaveformGen(Protocol):
-    """Protocol for frequency domain waveform generators."""
-
-    def __call__(
-        self, *args, **kwargs
-    ) -> FormattedWaveform[
-        modes.Harmonic | modes.QNM, reps.FrequencySeries
-    ]:  # pyright: ignore[reportReturnType]
-        """Get the frequency domain waveform at the given frequencies."""
-
-
-def get_dense_maker(
-    interpolator: reps.Interpolator,
+class HarmonicProjectedWaveform[ModeT: Mode, RepT: Reps](
+    _ModeMapping[ModeT, ProjectedWaveform[RepT]]
 ):
-    """Return a function to convert a phasor waveform to a dense representation.
+    """Projected waveform in different modes.
 
-    This function is to be used with `pass_through` to convert a :class:`.arithdicts.ModeDict`
-    or :class:`.arithdicts.ChannelDict` of :class:`.representations.Phasor` to dictionaries of
-    dense representations.
+    This class is a mapping from modes to :class:`.ProjectedWaveform` instances.
+    """
+
+    def __xp__(self, api_version: str | None = None):
+        """Get the array API namespace of the entries."""
+        return self._first.__xp__(api_version=api_version)
+
+    @property
+    def _first(self):
+        return self[next(iter(self))]
+
+    @property
+    def domain(self):
+        """Physical domain shared by all harmonics."""
+        return self._first.domain
+
+    @property
+    def channel_names(self) -> tuple[str, ...]:
+        """All channel names."""
+        return tuple(self._first.keys())
+
+    @property
+    def is_homogeneous(self) -> bool:
+        """Whether the waveform is homogeneous across channels."""
+        return all(
+            self[harmonic].grid == self[next(iter(self))].grid
+            for harmonic in self.harmonics
+        )
+
+    def get_kernel(self):
+        """Return an array of the conventional shape.
+
+        The shape is ``(n_batches, n_channels, n_harmonics, n_features, *grid_like)``
+        The returned array is suitable for downstream processing (e.g., by noise models to compute inner products).
+        This method is only valid when `is_homogeneous` is ``True``. Otherwise, this method should raise an error.
+        """
+        if not self.is_homogeneous:
+            raise ValueError("The waveform is not homogeneous across channels.")
+        xp = xpc.get_namespace(self._first.entries)
+        return xp.stack([self[harmonic].entries for harmonic in self.harmonics], axis=2)
+
+
+def sum_harmonics[ModeT: Mode, RepT: reps.FrequencySeries](
+    wf: HarmonicProjectedWaveform[ModeT, RepT],
+) -> ProjectedWaveform[RepT]:
+    """Sum over modes."""
+    entries = wf.get_kernel().sum(axis=2)  # c.f. shape convention
+    return wf._first.create_like(entries, wf.channel_names)  # pyright: ignore[reportPrivateUsage]
+
+
+def get_dense_maker[ModeT: Mode](
+    interpolator: utils.Interpolator,
+):
+    """Return a function to convert a sparse phasor projected waveform to a dense phasor projected waveform.
 
     The returned function has the signature:
 
@@ -126,7 +177,8 @@ def get_dense_maker(
         def make(
             frequencies: npt.NDArray[np.floating],
             embed: bool = False,
-        ) -> Callable[[reps.Phasor], reps.Phasor]
+        ) -> Callable[HarmonicProjectedWaveform[ModeT, reps.Phasor], HarmonicProjectedWaveform[ModeT, reps.Phasor]]:
+            ...
 
     The function takes a list of frequencies and an optional boolean
     `embed` argument. If `embed` is True, the returned function will
@@ -137,16 +189,24 @@ def get_dense_maker(
     """
 
     def make(
-        frequencies: npt.NDArray[np.floating],
+        frequencies: "Array",
         embed: bool = False,
     ):
-        def do(wf: reps.Phasor):
-            fmin, fmax = np.array(wf.frequencies)[0], np.array(wf.frequencies)[-1]
-            freqs = frequencies[utils.get_subset_slice(frequencies, fmin, fmax)]
+
+        def do_phasor(wf: reps.Phasor):
+            freqs = frequencies[utils.get_subset_slice(frequencies, wf.f_min, wf.f_max)]
             nwf = wf.get_interpolated(freqs, interpolator)
             if not embed:
                 return nwf
             return nwf.get_embedded(frequencies)
+
+        def do_response(resp: ProjectedWaveform[reps.Phasor]):
+            return ProjectedWaveform[reps.Phasor].from_dict(
+                {chnname: do_phasor(resp[chnname]) for chnname in resp.channel_names}
+            )
+
+        def do(wf: HarmonicProjectedWaveform[ModeT, reps.Phasor]):
+            return type(wf)({mode: do_response(wf[mode]) for mode in wf.harmonics})
 
         return do
 
