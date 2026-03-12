@@ -154,6 +154,24 @@ class ArithDict(UserDict[KT, ArithT], lib.mixins.NDArrayMixin):
             #     k: [self._unwrap(inp, k) for inp in inputs] for k in self.keys()
             # }
             out_arg = kwargs.get("out", None)
+
+            if (
+                out_arg is not None
+                and len(out_arg) == 1
+                and out_arg[0] is self
+                and len(inputs) == 2
+                and inputs[0] is self
+                and ufunc in (np.add, np.subtract)
+            ):
+                other = inputs[1]
+                for k in self.keys():
+                    rhs, _ = self._unwrap(other, k)
+                    if ufunc is np.add:
+                        self[k] = self[k].__iadd__(rhs)  # type: ignore[attr-defined]
+                    else:
+                        self[k] = self[k].__iadd__(-rhs)  # type: ignore[attr-defined]
+                return self
+
             if out_arg is None:
                 new_data = {k: ufunc(*unwrapped[k], **kwargs) for k in self.keys()}
                 return for_type.create_new(new_data)
