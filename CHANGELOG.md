@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.4.4 - 2026-03-12
+#### Bug Fixes
+- `__iadd__` catch - (1755985) - Senwen Deng
+
+- - -
+
 ## 0.4.3 - 2026-02-19
 #### Features
 - <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>WDM representation and WDM Whittle noise model - (8749eb1) - Solano Sousa Felicio
