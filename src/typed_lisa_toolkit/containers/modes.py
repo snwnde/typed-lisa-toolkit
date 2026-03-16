@@ -1,7 +1,7 @@
 """Module for modes."""
 
 import logging
-from typing import NamedTuple, Self, TypeVar, overload
+from typing import NamedTuple, Self, overload
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class Harmonic(NamedTuple):
         return self.m
 
     @classmethod
-    def cast(cls, mode: tuple[PosInt, PosInt] | Self) -> Self:
+    def cast(cls, mode: tuple[PosInt, PosInt]) -> Self:
         """Cast a tuple to :class:`.Harmonic`."""
         return cls(*mode)
 
@@ -74,7 +74,7 @@ def cast_mode(mode: tuple[PosInt, PosInt]) -> Harmonic: ...
 def cast_mode(mode: tuple[PosInt, PosInt, PosInt]) -> QNM: ...
 
 
-def cast_mode(mode):
+def cast_mode(mode: tuple[PosInt, PosInt] | tuple[PosInt, PosInt, PosInt]):
     """Cast a tuple of positive integers to :class:`.Harmonic` or :class:`.QNM`."""
     if len(mode) == 2:
         return Harmonic.cast(mode)

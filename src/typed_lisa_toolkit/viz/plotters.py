@@ -26,7 +26,7 @@ Entities
     :member-order: groupwise
     :inherited-members:
 
-.. autoclass:: TimeFrequencyPlotter
+.. autoclass:: WDMPlotter
     :members:
     :member-order: groupwise
     :inherited-members:
@@ -44,18 +44,24 @@ Entities
 """
 
 from __future__ import annotations
+
 import abc
-import logging
 import copy
-from typing import TYPE_CHECKING, Self, Literal
+import logging
+from typing import Any, Literal, Self
+
 import matplotlib.axes
 import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
-if TYPE_CHECKING:
-    from ..containers import data, representations
+from ..containers import data, representations
 
+_1DRep = (
+    representations.TimeSeries
+    | representations.FrequencySeries
+    | representations.Phasor
+)
 logger = logging.getLogger(__name__)
 
 figure_kwargs = [
@@ -150,19 +156,17 @@ savefig_kwargs = [
 ]
 
 
-def sieve_kwargs(keys_to_accept: list[str], **kwargs):
+def sieve_kwargs(keys_to_accept: list[str], **kwargs: Any) -> dict[str, Any]:
     """Sieve the keyword arguments to accept."""
     return {k: v for k, v in kwargs.items() if k in keys_to_accept}
 
 
-class _SeriesPlotter(abc.ABC):
-    series: representations._Series
-
-    def __init__(self, series: representations._Series) -> None:
+class _1DPlotter[RepT: _1DRep](abc.ABC):
+    def __init__(self, series: RepT) -> None:
         self.series = copy.deepcopy(series)
 
     def _get_fig_ax(
-        self, **kwargs
+        self, **kwargs: Any
     ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
         """Get the figure and axes."""
         fig = kwargs.pop("fig", None)
@@ -171,11 +175,11 @@ class _SeriesPlotter(abc.ABC):
             if ax is not None:
                 raise ValueError("If ax is provided, fig must also be provided.")
             _fig_kwargs = sieve_kwargs(figure_kwargs, **kwargs)
-            fig = plt.figure(**_fig_kwargs)
+            fig = plt.figure(**_fig_kwargs)  # pyright: ignore[reportUnknownMemberType]
         if ax is None:
             _add_subplot_kwargs = sieve_kwargs(add_subplot_kwargs, **kwargs)
-            ax = fig.add_subplot(**_add_subplot_kwargs)
-        return fig, ax
+            ax = fig.add_subplot(**_add_subplot_kwargs)  # pyright: ignore[reportUnknownVariableType]
+        return fig, ax  # pyright: ignore[reportUnknownVariableType]
 
     @abc.abstractmethod
     def plot(
@@ -184,25 +188,19 @@ class _SeriesPlotter(abc.ABC):
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> matplotlib.axes.Axes: ...
 
-    def draw(self, **kwargs) -> matplotlib.figure.Figure:
+    def draw(self, **kwargs: Any) -> matplotlib.figure.Figure:
         """Draw the series on a figure."""
         fig, ax = self._get_fig_ax(**kwargs)
         self.plot(ax, set_xlabel=True, set_ylabel=True, **kwargs)
         return fig
 
 
-class TSPlotter(_SeriesPlotter):
+class TSPlotter(_1DPlotter["representations.TimeSeries"]):
     """Plotter for :class:`.containers.representations.TimeSeries`."""
 
-    series: (  # pyright: ignore[reportIncompatibleVariableOverride]
-        representations.TimeSeries
-    )
-
-    # FIXME confusing default behavior, time axis not labeled
-    # and not in seconds
     def plot(
         self,
         ax: matplotlib.axes.Axes,
@@ -211,40 +209,36 @@ class TSPlotter(_SeriesPlotter):
         set_legend: bool = False,
         time_unit: Literal["hrs", "days"] = "hrs",
         ylabel: str = "strain",
-        **kwargs,
+        **kwargs: Any,
     ) -> matplotlib.axes.Axes:
         """Plot the series on the provided Axes."""
-        grid = np.array(self.series.grid)
-        if not np.issubdtype(grid.dtype, np.datetime64):
+        times = representations.to_array(self.series.times)
+        if not np.issubdtype(times.dtype, np.datetime64):
             if time_unit == "hrs":
-                grid /= 3600
+                times /= 3600
             elif time_unit == "days":
-                grid /= 3600 * 24
+                times /= 3600 * 24
             else:
                 raise ValueError(
                     f"The time unit {time_unit} is not supported. Please use 'hrs' or 'days'."
                 )
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
-        ax.plot(grid, self.series.entries, **_kwargs)
+        ax.plot(times, self.series.entries.squeeze(), **_kwargs)  # pyright: ignore[reportUnknownMemberType]
         if set_xlabel:
-            if not np.issubdtype(grid.dtype, np.datetime64):
-                ax.set_xlabel(f"Time [{time_unit}]")
+            if not np.issubdtype(times.dtype, np.datetime64):
+                ax.set_xlabel(f"Time [{time_unit}]")  # pyright: ignore[reportUnknownMemberType]
             else:
-                ax.set_xlabel("Time")
+                ax.set_xlabel("Time")  # pyright: ignore[reportUnknownMemberType]
         if set_ylabel:
-            ax.set_ylabel(ylabel)
+            ax.set_ylabel(ylabel)  # pyright: ignore[reportUnknownMemberType]
         if set_legend:
             _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
-            ax.legend(**_legend_kwargs)
+            ax.legend(**_legend_kwargs)  # pyright: ignore[reportUnknownMemberType]
         return ax
 
 
-class FSPlotter(_SeriesPlotter):
+class FSPlotter(_1DPlotter["representations.FrequencySeries"]):
     """Plotter for :class:`.containers.representations.FrequencySeries`."""
-
-    series: (  # pyright: ignore[reportIncompatibleVariableOverride]
-        representations.FrequencySeries
-    )
 
     def plot(
         self,
@@ -255,32 +249,31 @@ class FSPlotter(_SeriesPlotter):
         freq_unit: Literal["Hz", "mHz"] = "Hz",
         ylabel: str = "Strain",
         method: Literal["loglog"] | Literal["semilogx"] = "loglog",
-        **kwargs,
+        **kwargs: Any,
     ) -> matplotlib.axes.Axes:
         """Plot the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
-        series_abs = self.series.abs()
+        frequencies = representations.to_array(self.series.frequencies)
         if freq_unit == "Hz":
-            grid = series_abs.grid
             grid_label = "Frequency [Hz]"
         elif freq_unit == "mHz":
-            grid = np.array(series_abs.grid) * 1e3
+            frequencies *= 1e3
             grid_label = "Frequency [mHz]"
         else:
             raise ValueError(
                 f"The frequency unit {freq_unit} is not supported. Please use 'Hz' or 'mHz'."
             )
         if method == "loglog":
-            ax.loglog(grid, series_abs.entries, **_kwargs)
+            ax.loglog(frequencies, self.series.abs().entries.squeeze(), **_kwargs)  # pyright: ignore[reportUnknownMemberType]
         elif method == "semilogx":
-            ax.semilogx(grid, series_abs.entries, **_kwargs)
+            ax.semilogx(frequencies, self.series.abs().entries.squeeze(), **_kwargs)  # pyright: ignore[reportUnknownMemberType]
         if set_xlabel:
-            ax.set_xlabel(grid_label)
+            ax.set_xlabel(grid_label)  # pyright: ignore[reportUnknownMemberType]
         if set_ylabel:
-            ax.set_ylabel(ylabel)
+            ax.set_ylabel(ylabel)  # pyright: ignore[reportUnknownMemberType]
         if set_legend:
             _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
-            ax.legend(**_legend_kwargs)
+            ax.legend(**_legend_kwargs)  # pyright: ignore[reportUnknownMemberType]
         return ax
 
     def plot_angle(
@@ -289,37 +282,69 @@ class FSPlotter(_SeriesPlotter):
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> matplotlib.axes.Axes:
         """Plot the angle of the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
-        angle = self.series.angle().entries
-        ax.semilogx(self.series.grid, angle, **_kwargs)
+        angle = self.series.angle().entries.squeeze()
+        frequencies = representations.to_array(self.series.frequencies)
+        ax.semilogx(frequencies, angle, **_kwargs)  # pyright: ignore[reportUnknownMemberType]
         if set_xlabel:
-            ax.set_xlabel("Frequency [Hz]")
+            ax.set_xlabel("Frequency [Hz]")  # pyright: ignore[reportUnknownMemberType]
         if set_ylabel:
-            ax.set_ylabel("Angle [rad]")
+            ax.set_ylabel("Angle [rad]")  # pyright: ignore[reportUnknownMemberType]
         if set_legend:
             _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
-            ax.legend(**_legend_kwargs)
+            ax.legend(**_legend_kwargs)  # pyright: ignore[reportUnknownMemberType]
         return ax
 
-    def draw(self, **kwargs) -> matplotlib.figure.Figure:
+    def draw(self, **kwargs: Any) -> matplotlib.figure.Figure:
         """Draw the representation on a figure."""
-        fig, axs = plt.subplots(2, sharex=True)
+        fig, axs = plt.subplots(2, sharex=True)  # pyright: ignore[reportUnknownMemberType]
         amp_ax, phase_ax = axs[0], axs[1]
         self.plot(amp_ax, set_xlabel=False, set_ylabel=True, **kwargs)
         self.plot_angle(phase_ax, set_xlabel=True, set_ylabel=True, **kwargs)
         return fig
 
 
-class PhasorPlotter(FSPlotter):
+class PhasorPlotter(_1DPlotter["representations.Phasor"]):
     """Plotter for :class:`.containers.representations.Phasor`."""
 
-    series: representations.Phasor
-
-    def __init__(self, series: representations.Phasor) -> None:
-        self.series = series  # pyright: ignore[reportIncompatibleVariableOverride]
+    def plot(
+        self,
+        ax: matplotlib.axes.Axes,
+        set_xlabel: bool = False,
+        set_ylabel: bool = False,
+        set_legend: bool = False,
+        freq_unit: Literal["Hz", "mHz"] = "Hz",
+        ylabel: str = "Strain",
+        method: Literal["loglog"] | Literal["semilogx"] = "loglog",
+        **kwargs: Any,
+    ) -> matplotlib.axes.Axes:
+        """Plot the series on the provided Axes."""
+        _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
+        frequencies = representations.to_array(self.series.frequencies)
+        if freq_unit == "Hz":
+            grid_label = "Frequency [Hz]"
+        elif freq_unit == "mHz":
+            frequencies *= 1e3
+            grid_label = "Frequency [mHz]"
+        else:
+            raise ValueError(
+                f"The frequency unit {freq_unit} is not supported. Please use 'Hz' or 'mHz'."
+            )
+        if method == "loglog":
+            ax.loglog(frequencies, self.series.amplitudes.squeeze(), **_kwargs)  # pyright: ignore[reportUnknownMemberType]
+        elif method == "semilogx":
+            ax.semilogx(frequencies, self.series.amplitudes.squeeze(), **_kwargs)  # pyright: ignore[reportUnknownMemberType]
+        if set_xlabel:
+            ax.set_xlabel(grid_label)  # pyright: ignore[reportUnknownMemberType]
+        if set_ylabel:
+            ax.set_ylabel(ylabel)  # pyright: ignore[reportUnknownMemberType]
+        if set_legend:
+            _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
+            ax.legend(**_legend_kwargs)  # pyright: ignore[reportUnknownMemberType]
+        return ax
 
     def plot_phase(
         self,
@@ -327,26 +352,34 @@ class PhasorPlotter(FSPlotter):
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> matplotlib.axes.Axes:
         """Plot the phase of the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
-        phases = self.series.phases
-        ax.semilogx(self.series.grid, phases, **_kwargs)
+        phases = self.series.phases.squeeze()
+        ax.semilogx(self.series.frequencies, phases, **_kwargs)  # pyright: ignore[reportUnknownMemberType]
         if set_xlabel:
-            ax.set_xlabel("Frequency [Hz]")
+            ax.set_xlabel("Frequency [Hz]")  # pyright: ignore[reportUnknownMemberType]
         if set_ylabel:
-            ax.set_ylabel("Phase [rad]")
+            ax.set_ylabel("Phase [rad]")  # pyright: ignore[reportUnknownMemberType]
         if set_legend:
             _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
-            ax.legend(**_legend_kwargs)
+            ax.legend(**_legend_kwargs)  # pyright: ignore[reportUnknownMemberType]
         return ax
 
+    def draw(self, **kwargs: Any) -> matplotlib.figure.Figure:
+        """Draw the representation on a figure."""
+        fig, axs = plt.subplots(2, sharex=True)  # pyright: ignore[reportUnknownMemberType]
+        amp_ax, phase_ax = axs[0], axs[1]
+        self.plot(amp_ax, set_xlabel=False, set_ylabel=True, **kwargs)
+        self.plot_phase(phase_ax, set_xlabel=True, set_ylabel=True, **kwargs)
+        return fig
 
-class TimeFrequencyPlotter:
-    """Plotter for :class:`.containers.representations.TimeFrequency`."""
 
-    def __init__(self, representation: representations.TimeFrequency) -> None:
+class WDMPlotter:
+    """Plotter for :class:`.containers.representations.WDM`."""
+
+    def __init__(self, representation: representations.WDM) -> None:
         self.representation = representation
 
     def plot(
@@ -355,50 +388,50 @@ class TimeFrequencyPlotter:
         set_xlabel: bool = False,
         set_ylabel: bool = False,
         set_legend: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> matplotlib.axes.Axes:
         """Plot the time-frequency representation on the provided Axes."""
         _kwargs = sieve_kwargs(imshow_kwargs, **kwargs)
-        times = np.array(self.representation.times)
-        frequencies = np.array(self.representation.frequencies)
-        dT, dF = self.representation.dT, self.representation.dF
+        dT, dF = self.representation.times.step, self.representation.dF
 
         times_extent = (
-            times[0] / 3600,
-            (times[-1] + dT) / 3600,
+            self.representation.times.start / 3600,
+            (self.representation.times.stop + dT) / 3600,
         )
         freqs_extent = (
-            frequencies[0],
-            frequencies[-1] + dF,
+            self.representation.frequencies.start,
+            self.representation.frequencies.stop + dF,
         )
         extent = times_extent + freqs_extent
-        ax.imshow(
-            abs(self.representation.entries),
+        ax.imshow(  # pyright: ignore[reportUnknownMemberType]
+            self.representation.abs().entries,
             origin="lower",
             aspect="auto",
             extent=extent,
             **_kwargs,
         )
         if set_xlabel:
-            ax.set_xlabel("Time [hrs]")
+            ax.set_xlabel("Time [hrs]")  # pyright: ignore[reportUnknownMemberType]
         if set_ylabel:
-            ax.set_ylabel("Frequency [Hz]")
+            ax.set_ylabel("Frequency [Hz]")  # pyright: ignore[reportUnknownMemberType]
         if set_legend:
             _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
-            ax.legend(**_legend_kwargs)
+            ax.legend(**_legend_kwargs)  # pyright: ignore[reportUnknownMemberType]
         return ax
 
 
-class _SeriesDataPlotter(abc.ABC):
-    def __init__(self, data: data._SeriesData) -> None:
+class _1DDataPlotter[
+    RepT: representations.TimeSeries | representations.FrequencySeries
+](abc.ABC):
+    def __init__(self, data: data._SeriesData[RepT]) -> None:  # pyright: ignore[reportPrivateUsage]
         self.data = copy.deepcopy(data)
 
     def _draw(
-        self, plotter: type[_SeriesPlotter], set_legend: bool = False, **kwargs
+        self, plotter: type[_1DPlotter[RepT]], set_legend: bool = False, **kwargs: Any
     ) -> matplotlib.figure.Figure:
         chn_num = len(self.data.channel_names)
 
-        fig, axs = plt.subplots(chn_num, sharex=True)
+        fig, axs = plt.subplots(chn_num, sharex=True)  # pyright: ignore[reportUnknownMemberType]
 
         # If only one channel, axs is not a list
         try:
@@ -423,17 +456,17 @@ class _SeriesDataPlotter(abc.ABC):
 
     def _compare(
         self,
-        plotter: type[_SeriesPlotter],
+        plotter: type[_1DPlotter[RepT]],
         other: Self,
         plot_residual: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> matplotlib.figure.Figure:
         chn_num = len(self.data.channel_names)
         ylabel_bool = kwargs.pop("set_ylabel", False)
         if plot_residual:
-            fig, axs = plt.subplots(2 * chn_num, sharex=True)
+            fig, axs = plt.subplots(2 * chn_num, sharex=True)  # pyright: ignore[reportUnknownMemberType]
         else:
-            fig, axs = plt.subplots(chn_num, sharex=True)
+            fig, axs = plt.subplots(chn_num, sharex=True)  # pyright: ignore[reportUnknownMemberType]
         diff_ylabel = kwargs.pop("diff_ylabel", "difference")
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == chn_num - 1 else False
@@ -459,7 +492,7 @@ class _SeriesDataPlotter(abc.ABC):
                 **kwargs,
             )
             if plot_residual:
-                plotter(self.data[chnname] - other.data[chnname]).plot(
+                plotter(self.data[chnname] - other.data[chnname]).plot(  # type: ignore[arg-type]
                     axs[diff_idx],  # pyright: ignore[reportPossiblyUnboundVariable]
                     set_xlabel=xlabel_bool,
                     set_ylabel=ylabel_bool,
@@ -471,39 +504,39 @@ class _SeriesDataPlotter(abc.ABC):
         return fig
 
     @abc.abstractmethod
-    def draw(self, **kwargs) -> matplotlib.figure.Figure: ...
+    def draw(self, **kwargs: Any) -> matplotlib.figure.Figure: ...
 
     @abc.abstractmethod
-    def compare(self, other: Self, **kwargs) -> matplotlib.figure.Figure: ...
+    def compare(self, other: Self, **kwargs: Any) -> matplotlib.figure.Figure: ...
 
 
-class TSDataPlotter(_SeriesDataPlotter):
+class TSDataPlotter(_1DDataPlotter["representations.TimeSeries"]):
     """Plotter for :class:`.containers.data.TSData`."""
 
-    def draw(self, set_legend: bool = False, **kwargs) -> matplotlib.figure.Figure:
+    def draw(self, set_legend: bool = False, **kwargs: Any) -> matplotlib.figure.Figure:
         """Draw the time series data."""
         return self._draw(plotter=TSPlotter, set_legend=set_legend, **kwargs)
 
     def compare(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self, other: Self, **kwargs
+        self, other: Self, **kwargs: Any
     ) -> matplotlib.figure.Figure:
         """Compare two time series data."""
         return self._compare(plotter=TSPlotter, other=other, **kwargs)
 
 
-class FSDataPlotter(_SeriesDataPlotter):
+class FSDataPlotter(_1DDataPlotter["representations.FrequencySeries"]):
     """Plotter for :class:`.containers.data.FSData`."""
 
     def _draw_angle(
-        self, set_legend: bool = False, **kwargs
+        self, set_legend: bool = False, **kwargs: Any
     ) -> matplotlib.figure.Figure:
         chn_num = len(self.data.channel_names)
-        fig, axs = plt.subplots(2 * chn_num, sharex=True)
+        fig, axs = plt.subplots(2 * chn_num, sharex=True)  # pyright: ignore[reportUnknownMemberType]
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == chn_num - 1 else False
             amp_idx = 2 * idx
             phase_idx = 2 * idx + 1
-            plotter = PhasorPlotter(self.data[chnname])
+            plotter = FSPlotter(self.data[chnname])
             plotter.plot(
                 axs[amp_idx],
                 set_xlabel=False,
@@ -523,18 +556,18 @@ class FSDataPlotter(_SeriesDataPlotter):
             )
         return fig
 
-    def _compare_angle(self, other: Self, **kwargs) -> matplotlib.figure.Figure:
+    def _compare_angle(self, other: Self, **kwargs: Any) -> matplotlib.figure.Figure:
         chn_num = len(self.data.channel_names)
-        fig, axs = plt.subplots(4 * chn_num, sharex=True)
+        fig, axs = plt.subplots(4 * chn_num, sharex=True)  # pyright: ignore[reportUnknownMemberType]
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == chn_num - 1 else False
             orig_amp_idx = 4 * idx
             orig_phase_idx = 4 * idx + 1
             diff_amp_idx = 4 * idx + 2
             diff_phase_idx = 4 * idx + 3
-            self_plotter = PhasorPlotter(self.data[chnname])
-            other_plotter = PhasorPlotter(other.data[chnname])
-            diff_plotter = PhasorPlotter(self.data[chnname] - other.data[chnname])
+            self_plotter = FSPlotter(self.data[chnname])
+            other_plotter = FSPlotter(other.data[chnname])
+            diff_plotter = FSPlotter(self.data[chnname] - other.data[chnname])
             self_plotter.plot(
                 axs[orig_amp_idx],
                 set_xlabel=False,
@@ -582,7 +615,7 @@ class FSDataPlotter(_SeriesDataPlotter):
         return fig
 
     def draw(
-        self, set_legend: bool = False, angle: bool = False, **kwargs
+        self, set_legend: bool = False, angle: bool = False, **kwargs: Any
     ) -> matplotlib.figure.Figure:
         """Draw the frequency series data."""
         if not angle:
@@ -590,7 +623,7 @@ class FSDataPlotter(_SeriesDataPlotter):
         return self._draw_angle(set_legend=set_legend, **kwargs)
 
     def compare(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self, other: Self, angle: bool = False, **kwargs
+        self, other: Self, angle: bool = False, **kwargs: Any
     ) -> matplotlib.figure.Figure:
         """Compare two frequency series data."""
         if not angle:
@@ -601,12 +634,12 @@ class FSDataPlotter(_SeriesDataPlotter):
 class TFDataPlotter:
     """Plotter for :class:`.containers.data.TFData`."""
 
-    def __init__(self, data: data.TFData) -> None:
+    def __init__(self, data: data.WDMData) -> None:
         self.data = copy.deepcopy(data)
 
-    def draw(self, set_legend: bool = False, **kwargs) -> matplotlib.figure.Figure:
+    def draw(self, set_legend: bool = False, **kwargs: Any) -> matplotlib.figure.Figure:
         """Draw the time-frequency data."""
-        fig, axs = plt.subplots(len(self.data.channel_names), sharex=True)
+        fig, axs = plt.subplots(len(self.data.channel_names), sharex=True)  # pyright: ignore[reportUnknownMemberType]
         # If only one channel, axs is not a list
         try:
             axs[0]
@@ -614,7 +647,7 @@ class TFDataPlotter:
             axs = [axs]
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == len(self.data.channel_names) - 1 else False
-            TimeFrequencyPlotter(self.data[chnname]).plot(
+            WDMPlotter(self.data[chnname]).plot(
                 axs[idx],
                 set_xlabel=xlabel_bool,
                 set_ylabel=True,

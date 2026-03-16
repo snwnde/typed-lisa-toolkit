@@ -1,0 +1,491 @@
+"""Tests for data containers with JAX arrays."""
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
+
+import tempfile
+import unittest
+from unittest.mock import MagicMock, patch
+
+import jax
+
+jax.config.update("jax_enable_x64", True)
+import h5py
+import jax.numpy as jnp
+import numpy as np
+import numpy.testing as npt
+
+from tests._shared.data_helpers import DataAbstractBranchesMixin
+from tests._shared.noisemodel_helpers import build_fd_pair, build_wdm_pair
+from tests._shared.waveforms_helpers import \
+    build_harmonic_projected_frequency_waveform
+from typed_lisa_toolkit.containers.data import (FSData, STFTData, TimedFSData,
+                                                TSData, WDMData, load_data,
+                                                load_ldc_data)
+from typed_lisa_toolkit.containers.representations import TimeSeries
+
+
+def _build_tsdata_jax():
+    times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
+    x = jnp.asarray([0.0, 1.0, 0.5, -0.5, -1.0, -0.25, 0.75, 0.0], dtype=jnp.float64)
+    y = jnp.asarray([1.0, 0.0, -0.5, 0.25, 0.5, -0.75, 0.0, 1.0], dtype=jnp.float64)
+    data = TSData.from_dict(
+        {
+            "X": TimeSeries((times,), x[None, None, None, None, :]),
+            "Y": TimeSeries((times,), y[None, None, None, None, :]),
+        }
+    )
+    return times, data
+
+
+class TestDataContainersJAX(unittest.TestCase):
+    def test_tsdata_times_dt_and_get_frequencies(self):
+        times, tsdata = _build_tsdata_jax()
+
+        npt.assert_allclose(np.asarray(tsdata.times), np.asarray(times))
+        self.assertAlmostEqual(tsdata.dt, float(times[1] - times[0]))
+        npt.assert_allclose(
+            np.asarray(tsdata.get_frequencies()),
+            np.asarray(jnp.fft.rfftfreq(len(times), tsdata.dt)),
+        )
+
+    def test_fsdata_to_wdmdata_and_back_preserves_channels(self):
+        _, tsdata = _build_tsdata_jax()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+
+        wdmdata = fsdata.to_WDMdata(Nf=2, Nt=2)
+        recovered = wdmdata.to_fsdata()
+
+        self.assertIsInstance(wdmdata, WDMData)
+        self.assertIsInstance(recovered, FSData)
+        self.assertEqual(wdmdata.channel_names, fsdata.channel_names)
+        self.assertEqual(recovered.channel_names, fsdata.channel_names)
+        self.assertEqual(np.asarray(wdmdata["X"].entries).shape[-2:], (2, 2))
+        self.assertEqual(
+            np.asarray(recovered.get_kernel()).shape[-1],
+            np.asarray(recovered.frequencies).shape[0],
+        )
+
+    def test_wdm_fs_wdm_roundtrip_preserves_grid_and_entries(self):
+        wdmdata = build_wdm_pair(jnp)["left"]
+        nf, nt = wdmdata["X"].Nf, wdmdata["X"].Nt
+
+        fsdata = wdmdata.to_fsdata()
+        roundtrip = fsdata.to_WDMdata(Nf=nf, Nt=nt)
+
+        self.assertIsInstance(roundtrip, WDMData)
+        self.assertEqual(roundtrip.channel_names, wdmdata.channel_names)
+        npt.assert_allclose(
+            np.asarray(roundtrip["X"].times), np.asarray(wdmdata["X"].times)
+        )
+        npt.assert_allclose(
+            np.asarray(roundtrip["X"].frequencies),
+            np.asarray(wdmdata["X"].frequencies),
+        )
+        npt.assert_allclose(
+            np.asarray(roundtrip.get_kernel()),
+            np.asarray(wdmdata.get_kernel()),
+            rtol=1e-7,
+            atol=1e-7,
+        )
+
+    def test_fsdata_frequencies_and_df(self):
+        times, tsdata = _build_tsdata_jax()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+
+        frequencies = np.asarray(fsdata.frequencies)
+        npt.assert_allclose(
+            frequencies,
+            np.asarray(jnp.fft.rfftfreq(len(times), tsdata.dt)),
+        )
+        self.assertAlmostEqual(float(fsdata.df), float(frequencies[1] - frequencies[0]))
+
+    def test_pick_preserves_requested_order(self):
+        case = build_fd_pair(jnp)
+
+        picked = case["left"].pick(("Y", "X"))
+
+        self.assertEqual(picked.channel_names, ("Y", "X"))
+        self.assertEqual(np.asarray(picked["Y"].entries).shape[1], 1)
+        npt.assert_allclose(
+            np.asarray(picked["Y"].entries),
+            np.asarray(case["left"]["Y"].entries),
+        )
+
+    def test_init_rejects_non_unit_harmonic_dimension(self):
+        times = jnp.linspace(0.0, 1.0, 4, dtype=jnp.float64)
+        bad_repr = TimeSeries((times,), jnp.ones((1, 2, 2, 1, 4), dtype=jnp.float64))
+
+        with self.assertRaises(ValueError):
+            TSData(bad_repr, ("X", "Y"))
+
+    def test_tsdata_to_fsdata_keep_times_returns_timedfsdata(self):
+        times, tsdata = _build_tsdata_jax()
+
+        fsdata = tsdata.to_fsdata(keep_times=True)
+
+        self.assertIsInstance(fsdata, TimedFSData)
+        npt.assert_allclose(np.asarray(fsdata.times), np.asarray(times))
+        npt.assert_allclose(
+            np.asarray(fsdata.frequencies),
+            np.asarray(jnp.fft.rfftfreq(len(times), tsdata.dt)),
+        )
+
+    def test_from_waveform_preserves_entries_and_channels(self):
+        case = build_harmonic_projected_frequency_waveform(jnp)
+
+        data = FSData.from_waveform(case["resp_22"])
+
+        self.assertEqual(data.channel_names, case["resp_22"].channel_names)
+        npt.assert_allclose(
+            np.asarray(data.get_kernel()),
+            np.asarray(case["resp_22"].get_kernel()),
+        )
+
+    def test_get_embedded_expands_frequency_grid(self):
+        case = build_fd_pair(jnp)
+        embedding = jnp.asarray([0.5, 1.0, 2.0, 4.0, 5.0], dtype=jnp.float64)
+
+        embedded = case["left"].get_embedded(embedding)
+        got = np.asarray(embedded.get_kernel())
+        source = np.asarray(case["left"].get_kernel())
+
+        self.assertEqual(np.asarray(embedded.frequencies).shape[0], 5)
+        npt.assert_allclose(got[..., 1:4], source)
+        npt.assert_allclose(got[..., 0], 0.0)
+        npt.assert_allclose(got[..., -1], 0.0)
+
+    def test_fsdata_set_times_and_drop_times(self):
+        times, tsdata = _build_tsdata_jax()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+
+        timed = fsdata.set_times(np.asarray(times))
+
+        self.assertIsInstance(timed, TimedFSData)
+        self.assertIsInstance(timed.drop_times(), FSData)
+        npt.assert_allclose(np.asarray(timed.times), np.asarray(times))
+
+    def test_fsdata_set_times_drop_times_and_to_tsdata(self):
+        case = build_fd_pair(jnp)
+        times = np.linspace(0.0, 7.0, 8)
+
+        timed = case["left"].set_times(times)
+        recovered = timed.to_tsdata()
+
+        self.assertIsInstance(timed, TimedFSData)
+        self.assertIsInstance(timed.drop_times(), FSData)
+        self.assertEqual(recovered.channel_names, case["left"].channel_names)
+        npt.assert_allclose(np.asarray(recovered.times), times)
+        self.assertEqual(np.asarray(recovered.get_kernel()).shape[-1], len(times))
+
+    def test_save_and_load_dispatches_by_type(self):
+        case = build_fd_pair(jnp)
+        times = np.linspace(0.0, 7.0, 8)
+        timed = case["left"].set_times(times)
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            timed.save(handle.name)
+            loaded = load_data(handle.name)
+
+        self.assertIsInstance(loaded, TimedFSData)
+        npt.assert_allclose(np.asarray(loaded.times), times)
+        npt.assert_allclose(
+            np.asarray(loaded.get_kernel()),
+            np.asarray(timed.get_kernel()),
+        )
+
+    def test_tsdata_t_start_and_t_end(self):
+        times, tsdata = _build_tsdata_jax()
+        self.assertAlmostEqual(tsdata.t_start, float(times[0]))
+        self.assertAlmostEqual(tsdata.t_end, float(times[-1]))
+
+    def test_fsdata_f_min_and_f_max(self):
+        _, tsdata = _build_tsdata_jax()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+        freqs = np.asarray(fsdata.frequencies)
+        self.assertAlmostEqual(float(fsdata.f_min), float(freqs[0]))
+        self.assertAlmostEqual(float(fsdata.f_max), float(freqs[-1]))
+
+    def test_fsdata_to_tsdata_explicit_times(self):
+        times, tsdata = _build_tsdata_jax()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+        recovered = fsdata.to_tsdata(times)
+        self.assertIsInstance(recovered, TSData)
+        self.assertEqual(recovered.channel_names, fsdata.channel_names)
+        self.assertEqual(np.asarray(recovered.times).shape[0], len(times))
+
+    def test_tsdata_to_stftdata(self):
+        _, tsdata = _build_tsdata_jax()
+        win = np.hanning(4).astype(float)
+        stftdata = tsdata.to_stftdata(win=win, hop=2)
+        self.assertIsInstance(stftdata, STFTData)
+        self.assertEqual(stftdata.channel_names, tsdata.channel_names)
+
+    def test_stftdata_get_subset(self):
+        _, tsdata = _build_tsdata_jax()
+        win = np.hanning(4).astype(float)
+        stftdata = tsdata.to_stftdata(win=win, hop=2)
+
+        times_arr = np.array(list(stftdata.values())[0].times)
+        t_start, t_end = float(times_arr[0]), float(times_arr[-1])
+        sub = stftdata.get_subset(
+            time_interval=(t_start, t_start + (t_end - t_start) / 2)
+        )
+        self.assertIsInstance(sub, STFTData)
+        self.assertEqual(sub.channel_names, stftdata.channel_names)
+
+    def test_wdmdata_get_subset(self):
+        wdmdata = build_wdm_pair(jnp)["left"]
+        times_arr = np.array(wdmdata["X"].times)
+        t_mid = float(times_arr[len(times_arr) // 2])
+        sub = wdmdata.get_subset(time_interval=(float(times_arr[0]), t_mid))
+        self.assertIsInstance(sub, WDMData)
+        self.assertEqual(sub.channel_names, wdmdata.channel_names)
+
+    def test_load_data_dispatches_tsdata_and_fsdata(self):
+        _, tsdata = _build_tsdata_jax()
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            tsdata.save(handle.name)
+            loaded = load_data(handle.name)
+        self.assertIsInstance(loaded, TSData)
+        npt.assert_allclose(
+            np.asarray(loaded.get_kernel()), np.asarray(tsdata.get_kernel())
+        )
+
+    def test_channel_mapping_set_name(self):
+        case = build_fd_pair(jnp)
+        result = case["left"].set_name("my_data")
+        self.assertIs(result, case["left"])
+        self.assertEqual(case["left"].name, "my_data")
+
+    def test_channel_mapping_create_like(self):
+        case = build_fd_pair(jnp)
+        new_entries = jnp.zeros_like(case["left"].entries)
+        new_data = case["left"].create_like(new_entries, case["left"].channel_names)
+        self.assertIsInstance(new_data, FSData)
+        npt.assert_allclose(np.asarray(new_data.entries), 0.0)
+
+    def test_channel_mapping_repr_includes_class_name(self):
+        case = build_fd_pair(jnp)
+        r = repr(case["left"])
+        self.assertIn("FSData", r)
+
+    def test_channel_mapping_repr_with_name_includes_name(self):
+        case = build_fd_pair(jnp)
+        case["left"].set_name("named")
+        r = repr(case["left"])
+        self.assertIn("name='named'", r)
+
+    def test_from_dict_empty_raises(self):
+        with self.assertRaises(ValueError):
+            FSData.from_dict({})
+
+    def test_timedfsdata_set_times_updates_in_place(self):
+        case = build_fd_pair(jnp)
+        times_orig = np.linspace(0.0, 7.0, 8)
+        times_new = np.linspace(0.0, 14.0, 8)
+        timed = case["left"].set_times(times_orig)
+        result = timed.set_times(times_new)
+        self.assertIs(result, timed)
+        npt.assert_allclose(np.asarray(timed.times), times_new)
+
+    def test_timedfsdata_get_subset_creates_new(self):
+        case = build_fd_pair(jnp)
+        times = np.linspace(0.0, 7.0, 8)
+        timed = case["left"].set_times(times)
+        sub = timed.get_subset(
+            interval=(float(case["frequencies"][0]), float(case["frequencies"][-1]))
+        )
+        self.assertIsInstance(sub, TimedFSData)
+        npt.assert_allclose(np.asarray(sub.times), times)
+
+    def test_data_arithmetic_inplace_and_reflected(self):
+        case = build_fd_pair(jnp)
+        left = case["left"]
+        right = case["right"]
+
+        left_copy = FSData.from_dict({chn: left[chn] for chn in left.channel_names})
+        left_copy += right
+        npt.assert_allclose(
+            np.asarray(left_copy.entries),
+            np.asarray(left.entries),
+        )
+
+        scaled = 2.0 * left
+        npt.assert_allclose(
+            np.asarray(scaled.entries),
+            2.0 * np.asarray(left.entries),
+        )
+
+    def test_channel_mapping_properties_namespace_and_pick_string(self):
+        case = build_fd_pair(jnp)
+        left = case["left"]
+
+        self.assertIs(left.xp, left.__xp__())
+        self.assertEqual(left.grid, left.representation.grid)
+        self.assertEqual(left.domain, left.representation.domain)
+        self.assertEqual(left.kind, left.representation.kind)
+        npt.assert_allclose(np.asarray(left.get_kernel()), np.asarray(left.entries))
+
+        picked = left.pick("X")
+        self.assertEqual(picked.channel_names, ("X",))
+        self.assertEqual(np.asarray(picked.entries).shape[1], 1)
+
+    def test_data_unary_op_and_mismatched_binary_op(self):
+        case = build_fd_pair(jnp)
+        left = case["left"]
+        right = FSData(left.representation, ("A", "B"))
+
+        absolute = abs(left)
+        npt.assert_allclose(
+            np.asarray(absolute.entries), np.abs(np.asarray(left.entries))
+        )
+
+        with self.assertRaises(ValueError):
+            _ = left + right
+
+    def test_timedfsdata_requires_times(self):
+        case = build_fd_pair(jnp)
+        with self.assertRaises(ValueError):
+            TimedFSData(case["left"].representation, case["left"].channel_names)
+
+    def test_tsdata_get_zero_padded(self):
+        _, tsdata = _build_tsdata_jax()
+        with self.assertRaises(TypeError):
+            tsdata.get_zero_padded((tsdata.dt, 2 * tsdata.dt))
+
+    def test_load_data_unknown_type_raises(self):
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                f.attrs["type"] = "UnknownData"
+            with self.assertRaises(ValueError):
+                load_data(handle.name)
+
+    def test_load_data_dispatches_fsdata(self):
+        _, tsdata = _build_tsdata_jax()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            fsdata.save(handle.name)
+            loaded = load_data(handle.name)
+
+        self.assertIsInstance(loaded, FSData)
+        npt.assert_allclose(np.asarray(loaded.entries), np.asarray(fsdata.entries))
+
+    def test_load_ldc_data_aet_to_xyz(self):
+        n = 16
+        t = np.linspace(0.0, 1.0, n)
+        dataset = np.zeros(
+            n, dtype=[("t", "f8"), ("A", "f8"), ("E", "f8"), ("T", "f8")]
+        )
+        dataset["t"] = t
+        dataset["A"] = np.sin(2 * np.pi * t)
+        dataset["E"] = np.cos(2 * np.pi * t)
+        dataset["T"] = 0.5 * np.ones_like(t)
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                f.create_dataset("obs/tdi", data=dataset)
+            loaded = load_ldc_data(handle.name, name="obs/tdi", channels="XYZ")
+
+        self.assertIsInstance(loaded, TSData)
+        self.assertEqual(loaded.channel_names, ("X", "Y", "Z"))
+        self.assertEqual(np.asarray(loaded.entries).shape[-1], n)
+
+    def test_load_ldc_data_xyz_to_ae(self):
+        n = 16
+        t = np.linspace(0.0, 1.0, n)
+        dataset = np.zeros(
+            n, dtype=[("t", "f8"), ("X", "f8"), ("Y", "f8"), ("Z", "f8")]
+        )
+        dataset["t"] = t
+        dataset["X"] = np.sin(2 * np.pi * t)
+        dataset["Y"] = np.cos(2 * np.pi * t)
+        dataset["Z"] = t
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                f.create_dataset("obs/tdi", data=dataset)
+            loaded = load_ldc_data(handle.name, name="obs/tdi", channels="AE")
+
+        self.assertIsInstance(loaded, TSData)
+        self.assertEqual(loaded.channel_names, ("A", "E"))
+        self.assertEqual(np.asarray(loaded.entries).shape[-1], n)
+
+    def test_load_ldc_data_direct_pick_branch(self):
+        n = 16
+        t = np.linspace(0.0, 1.0, n)
+        dataset = np.zeros(n, dtype=[("t", "f8"), ("A", "f8"), ("E", "f8")])
+        dataset["t"] = t
+        dataset["A"] = np.sin(2 * np.pi * t)
+        dataset["E"] = np.cos(2 * np.pi * t)
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                f.create_dataset("obs/tdi", data=dataset)
+            loaded = load_ldc_data(handle.name, name="obs/tdi", channels="AE")
+
+        self.assertEqual(loaded.channel_names, ("A", "E"))
+
+    def test_load_ldc_data_invalid_requested_channels_raises(self):
+        n = 8
+        t = np.linspace(0.0, 1.0, n)
+        dataset = np.zeros(n, dtype=[("t", "f8"), ("A", "f8"), ("E", "f8")])
+        dataset["t"] = t
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                f.create_dataset("obs/tdi", data=dataset)
+            with self.assertRaises(ValueError):
+                load_ldc_data(handle.name, name="obs/tdi", channels="Q")  # type: ignore[arg-type]
+
+    def test_load_ldc_data_invalid_structure_raises(self):
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                f.create_dataset("obs/tdi", data=np.arange(8.0))
+            with self.assertRaises(ValueError):
+                load_ldc_data(handle.name, name="obs/tdi", channels="AE")
+
+    def test_tsdata_draw_uses_ts_plotter(self):
+        _, tsdata = _build_tsdata_jax()
+
+        with patch("typed_lisa_toolkit.viz.plotters.TSDataPlotter") as plotter_cls:
+            plotter = MagicMock()
+            plotter.draw.return_value = "drawn"
+            plotter_cls.return_value = plotter
+
+            result = tsdata.draw(interval=(0.0, 1.0))
+
+        self.assertEqual(result, "drawn")
+        plotter.draw.assert_called_once()
+
+    def test_fsdata_draw_compare_uses_fs_plotter_compare(self):
+        case = build_fd_pair(jnp)
+        left = case["left"]
+        right = case["right"]
+
+        with patch("typed_lisa_toolkit.viz.plotters.FSDataPlotter") as plotter_cls:
+            left_plotter = MagicMock()
+            right_plotter = MagicMock()
+            left_plotter.compare.return_value = "compared"
+            plotter_cls.side_effect = [left_plotter, right_plotter]
+
+            result = left.draw(compare_to=right, interval=(1.0, 3.0))
+
+        self.assertEqual(result, "compared")
+        left_plotter.compare.assert_called_once_with(right_plotter)
+
+    def test_wdmdata_draw_uses_tf_plotter(self):
+        wdmdata = build_wdm_pair(jnp)["left"]
+
+        with patch("typed_lisa_toolkit.viz.plotters.TFDataPlotter") as plotter_cls:
+            plotter = MagicMock()
+            plotter.draw.return_value = "tf-drawn"
+            plotter_cls.return_value = plotter
+
+            result = wdmdata.draw()
+
+        self.assertEqual(result, "tf-drawn")
+        plotter.draw.assert_called_once()
+
+
+class TestDataInternalAbstractBranchesJAX(DataAbstractBranchesMixin, unittest.TestCase):
+    """Abstract/NotImplementedError branch tests (shared via mixin)."""

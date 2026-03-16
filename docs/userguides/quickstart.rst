@@ -12,9 +12,12 @@ Installation
 
 Load LDC data
 ~~~~~~~~~~~~~
-Assuming you have installed `LISA Data Challenge <https://gitlab.in2p3.fr/LISA/LDC>`_
-and exported the environment variable ``SANGRIA_TRAINING_DATA`` pointing to the
-LDC data path, you can load the data as follows:
+LDC data stands for data in the format given by the
+`LISA Data Challenge <https://gitlab.in2p3.fr/LISA/LDC>`_.
+This includes `Sangria` and `Sangria HM` datasets.
+
+Assuming you have exported the environment variable ``SANGRIA_TRAINING_DATA`` 
+pointing to the LDC data path, you can load the data as follows:
 
 .. code-block:: python
 

@@ -1,52 +1,27 @@
 """Module for data containers.
 
-We model data containers as :class:`.arithdicts.ChannelDict` instances that encapsulate
-data as time series (:class:`.TSData`), frequency series (:class:`.FSData` and
-:class:`.TimedFSData`) or WDM wavelets (:class:`.WDMData`).
-
-In this model, data are recorded instead of being generated, and for that reason we do
-not distinguish different modes in data containers.
-
 .. currentmodule:: typed_lisa_toolkit.containers.data
-
-
-Types
------
-.. autoclass:: ValueT
-.. autoclass:: NPFloatingT
-.. autoclass:: NPNumberT
-
-Entities
---------
 
 .. autoclass:: TSData
    :members:
    :member-order: groupwise
-   :exclude-members: listify
-   :undoc-members:
-   :inherited-members: UserDict
 
 .. autoclass:: FSData
    :members:
    :member-order: groupwise
-   :exclude-members: listify
-   :undoc-members:
-   :inherited-members: UserDict
 
 .. autoclass:: TimedFSData
    :members:
    :member-order: groupwise
-   :exclude-members: listify
-   :undoc-members:
-   :inherited-members: UserDict
    :show-inheritance:
+
+.. autoclass:: STFTData
+   :members:
+   :member-order: groupwise
 
 .. autoclass:: WDMData
    :members:
    :member-order: groupwise
-   :exclude-members: listify
-   :undoc-members:
-   :inherited-members: UserDict
 
 Functions
 ---------
@@ -57,102 +32,60 @@ Functions
 """
 
 from __future__ import annotations
-from collections.abc import Mapping
+
 import logging
 import pathlib
-from typing import TypeVar, Generic, Self, TYPE_CHECKING, Literal, overload
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
+import array_api_compat as xpc
+import h5py
 import numpy as np
 import numpy.typing as npt
-import h5py  # type: ignore
 
-from . import arithdicts, representations as reps, tapering
+from .. import lib
+from . import representations as reps
+from . import tapering
 
 if TYPE_CHECKING:
-    from ..viz import plotters
+    from . import waveforms as wf
 
 log = logging.getLogger(__name__)
 
-NPFloatingT = TypeVar("NPFloatingT", bound=np.floating)
-"""Numpy floating dtype."""
-
-NPFloatingTb = TypeVar("NPFloatingTb", bound=np.floating)
-"""Numpy floating dtype (bis)."""
-
-NPNumberT = TypeVar("NPNumberT", bound=np.number)
-"""Numpy dtype."""
-
-ValueT = TypeVar("ValueT", bound=reps.Representation)
-"""Value type in the data container."""
-
-_SeriesT = TypeVar("_SeriesT", bound=reps._Series)
-_TimeFreqT = TypeVar("_TimeFreqT", bound=reps.TimeFrequency)
-_ChnT = TypeVar("_ChnT", bound=arithdicts.ChannelDict)
-_DataT = TypeVar("_DataT", bound="_Data")
+Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
 
 
-class _Data(arithdicts.ChannelDict[ValueT], Generic[ValueT]):
-    """Dictionary data container."""
+class _GetSubsetMixin[RepT: reps.TimeSeries | reps.FrequencySeries | reps.Phasor](
+    Mapping[str, RepT]
+):
+    """Mixin class to provide get_subset method for data containers."""
 
-    def __init__(
-        self,
-        data: Mapping[str, ValueT],
-        name: str | None = None,
-    ):
-        super().__init__(data)
-        self.set_name(name)
+    representation: RepT
+    channel_names: tuple[str, ...]
 
-    def create_new(self, data: Mapping[str, ValueT]):  # type: ignore[override]
-        """Create a new instance of the class."""
-        return type(self)(data, self.name)
-
-    def set_name(self, name: str | None) -> Self:
-        """Set the name of the data container.
-
-        The name is used for labeling the data container in plots.
-        This method returns `self` to allow for fluent method chaining.
-        """
-        self.name = name
-        return self
-
-
-class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
-    """Series data container."""
-
-    _series_type: type[_SeriesT]
-
-    @property
-    def grid(self):
-        """Return the grid."""
-        return next(iter(self.values())).grid
+    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
+        del representation, channels
+        raise NotImplementedError("This method must be implemented by subclass.")
 
     def get_subset(
         self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
     ) -> Self:
         """Return the subset as a new instance."""
-        series_dict = {
-            chnname: chn.get_subset(interval=interval, slice=slice)
-            for chnname, chn in self.items()
-        }
-        return self.create_new(series_dict)
+        subset = self.representation.get_subset(interval=interval, slice=slice)
+        return self.create_new(
+            subset,  # type: ignore[arg-type] # mypy's inference is confused
+            self.channel_names,
+        )
 
-    def get_embedded(self, embedding_grid: npt.NDArray[NPFloatingT]) -> Self:
-        """Return the embedded data."""
-        series_dict = {
-            chnname: chn.get_embedded(embedding_grid) for chnname, chn in self.items()
-        }
-        return self.create_new(series_dict)
-
-    def _get_plotter(self) -> type[plotters._SeriesDataPlotter]:
-        """Return the plotter class."""
-        raise NotImplementedError("The method must be implemented in the subclass.")
+    def _get_plotter(self) -> type[Any]:
+        raise NotImplementedError("This method must be implemented by subclass.")
 
     def draw(
         self,
         compare_to: Self | None = None,
         *,
         interval: tuple[float, float] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ):
         """Plot the data.
 
@@ -165,6 +98,206 @@ class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
         return plotter(self.get_subset(interval=interval)).compare(
             plotter(compare_to.get_subset(interval=interval)), **kwargs
         )
+
+
+class _EmbeddableMixin[RepT: reps.TimeSeries | reps.FrequencySeries](
+    Mapping[str, RepT]
+):
+    """Mixin class to provide get_embedded method for data containers."""
+
+    representation: RepT
+    channel_names: tuple[str, ...]
+
+    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
+        del representation, channels
+        raise NotImplementedError("This mixin should not be instantiated directly.")
+
+    def get_embedded(self, embedding_grid: npt.NDArray[np.number]) -> Self:
+        """Return the embedded data."""
+        embedded_repr = self.representation.get_embedded(embedding_grid)
+        return self.create_new(embedded_repr, self.channel_names)  # type: ignore[arg-type]
+        # mypy's inference is confused
+
+
+class _ChannelMapping[RepT: Reps](Mapping[str, RepT], lib.mixins.NDArrayMixin):
+    def __init__(
+        self,
+        representation: RepT,
+        channels: tuple[str, ...],
+        name: str | None = None,
+    ):
+        entries = cast(Any, representation.entries)
+        if entries.shape[1] != len(channels):
+            raise ValueError(
+                "Channel count mismatch between representation entries and channel names."
+            )
+        if entries.shape[2] != 1:
+            raise ValueError(
+                "Data containers require n_harmonics=1 in the representation entries."
+            )
+        self.representation = representation
+        self.channel_names = channels
+        self._channel_to_idx = {chn: i for i, chn in enumerate(channels)}
+        self.name = name
+
+    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
+        """Create a new instance with a representation and channels."""
+        return type(self)(representation, channels, self.name)
+
+    def create_like(self, entries: "reps.Array", channels: tuple[str, ...]) -> Self:
+        """Create a new instance with different entries but the same grid and type."""
+        return type(self)(self.representation.create_like(entries), channels, self.name)
+
+    def __xp__(self, api_version: str | None = None) -> Any:
+        """Get the array namespace from the representation entries."""
+        return xpc.get_namespace(self.representation.entries, api_version=api_version)
+
+    def _binary_op(
+        self,
+        other: object,
+        op: Callable[[object, object], object],
+        /,
+        reflected: bool = False,
+        inplace: bool = False,
+        **kwargs: Any,
+    ) -> Any:
+        """Apply binary operation using native array ops on representations."""
+        del kwargs  # Unused
+
+        if isinstance(other, _ChannelMapping):
+            other = cast(_ChannelMapping[Any], other)
+            if self.channel_names != other.channel_names:
+                raise ValueError("Cannot operate on data with different channel sets.")
+            if reflected:
+                new_repr = op(other.representation, self.representation)
+            else:
+                new_repr = op(self.representation, other.representation)
+        else:
+            # Scalar or array-like broadcast
+            if reflected:
+                new_repr = op(other, self.representation)
+            else:
+                new_repr = op(self.representation, other)
+
+        if inplace:
+            self.representation = cast(RepT, new_repr)
+            return self
+
+        return self.create_new(cast(RepT, new_repr), self.channel_names)
+
+    def _unary_op(self, op: Callable[[object], object], /, **kwargs: Any) -> Self:
+        """Apply unary operation using native array ops."""
+        new_repr = op(self.representation, **kwargs)
+        return self.create_new(cast(RepT, new_repr), self.channel_names)
+
+    def pick(self, channels: str | tuple[str, ...]) -> Self:
+        """Pick specific channels.
+
+        Parameters
+        ----------
+        channels : str or tuple[str, ...]
+            Channel name(s) to pick.
+
+        Returns
+        -------
+        Self
+            New instance with only the specified channels.
+        """
+        if isinstance(channels, str):
+            channels = (channels,)
+
+        indices = tuple([self._channel_to_idx[chn] for chn in channels])
+        # Slice entries to pick only these channels (canonical shape: n_batches, n_channels, ...)
+        xp = xpc.get_namespace(self.representation.entries)
+        picked_entries = xp.asarray(self.representation.entries)[:, indices, ...]
+        picked_repr = self.representation.create_like(picked_entries)
+        return self.create_new(picked_repr, channels)
+
+    @classmethod
+    def from_dict(cls, data_dict: Mapping[str, RepT]) -> Self:
+        """Create a new instance from a dictionary of channel names to representations."""
+        if len(data_dict) == 0:
+            raise ValueError("Cannot build data container from an empty mapping.")
+        channels = tuple(data_dict.keys())
+        xp = xpc.get_namespace(*(cast(Any, data_dict[chn]).entries for chn in channels))
+        # Concatenate entries along the channel dimension (canonical shape: n_batches, n_channels, ...)
+        entries = xp.concatenate([data_dict[chn].entries for chn in channels], axis=1)
+        # Assume all representations have the same grid and type
+        first = next(iter(data_dict.values()))
+        return cls(first.create_like(entries), channels)
+
+    def set_name(self, name: str | None) -> Self:
+        """Set the name of the data container.
+
+        .. note:: The name is only used for labeling the data container in plots.
+
+        .. note:: This method returns `self` to allow for fluent method chaining.
+        """
+        self.name = name
+        return self
+
+    # Implement Mapping protocol
+    def __getitem__(self, key: str) -> RepT:
+        """Get a channel by name as a view with preserved channel dimension (size 1)."""
+        idx = self._channel_to_idx[key]
+        entries_view = self.representation.entries[:, idx : idx + 1, 0:1, ...]
+        return self.representation.create_like(entries_view)
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over channel names."""
+        return iter(self.channel_names)
+
+    def __len__(self) -> int:
+        """Return the number of channels."""
+        return len(self.channel_names)
+
+    def __repr__(self):
+        items = {key: self[key] for key in self}
+        if self.name is not None:
+            return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
+        return f"{self.__class__.__name__}({items!r})"
+
+    @property
+    def grid(self):
+        """Return the grid."""
+        return self.representation.grid
+
+    @property
+    def domain(self):
+        """Physical domain shared by all channels."""
+        return self.representation.domain
+
+    @property
+    def kind(self):
+        """Semantic kind shared by all channels."""
+        return self.representation.kind
+
+    @property
+    def entries(self) -> Any:
+        """Return the raw entries array for direct matrix operations.
+
+        Shape is (n_channels, ...) where ... depends on the representation type.
+        Use this for complicated array operations with numpy/jax.
+        """
+        return self.representation.entries
+
+    def get_kernel(self):
+        """Return kernel entries in conventional shape."""
+        return self.representation.entries
+
+
+class Data[RepT: Reps](_ChannelMapping[RepT]):
+    """Channel-indexed data containers.
+
+    Stores a single homogeneous representation with channels as the first dimension,
+    providing per-channel access via views and the Mapping protocol.
+    """
+
+    _reps_type: type[RepT]
+
+    def _get_plotter(self) -> type[Any]:
+        """Return the plotter class."""
+        raise NotImplementedError("The method must be implemented in the subclass.")
 
     def _additional_save(self, f: h5py.File):
         del f
@@ -186,49 +319,69 @@ class _SeriesData(_Data[_SeriesT], Generic[_SeriesT]):
         - For :class:`.TimedFSData`, there will be a dataset 'times' at the root level containing the time grid.
 
         """
-        with h5py.File(file_path, "a") as f:
+        with h5py.File(str(file_path), "a") as f:
             f.attrs["type"] = self.__class__.__name__
+            f.attrs["channels"] = self.channel_names
             self._additional_save(f)
-            for chnname, chn in self.items():
-                grp = f.create_group(chnname)
-                grp.create_dataset("grid", data=chn.grid)
-                grp.create_dataset("entries", data=chn.entries)
+            grp = f.create_group("data")
+            representation = cast(Any, self.representation)
+            grp.create_dataset("grid", data=representation.grid)
+            grp.create_dataset("entries", data=representation.entries)
 
     @classmethod
-    def _additional_load(cls, f: h5py.File):
+    def _additional_load(cls, f: h5py.File) -> dict[str, Any]:
         del f
         return {}
 
     @classmethod
     def load(cls, file_path: str | pathlib.Path) -> Self:
         """Load the data from an HDF5 file."""
-        with h5py.File(file_path, "r") as f:
+        with h5py.File(str(file_path), "r") as f:
+            channels_attr = cast(Iterable[Any], f.attrs["channels"])
+            channels = tuple(str(ch) for ch in channels_attr)
             additions = cls._additional_load(f)
-            dict_ = {
-                chnname: cls._series_type(
-                    grid=f[chnname]["grid"][...],
-                    entries=f[chnname]["entries"][...],  # type: ignore
-                )
-                for chnname in f
-                if isinstance(f[chnname], h5py.Group)
-            }
-        return cls(dict_, **additions)  # pyright: ignore[reportArgumentType]
+            data_group = cast(h5py.Group, f["data"])
+            grid_data = cast(h5py.Dataset, data_group["grid"])[()]
+            entries_data = cast(h5py.Dataset, data_group["entries"])[()]
+            repr_obj = cls._reps_type(grid_data, entries_data)
+        return cls(repr_obj, channels, **additions)  # type: ignore[arg-type] # mypy's inference is confused
+
+    @classmethod
+    def from_waveform(cls, waveform: "wf.ProjectedWaveform[RepT]"):
+        """Create a new instance from a projected waveform."""
+        return cls(waveform.representation, waveform.channel_names)
+
+
+class _SeriesData[RepT: reps.TimeSeries | reps.FrequencySeries](
+    Data[RepT], _GetSubsetMixin[RepT], _EmbeddableMixin[RepT]
+): ...
 
 
 class TSData(_SeriesData[reps.TimeSeries]):
-    """Dictionary data container of time series data."""
+    """Multi-channel time series data container."""
 
-    _series_type = reps.TimeSeries
+    _reps_type = reps.TimeSeries
 
     @property
-    def times(self):
+    def times(self) -> npt.NDArray[np.floating[Any]]:
         """Return the times."""
-        return next(iter(self.values())).times
+        representation = cast(Any, self.representation)
+        return np.asarray(representation.times)
 
     @property
     def dt(self) -> float:
         """Return the time step."""
-        return next(iter(self.values())).dt
+        return self.representation.dt
+
+    @property
+    def t_start(self) -> float:
+        """Return the start time."""
+        return self.representation.t_start
+
+    @property
+    def t_end(self) -> float:
+        """Return the end time."""
+        return self.representation.t_end
 
     def get_frequencies(self):
         """Return the frequencies grid matching the time grid."""
@@ -263,20 +416,28 @@ class TSData(_SeriesData[reps.TimeSeries]):
         :class:`.FSData` | :class:`.TimedFSData`
             The frequency series data. If `keep_times` is `True`, the time grid is kept.
         """
-        fsdict = {chnname: chn.rfft(tapering=tapering) for chnname, chn in self.items()}
+        fsrepr = self.representation.rfft(tapering=tapering)
         if keep_times:
-            return TimedFSData(fsdict, times=self.times)
-        return FSData(fsdict)
+            return TimedFSData(fsrepr, self.channel_names, times=self.times)
+        return FSData(fsrepr, self.channel_names)
 
-    def to_tfdata(
+    def to_stftdata(
         self,
         *,
-        win: npt.NDArray[np.floating],
+        win: npt.NDArray[np.floating[Any]],
         hop: int,
-    ):
+    ) -> STFTData:
         """Return the time-frequency data."""
-        tfdict = {chnname: chn.stfft(win, hop) for chnname, chn in self.items()}
-        return TFData(tfdict)
+        tfrepr = self.representation.stfft(win, hop)
+        tf_entries = cast(Any, tfrepr.entries)
+        tfdict = {
+            chn: reps.STFT(
+                tfrepr.grid,
+                tf_entries[:, idx : idx + 1, 0:1, ...],
+            )
+            for idx, chn in enumerate(self.channel_names)
+        }
+        return STFTData.from_dict(tfdict).set_name(self.name)
 
     def get_zero_padded(
         self,
@@ -284,24 +445,29 @@ class TSData(_SeriesData[reps.TimeSeries]):
         tapering: tapering.Tapering | None = None,
     ) -> Self:
         """Return the zero-padded data."""
-        pad_width = tuple(int(np.rint(time / self.dt)) for time in pad_time)
-        self_times = np.array(self.times)
+        xp = xpc.get_namespace(self.entries)
+        pad_width = tuple(int(xp.rint(time / self.dt)) for time in pad_time)
         time_end_values = (
-            -self.dt * pad_width[0] + self_times[0],
-            self.dt * pad_width[1] + self_times[-1],
+            -self.dt * pad_width[0] + self.times[0],
+            self.dt * pad_width[1] + self.times[-1],
         )
-        padded_time = np.pad(
-            self_times, pad_width, mode="linear_ramp", end_values=time_end_values
+        padded_time = xp.pad(
+            self.times,
+            pad_width,
+            mode="linear_ramp",
+            end_values=time_end_values,
         )
-        tapering_window = tapering(self_times) if tapering is not None else 1
 
-        def get_padded_ts(chn: reps.TimeSeries):
-            signal = chn * tapering_window
-            padded_signal = np.pad(signal.entries, pad_width, mode="constant")
-            return type(chn)(grid=padded_time, entries=padded_signal)
+        tapering_window = cast(Any, tapering(self.times)) if tapering is not None else 1
+        signal = self.entries * tapering_window
+        padded_signal = xp.pad(
+            signal,
+            ((0, 0), (0, 0), (0, 0), (0, 0), pad_width),
+            mode="constant",
+        )
 
-        tsdict = {chnname: get_padded_ts(chn) for chnname, chn in self.items()}
-        return self.create_new(tsdict)
+        padded_repr = reps.TimeSeries(padded_time, padded_signal)
+        return self.create_new(padded_repr, self.channel_names)
 
     def _get_plotter(self):
         from ..viz import plotters
@@ -310,131 +476,123 @@ class TSData(_SeriesData[reps.TimeSeries]):
 
 
 class FSData(_SeriesData[reps.FrequencySeries]):
-    """Dictionary data container of frequency series data."""
+    """Multi-channel frequency series data container."""
 
-    _series_type = reps.FrequencySeries
-
-    def __init__(
-        self,
-        data: Mapping[str, reps.FrequencySeries],
-        name: str | None = None,
-    ):
-        def sieve(chn: reps.FrequencySeries):
-            if isinstance(chn, reps.Phasor):
-                return chn.to_frequency_series()
-            return chn
-
-        dict_ = {chnname: sieve(chn) for chnname, chn in data.items()}
-
-        super().__init__(dict_, name)
+    _reps_type = reps.FrequencySeries
 
     @property
     def frequencies(self):
         """Return the frequencies."""
-        return next(iter(self.values())).frequencies
+        return self.representation.frequencies
 
     @property
     def df(self):
         """Return the frequency step."""
-        return next(iter(self.values())).df
-
-    def angle(self):
-        """Return the angle of the data."""
-        return self.create_new({chnname: chn.angle() for chnname, chn in self.items()})
+        return self.representation.df
 
     @property
-    def real(self):
-        """Return the real part of the data."""
-        return self.create_new({chnname: chn.real for chnname, chn in self.items()})
+    def f_min(self):
+        """Return the minimum frequency."""
+        return self.representation.f_min
 
     @property
-    def imag(self):
-        """Return the imaginary part of the data."""
-        return self.create_new({chnname: chn.imag for chnname, chn in self.items()})
+    def f_max(self):
+        """Return the maximum frequency."""
+        return self.representation.f_max
 
-    def set_times(self, times: npt.NDArray[np.floating]):
+    def set_times(self, times: npt.NDArray[np.floating[Any]]):
         """Set the time grid."""
-        return TimedFSData(self, times)
+        return TimedFSData(self.representation, self.channel_names, times)
 
     def to_tsdata(
         self,
-        times: npt.NDArray[np.floating] | reps.Linspace,
+        times: npt.NDArray[np.floating[Any]] | reps.Linspace,
         *,
-        tapering: tapering.Tapering | None,
+        tapering: tapering.Tapering | None = None,
     ):
         """Return the time series data."""
-        tsdict = {
-            chnname: chn.irfft(np.array(times), tapering=tapering)
-            for chnname, chn in self.items()
-        }
-        return TSData(tsdict)
+        tsrepr = self.representation.irfft(np.asarray(times), tapering=tapering)
+        return TSData(tsrepr, self.channel_names)
 
     def _get_plotter(self):
         from ..viz import plotters
 
         return plotters.FSDataPlotter
 
-    def to_WDMdata(self, Nf=None, Nt=None, nx=4):
+    def to_WDMdata(
+        self,
+        Nf: int | None = None,
+        Nt: int | None = None,
+        nx: float = 4.0,
+    ) -> WDMData:
         """Return the WDM data.
 
         See :py:meth:`.representations.FrequencySeries.to_WDM`
         """
         wdmdict = {
-            chnname: chn.to_WDM(Nf=Nf, Nt=Nt, nx=nx) for chnname, chn in self.items()
+            chn: self[chn].to_WDM(Nf=Nf, Nt=Nt, nx=nx) for chn in self.channel_names
         }
-        return WDMData(wdmdict)
+        return WDMData.from_dict(wdmdict).set_name(self.name)
 
 
 class TimedFSData(FSData):
-    """Dictionary data container for frequency series data with time information."""
+    """Multi-channel frequency series data with time information."""
 
     def __init__(
         self,
-        data: Mapping[str, reps.FrequencySeries],
-        times: reps.Linspace | npt.NDArray[np.floating],
+        representation: reps.FrequencySeries,
+        channels: tuple[str, ...],
+        times: reps.Linspace | npt.NDArray[np.floating[Any]] | None = None,
+        name: str | None = None,
     ):
-        super().__init__(data)
+        super().__init__(representation, channels, name)
+        if times is None:
+            raise ValueError("TimedFSData requires times parameter")
         self.times = reps.Linspace.make(times)
         self.dt = self.times.step
 
     def _additional_save(self, f: h5py.File):
-        f.create_dataset("times", data=self.times)
+        f.create_dataset("times", data=np.asarray(self.times))
 
     @classmethod
     def _additional_load(cls, f: h5py.File):
-        return {"times": f["times"][...]}  # pyright: ignore[reportIndexIssue]
+        times_data = cast(h5py.Dataset, f["times"])[()]
+        return {"times": times_data}
 
-    def set_times(self, times: npt.NDArray[np.floating] | reps.Linspace):
+    def set_times(self, times: npt.NDArray[np.floating[Any]] | reps.Linspace):
         """Set the time grid.
 
         This method returns `self` to allow for fluent method chaining.
         """
         self.times = reps.Linspace.make(times)
+        self.dt = self.times.step
         return self
 
-    def create_new(  # noqa: D102
-        self,
-        data: Mapping[str, reps.FrequencySeries[NPNumberT]],  # type: ignore
+    def create_new(
+        self, representation: reps.FrequencySeries, channels: tuple[str, ...]
     ):
-        # Unless series.FrequencySeries is wrongly implemented so that it does not follow
-        # the SupportsArithmetic protocol, there is no reason to think the type hint is wrong.
-        # It is unlcear to me why mypy thinks it is wrong.
-        new = type(self)(data, self.times)
+        """Create a new instance preserving times."""
+        new = type(self)(representation, channels, times=self.times, name=self.name)
         return new
 
     def drop_times(self):
         """Drop the time grid."""
-        return FSData(self.data)
+        return FSData(self.representation, self.channel_names, self.name)
 
-    def to_tsdata(self, *, tapering: tapering.Tapering | None = None):  # type: ignore
-        # Indeed the signature of this subclass method is different from the superclass method.
-        # This is intentional, as the subclass method is more specific. Ignoring the error.
-        """Return the time series data."""
-        return super().to_tsdata(self.times, tapering=tapering)
+    def to_tsdata(
+        self,
+        times: npt.NDArray[np.floating[Any]] | reps.Linspace | None = None,
+        *,
+        tapering: tapering.Tapering | None = None,
+    ):
+        """Return the time series data with times grid."""
+        del times
+        tsrepr = self.representation.irfft(np.asarray(self.times), tapering=tapering)
+        return TSData(tsrepr, self.channel_names, self.name)
 
 
-class TFData(_Data[_TimeFreqT], Generic[_TimeFreqT]):
-    """Dictionary data container of time-frequency data."""
+class STFTData(Data[reps.STFT]):
+    """Dictionary data container of short-time Fourier transform data."""
 
     def get_subset(
         self,
@@ -449,29 +607,48 @@ class TFData(_Data[_TimeFreqT], Generic[_TimeFreqT]):
             )
             for chnname, chn in self.items()
         }
-        return self.create_new(tfdict)
+        return type(self).from_dict(tfdict).set_name(self.name)
 
-    def draw(
+    # def draw(
+    #     self,
+    #     *,
+    #     time_interval: tuple[float, float] | None = None,
+    #     freq_interval: tuple[float, float] | None = None,
+    #     **kwargs: Any,
+    # ):
+    #     """Plot the data."""
+    #     from ..viz import plotters
+
+    # plotter = plotters.TFDataPlotter(
+    #     self.get_subset(
+    #         time_interval=time_interval,
+    #         freq_interval=freq_interval,
+    #     )
+    # )
+    #     return plotter.draw(**kwargs)
+
+
+class WDMData(Data[reps.WDM]):
+    """Dictionary data container of WDM time-frequency data."""
+
+    _reps_type = reps.WDM
+
+    def get_subset(
         self,
         *,
         time_interval: tuple[float, float] | None = None,
         freq_interval: tuple[float, float] | None = None,
-        **kwargs,
     ):
-        """Plot the data."""
-        from ..viz import plotters
+        """Return the subset as a new instance."""
+        tfdict = {
+            chnname: chn.get_subset(
+                time_interval=time_interval, freq_interval=freq_interval
+            )
+            for chnname, chn in self.items()
+        }
+        return type(self).from_dict(tfdict).set_name(self.name)
 
-        return plotters.TFDataPlotter(
-            self.get_subset(time_interval=time_interval, freq_interval=freq_interval)
-        ).draw(**kwargs)
-
-
-class WDMData(TFData[reps.WDM]):
-    """Dictionary data container of WDM time-frequency data."""
-
-    # TODO add conversion to/from TSData
-
-    def to_fsdata(self, *, nx: float = 4.0, mask=None):
+    def to_fsdata(self, *, nx: float = 4.0, mask: Any | None = None):
         """Convert to FSData.
 
         See :py:meth:`.representations.WDM.to_freqseries`.
@@ -480,13 +657,31 @@ class WDMData(TFData[reps.WDM]):
             chnname: chn.to_freqseries(nx=nx, mask=mask)
             for chnname, chn in self.items()
         }
-        return FSData(fsdict)
+        return FSData.from_dict(fsdict)
+
+    def draw(
+        self,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+        **kwargs: Any,
+    ):
+        """Plot the data."""
+        from ..viz import plotters
+
+        plotter = plotters.TFDataPlotter(
+            self.get_subset(
+                time_interval=time_interval,
+                freq_interval=freq_interval,
+            )
+        )
+        return plotter.draw(**kwargs)
 
 
 def load_data(file_path: str | pathlib.Path):
     """Load the data from a saved HDF5 file."""
-    with h5py.File(file_path, "r") as f:
-        data_type = f.attrs["type"]
+    with h5py.File(str(file_path), "r") as f:
+        data_type = str(f.attrs["type"])
     if data_type == "TSData":
         return TSData.load(file_path)
     if data_type == "FSData":
@@ -505,7 +700,11 @@ def load_ldc_data(
 ) -> TSData:
     """Load the data from LDC dataset."""
 
-    def XYZ2AET(X: _ChnT, Y: _ChnT, Z: _ChnT) -> tuple[_ChnT, _ChnT, _ChnT]:
+    def XYZ2AET(
+        X: reps.TimeSeries,
+        Y: reps.TimeSeries,
+        Z: reps.TimeSeries,
+    ) -> tuple[reps.TimeSeries, reps.TimeSeries, reps.TimeSeries]:
         A, E, T = (
             (Z - X) / np.sqrt(2.0),
             (X - 2.0 * Y + Z) / np.sqrt(6.0),
@@ -513,7 +712,11 @@ def load_ldc_data(
         )
         return A, E, T
 
-    def AET2XYZ(A: _ChnT, E: _ChnT, T: _ChnT) -> tuple[_ChnT, _ChnT, _ChnT]:
+    def AET2XYZ(
+        A: reps.TimeSeries,
+        E: reps.TimeSeries,
+        T: reps.TimeSeries,
+    ) -> tuple[reps.TimeSeries, reps.TimeSeries, reps.TimeSeries]:
         X, Y, Z = [
             -1 / np.sqrt(2.0) * A + 1 / np.sqrt(6.0) * E + 1 / np.sqrt(3.0) * T,
             -np.sqrt(2.0 / 3.0) * E + 1 / np.sqrt(3.0) * T,
@@ -521,21 +724,21 @@ def load_ldc_data(
         ]
         return X, Y, Z
 
-    def transform_channels(data: _DataT):  # pyright: ignore[reportInvalidTypeVarUse]
+    def transform_channels(data: TSData) -> TSData:
         channel_names = tuple(name for name in channels)
         if set(channel_names).issubset(data.channel_names):
             return data.pick(channel_names)
         if set(channel_names).issubset(("X", "Y", "Z")):
             X, Y, Z = AET2XYZ(data["A"], data["E"], data["T"])
-            return type(data)({"X": X, "Y": Y, "Z": Z}).pick(channel_names)
+            return type(data).from_dict({"X": X, "Y": Y, "Z": Z}).pick(channel_names)
         if set(channel_names).issubset(("A", "E", "T")):
             A, E, T = XYZ2AET(data["X"], data["Y"], data["Z"])
-            return type(data)({"A": A, "E": E, "T": T}).pick(channel_names)
+            return type(data).from_dict({"A": A, "E": E, "T": T}).pick(channel_names)
         raise ValueError(
             f"The data does not have the expected channels. The data has {data.channel_names}."
         )
 
-    with h5py.File(file_path, "r") as fid:
+    with h5py.File(str(file_path), "r") as fid:
         dataset = np.array(fid[name])
     if dtype_names := dataset.dtype.names:
         domain = dtype_names[0]
@@ -543,11 +746,11 @@ def load_ldc_data(
         # I assume we only need to read LDC data in the time domain.
         # When this is not true anymore, we can enhance this function.
         if domain == "t":
-            tsdata = TSData(
+            tsdata = TSData.from_dict(
                 {
                     chnname: reps.TimeSeries(
-                        grid=dataset[domain].squeeze(),
-                        entries=dataset[chnname].squeeze(),
+                        grid=(dataset[domain].squeeze(),),
+                        entries=dataset[chnname].squeeze()[None, None, None, None, :],
                     )
                     for chnname in channel_names
                 }
