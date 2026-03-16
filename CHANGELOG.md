@@ -2,6 +2,27 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.0 - 2026-03-16
+#### Features
+- multiple array backends - (5941deb) - Senwen Deng
+#### Bug Fixes
+- added more unit tests and fixed catched errors - (822412f) - Senwen Deng
+- further cleaning - (e897e71) - Senwen Deng
+#### Documentation
+- up to date - (1ed2c6a) - Senwen Deng
+#### Tests
+- improve coverage - (e83aa5b) - Senwen Deng
+- remove legacy - (7097a06) - Senwen Deng
+#### Continuous Integration
+- test coverage - (74af774) - Senwen Deng
+#### Refactoring
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>multiple backends - (7f3e85b) - Senwen Deng
+- simplified typing - (d616e56) - Senwen Deng
+#### Style
+- sorted imports - (985eb62) - Senwen Deng
+
+- - -
+
 ## 0.4.4 - 2026-03-12
 #### Bug Fixes
 - `__iadd__` catch - (1755985) - Senwen Deng
