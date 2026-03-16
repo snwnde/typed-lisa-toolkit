@@ -64,7 +64,9 @@ class TestSpectralDensityJAX(unittest.TestCase):
         w = jnp.asarray(psd.get_whitening_matrix())
         reconstructed = jnp.einsum("fji,fjk->fik", jnp.conj(w), w)
 
-        npt.assert_allclose(np.asarray(reconstructed), np.asarray(kernel), rtol=1e-12, atol=1e-12)
+        npt.assert_allclose(
+            np.asarray(reconstructed), np.asarray(kernel), rtol=1e-12, atol=1e-12
+        )
 
     def test_whitening_matrix_invalid_kind_raises(self):
         case = build_fd_pair(jnp)
@@ -78,12 +80,18 @@ class TestSpectralDensityJAX(unittest.TestCase):
     def test_diagonal_whitening_default_kind(self):
         case = build_fd_pair(jnp)
         kernel = diagonal_kernel_2ch(jnp)
-        psd = DiagonalSpectralDensity(case["frequencies"], kernel, channel_order=["X", "Y"])
+        psd = DiagonalSpectralDensity(
+            case["frequencies"], kernel, channel_order=["X", "Y"]
+        )
 
         w = jnp.asarray(psd.get_whitening_matrix())
 
-        npt.assert_allclose(np.asarray(w[:, 0, 0]), np.sqrt(np.asarray(kernel[:, 0, 0])))
-        npt.assert_allclose(np.asarray(w[:, 1, 1]), np.sqrt(np.asarray(kernel[:, 1, 1])))
+        npt.assert_allclose(
+            np.asarray(w[:, 0, 0]), np.sqrt(np.asarray(kernel[:, 0, 0]))
+        )
+        npt.assert_allclose(
+            np.asarray(w[:, 1, 1]), np.sqrt(np.asarray(kernel[:, 1, 1]))
+        )
 
     def test_diagonal_from_fd_noise(self):
         case = build_fd_pair(jnp)
@@ -274,7 +282,9 @@ class TestEvolutionarySpectralDensityJAX(unittest.TestCase):
         w = jnp.asarray(esd.get_whitening_matrix())
         reconstructed = jnp.einsum("ftji,ftjk->ftik", jnp.conj(w), w)
 
-        npt.assert_allclose(np.asarray(reconstructed), np.asarray(invevsdm), rtol=1e-12, atol=1e-12)
+        npt.assert_allclose(
+            np.asarray(reconstructed), np.asarray(invevsdm), rtol=1e-12, atol=1e-12
+        )
 
     def test_get_kernel_backend_argument_is_not_supported(self):
         esd = EvolutionarySpectralDensity(
@@ -374,4 +384,6 @@ class TestTFNoiseModelJAX(unittest.TestCase):
             got.shape,
             (2, 2, len(case["frequencies"]), len(case["times"])),
         )
-        npt.assert_allclose(np.asarray(got), np.asarray(expected), rtol=1e-12, atol=1e-12)
+        npt.assert_allclose(
+            np.asarray(got), np.asarray(expected), rtol=1e-12, atol=1e-12
+        )

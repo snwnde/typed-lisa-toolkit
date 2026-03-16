@@ -62,8 +62,10 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
         got = np.asarray(likelihood.get_log_likelihood(case["right"]))
         expected = (
             np.asarray(model.reset().get_scalar_product(case["left"], case["right"]))
-            - 0.5 * np.asarray(model.reset().get_scalar_product(case["right"], case["right"]))
-            - 0.5 * np.asarray(model.reset().get_scalar_product(case["left"], case["left"]))
+            - 0.5
+            * np.asarray(model.reset().get_scalar_product(case["right"], case["right"]))
+            - 0.5
+            * np.asarray(model.reset().get_scalar_product(case["left"], case["left"]))
         )
 
         npt.assert_allclose(got, expected)

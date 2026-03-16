@@ -5,6 +5,7 @@ import unittest
 import numpy as np
 from typed_lisa_toolkit.containers import tapering
 
+
 class TestTaperingNumpy(unittest.TestCase):
     def test_ldc_window_basic(self):
         # kap=1.0 ensures tanh drives ends to ~0 and middle to ~1

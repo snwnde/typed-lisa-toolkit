@@ -132,9 +132,9 @@ class TestDenseMakerNumpy(unittest.TestCase):
         # Mirror the frequency-windowing logic in get_dense_maker so each test
         # can compute the exact slice it expects to see passed to get_interpolated.
         return np.asarray(frequencies)[
-            np.searchsorted(np.asarray(frequencies), phasor.f_min, side="left") : np.searchsorted(
-                np.asarray(frequencies), phasor.f_max, side="right"
-            )
+            np.searchsorted(
+                np.asarray(frequencies), phasor.f_min, side="left"
+            ) : np.searchsorted(np.asarray(frequencies), phasor.f_max, side="right")
         ]
 
     def test_dense_maker_embed_false_calls_interpolated_only(self):

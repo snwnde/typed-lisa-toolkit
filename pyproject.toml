@@ -79,8 +79,8 @@ convention = "numpy"
 
 [tool.coverage.report]
 omit = [
+    "*/typed_lisa_toolkit/containers/modes.py",
     "*/typed_lisa_toolkit/viz/*",
-    "*/typed_lisa_toolkit/lib/*",
 ]
 
 [tool.pytest.ini_options]

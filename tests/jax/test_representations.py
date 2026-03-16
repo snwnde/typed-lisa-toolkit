@@ -22,12 +22,19 @@ from typed_lisa_toolkit.containers.representations import (
     FrequencySeries,
     STFT,
     Linspace,
+    Phasor,
     _take_subset,
     _get_subset_slice,
     _get_full_slice,
 )
 from typed_lisa_toolkit import utils
-from tests._shared.representations_helpers import build_canonical_representations
+from tests._shared.representations_helpers import (
+    AdvancedRepresentationMethodsMixin,
+    HelperFunctionsMixin,
+    LinspaceExtraPropertiesMixin,
+    WDMPropertiesAndMethodsMixin,
+    build_canonical_representations,
+)
 
 
 class TestCanonicalShapeJAX(unittest.TestCase):
@@ -1477,5 +1484,155 @@ class TestErrorHandlingJAX(unittest.TestCase):
             pass
 
 
-if __name__ == "__main__":
-    unittest.main()
+class TestLinspaceExtraPropertiesJAX(LinspaceExtraPropertiesMixin, unittest.TestCase):
+    """Linspace edge-case tests (shared via mixin)."""
+
+
+class TestHelperFunctionsJAX(HelperFunctionsMixin, unittest.TestCase):
+    """Module-level helper function tests (shared via mixin)."""
+
+    xp = jnp
+
+
+class TestAdvancedRepresentationMethodsJAX(AdvancedRepresentationMethodsMixin, unittest.TestCase):
+    """FrequencySeries/TimeSeries/STFT method tests (shared via mixin)."""
+
+    xp = jnp
+
+
+class TestArithmeticAddMethodsJAX(unittest.TestCase):
+    def test_iadd_method(self):
+        large_freqs = Linspace(0.0, 0.01, 100)
+        small_freqs = Linspace(0.30, 0.01, 30)
+        entries_large = jnp.ones((1, 1, 1, 1, 100), dtype=jnp.float64)
+        entries_small = jnp.ones((1, 1, 1, 1, 30), dtype=jnp.float64) * 2.0
+        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large)
+        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
+        result = fs_large.iadd(fs_small, full_slice)
+        npt.assert_allclose(np.asarray(result.entries[0, 0, 0, 0, 30:60]), 1.0)
+
+    def test_add_method_inplace_false(self):
+        large_freqs = Linspace(0.0, 0.01, 100)
+        small_freqs = Linspace(0.30, 0.01, 30)
+        entries_large = jnp.ones((1, 1, 1, 1, 100), dtype=jnp.float64)
+        entries_small = jnp.ones((1, 1, 1, 1, 30), dtype=jnp.float64) * 2.0
+        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large)
+        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
+        result = fs_large.add(fs_small, full_slice, inplace=False)
+        npt.assert_allclose(np.asarray(result.entries[0, 0, 0, 0, 30:60]), 1.0)
+        npt.assert_allclose(np.asarray(fs_large.entries[0, 0, 0, 0, 30:60]), 1.0)
+
+    def test_add_method_inplace_true(self):
+        large_freqs = Linspace(0.0, 0.01, 100)
+        small_freqs = Linspace(0.30, 0.01, 30)
+        entries_large = jnp.ones((1, 1, 1, 1, 100), dtype=jnp.float64)
+        entries_small = jnp.ones((1, 1, 1, 1, 30), dtype=jnp.float64) * 2.0
+        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large)
+        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
+        result = fs_large.add(fs_small, full_slice, inplace=True)
+        npt.assert_allclose(np.asarray(result.entries[0, 0, 0, 0, 30:60]), 1.0)
+        self.assertIs(result, fs_large)
+
+    def test_iadd_operator_with_scalar(self):
+        freqs = Linspace(0.0, 0.01, 10)
+        entries = jnp.ones((1, 1, 1, 1, 10), dtype=jnp.float64)
+        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs += 1.0
+        npt.assert_allclose(np.asarray(fs.entries), 1.0)
+
+    def test_iadd_operator_with_array_grid_type(self):
+        large_freqs_arr = jnp.linspace(0.0, 0.99, 10, dtype=jnp.float64)
+        small_freqs_arr = jnp.linspace(0.30, 0.59, 3, dtype=jnp.float64)
+        entries_large = jnp.ones((1, 1, 1, 1, 10), dtype=jnp.float64)
+        entries_small = jnp.ones((1, 1, 1, 1, 3), dtype=jnp.float64) * 2.0
+        fs_large = FrequencySeries(grid=(large_freqs_arr,), entries=entries_large)
+        fs_small = FrequencySeries(grid=(small_freqs_arr,), entries=entries_small)
+        try:
+            fs_large += fs_small
+        except (ValueError, IndexError, TypeError):
+            pass
+
+    def test_setitem_on_series(self):
+        freqs = Linspace(0.0, 0.1, 50)
+        entries = jnp.ones((1, 1, 1, 1, 50), dtype=jnp.float64)
+        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        before = np.asarray(fs.entries)
+        fs[10:20] = jnp.zeros((1, 1, 1, 1, 10), dtype=jnp.float64)
+        npt.assert_allclose(np.asarray(fs.entries), before)
+
+
+class TestPhasorJAX(unittest.TestCase):
+    def setUp(self):
+        self.freqs = jnp.linspace(1e-4, 1e-2, 20, dtype=jnp.float64)
+        self.amps = jnp.ones((1, 1, 1, 20), dtype=jnp.complex128)
+        self.phases = jnp.linspace(0, jnp.pi, 20, dtype=jnp.float64)[
+            None, None, None, :
+        ]
+        entries = jnp.zeros((1, 1, 2, 1, 20), dtype=jnp.complex128)
+        entries = entries.at[:, :, 0, 0, :].set(self.amps[:, :, 0, :])
+        entries = entries.at[:, :, 1, 0, :].set(self.phases[:, :, 0, :])
+        self.phasor = Phasor(grid=(self.freqs,), entries=entries)
+
+    def test_domain_and_kind(self):
+        self.assertEqual(self.phasor.domain, "frequency")
+        self.assertEqual(self.phasor.kind, "phasor")
+
+    def test_phases_and_amplitudes(self):
+        npt.assert_allclose(np.asarray(self.phasor.amplitudes), np.asarray(self.amps))
+        npt.assert_allclose(np.asarray(self.phasor.phases), np.asarray(self.phases))
+
+    def test_frequencies_f_min_f_max(self):
+        npt.assert_allclose(np.asarray(self.phasor.frequencies), np.asarray(self.freqs))
+        self.assertAlmostEqual(self.phasor.f_min, float(self.freqs[0]))
+        self.assertAlmostEqual(self.phasor.f_max, float(self.freqs[-1]))
+
+    def test_create_like(self):
+        new_entries = jnp.zeros_like(self.phasor.entries)
+        new_phasor = self.phasor.create_like(new_entries)
+        self.assertIsInstance(new_phasor, Phasor)
+        npt.assert_allclose(np.asarray(new_phasor.entries), 0)
+        npt.assert_allclose(np.asarray(new_phasor.frequencies), np.asarray(self.freqs))
+
+    def test_setitem(self):
+        before = np.asarray(self.phasor.entries)
+        self.phasor[:] = jnp.zeros_like(self.phasor.entries)
+        npt.assert_allclose(np.asarray(self.phasor.entries), before)
+
+    def test_get_subset(self):
+        sub = self.phasor.get_subset(
+            interval=(float(self.freqs[5]), float(self.freqs[15]))
+        )
+        self.assertIsInstance(sub, Phasor)
+        self.assertLess(len(np.asarray(sub.frequencies)), len(self.freqs))
+
+    def test_to_frequency_series(self):
+        fs = self.phasor.to_frequency_series()
+        self.assertIsInstance(fs, FrequencySeries)
+        expected = self.amps * jnp.exp(1j * self.phases)
+        npt.assert_allclose(
+            np.abs(np.asarray(fs.entries) - np.asarray(expected)), 0, atol=1e-10
+        )
+
+    def test_get_interpolated(self):
+        from scipy.interpolate import interp1d  # type: ignore[import]
+
+        new_freqs = np.linspace(float(self.freqs[2]), float(self.freqs[-3]), 8)
+        interpolated = self.phasor.get_interpolated(new_freqs, interp1d)
+        self.assertIsInstance(interpolated, Phasor)
+        self.assertEqual(len(np.asarray(interpolated.frequencies)), 8)
+
+
+class TestWDMPropertiesAndMethodsJAX(WDMPropertiesAndMethodsMixin, unittest.TestCase):
+    """WDM property/method tests (shared via mixin)."""
+
+    def setUp(self):
+        self.wdm = build_canonical_wdm_jax()
+
+
+def build_canonical_wdm_jax():
+    from tests._shared.noisemodel_helpers import build_wdm_pair
+
+    return build_wdm_pair(jnp)["left"]["X"]

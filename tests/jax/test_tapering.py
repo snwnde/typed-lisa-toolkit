@@ -3,10 +3,12 @@
 
 import unittest
 import jax
+
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 from typed_lisa_toolkit.containers import tapering
+
 
 class TestTaperingJax(unittest.TestCase):
     def test_ldc_window_basic(self):

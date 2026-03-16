@@ -39,7 +39,10 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
         cross = np.asarray(likelihood.get_cross_product(case["right"]))
         template_square = np.asarray(likelihood.get_template_square(case["right"]))
 
-        npt.assert_allclose(cross, np.asarray(model.reset().get_scalar_product(case["left"], case["right"])))
+        npt.assert_allclose(
+            cross,
+            np.asarray(model.reset().get_scalar_product(case["left"], case["right"])),
+        )
         npt.assert_allclose(
             template_square,
             np.asarray(model.reset().get_scalar_product(case["right"], case["right"])),
@@ -55,8 +58,10 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
         got = np.asarray(likelihood.get_log_likelihood(case["right"]))
         expected = (
             np.asarray(model.reset().get_scalar_product(case["left"], case["right"]))
-            - 0.5 * np.asarray(model.reset().get_scalar_product(case["right"], case["right"]))
-            - 0.5 * np.asarray(model.reset().get_scalar_product(case["left"], case["left"]))
+            - 0.5
+            * np.asarray(model.reset().get_scalar_product(case["right"], case["right"]))
+            - 0.5
+            * np.asarray(model.reset().get_scalar_product(case["left"], case["left"]))
         )
 
         npt.assert_allclose(got, expected)
@@ -71,7 +76,9 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
 
         got = np.asarray(likelihood.get_cross_product(case["wf"]))
         expected = np.asarray(
-            model.reset().get_scalar_product(data, FSData.from_waveform(sum_harmonics(case["wf"])))
+            model.reset().get_scalar_product(
+                data, FSData.from_waveform(sum_harmonics(case["wf"]))
+            )
         )
 
         npt.assert_allclose(got, expected)

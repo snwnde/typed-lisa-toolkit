@@ -17,6 +17,7 @@ from typed_lisa_toolkit.containers.waveforms import (
 # Fake container stubs for dense-maker tests (no real arrays needed)
 # ---------------------------------------------------------------------------
 
+
 class FakeResponse(dict[str, Any]):
     @property
     def channel_names(self):

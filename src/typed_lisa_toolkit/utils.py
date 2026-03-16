@@ -154,12 +154,13 @@ def trim_interp(interpolator: Interpolator):
         min = float(trimmed_grid[0])
         max = float(trimmed_grid[-1])
 
-
         def _interpolated(target_grid: Array) -> Array:
             """Return the interpolated entries at the target grid, zero outside support."""
             target_support_slice = get_subset_slice(target_grid, min, max)
             interp_grid = target_grid[target_support_slice]
-            interpolated = interpolator(grid[support_slice], entries[support_slice])(interp_grid)
+            interpolated = interpolator(grid[support_slice], entries[support_slice])(
+                interp_grid
+            )
             return extend_to(target_grid)(interp_grid, interpolated)
 
         return _interpolated

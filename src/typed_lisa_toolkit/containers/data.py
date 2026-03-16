@@ -528,8 +528,7 @@ class FSData(_SeriesData[reps.FrequencySeries]):
         See :py:meth:`.representations.FrequencySeries.to_WDM`
         """
         wdmdict = {
-            chn: self[chn].to_WDM(Nf=Nf, Nt=Nt, nx=nx)
-            for chn in self.channel_names
+            chn: self[chn].to_WDM(Nf=Nf, Nt=Nt, nx=nx) for chn in self.channel_names
         }
         return WDMData.from_dict(wdmdict).set_name(self.name)
 

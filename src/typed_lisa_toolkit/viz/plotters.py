@@ -490,7 +490,7 @@ class _1DDataPlotter[
                 **kwargs,
             )
             if plot_residual:
-                plotter(self.data[chnname] - other.data[chnname]).plot( # type: ignore[arg-type]
+                plotter(self.data[chnname] - other.data[chnname]).plot(  # type: ignore[arg-type]
                     axs[diff_idx],  # pyright: ignore[reportPossiblyUnboundVariable]
                     set_xlabel=xlabel_bool,
                     set_ylabel=ylabel_bool,
