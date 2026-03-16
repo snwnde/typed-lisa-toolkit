@@ -167,9 +167,10 @@ def _make_integration_policy(
     method: IntegrationMethod = "trapezoid",
 ) -> IntegrationPolicy:
     """Build an integration policy from a method name."""
-    if xp.__name__ == "numpy":
+    module_name = xp.__name__
+    if module_name == "numpy":
         return _NumpyIntegrationPolicy(method=method)
-    if xp.__name__ == "jax":
+    if module_name == "jax.numpy":
         return _JaxIntegrationPolicy(method=method)
     raise NotImplementedError(
         f"Unsupported array module {xp}. Cannot create integration policy."

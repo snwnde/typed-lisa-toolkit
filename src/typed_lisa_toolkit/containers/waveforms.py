@@ -47,11 +47,11 @@ class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
 
     def __iter__(self) -> Iterator[ModeT]:
         """Iterate over harmonic modes."""
-        return iter(self.harmonics)
+        return iter(self._mapping)
 
     def __len__(self) -> int:
         """Return the number of harmonic modes."""
-        return len(self.harmonics)
+        return len(self._mapping)
 
     def __repr__(self):
         items = {key: self[key] for key in self}
@@ -82,7 +82,7 @@ class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
     @property
     def harmonics(self):
         """All harmonic modes and their order."""
-        return tuple(self.keys())
+        return tuple(self._mapping.keys())
 
 
 class HarmonicWaveform[ModeT: Mode, RepT: Reps](_ModeMapping[ModeT, RepT]):
@@ -93,7 +93,10 @@ class HarmonicWaveform[ModeT: Mode, RepT: Reps](_ModeMapping[ModeT, RepT]):
 
     def __xp__(self, api_version: str | None = None):
         """Get the array API namespace of the entries."""
-        return xpc.get_namespace(next(iter(self.values())), api_version=api_version)
+        return xpc.get_namespace(
+            next(iter(self.values())).entries,
+            api_version=api_version,
+        )
 
     @property
     def domain(self):

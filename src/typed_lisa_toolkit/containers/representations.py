@@ -692,7 +692,11 @@ class FrequencySeries(
         """
         ndof = 2 * (len(self.frequencies) - 1)  # pywavelet's convention
         dt = 1 / (ndof * self.df)
-        fs = pywFS(data=self.entries / dt, freq=self.xp.array(self.frequencies), t0=0.0)
+        fs = pywFS(
+            data=self.entries.squeeze() / dt,
+            freq=self.xp.array(self.frequencies),
+            t0=0.0,
+        )
         return WDM.from_pywWDM(_pyw_f2w(fs, Nf=Nf, Nt=Nt, nx=nx))
 
 
@@ -745,7 +749,7 @@ class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1
             else self.xp.ones_like(self_times)
         )
         return FrequencySeries(
-            grid=(self.xp.fft.rfftfreq(n=len(self.times), d=self.dt),),
+            grid=(self.xp.fft.rfftfreq(len(self.times), d=self.dt),),
             entries=self.xp.fft.rfft(self.entries * tapering_window * self.dt),
         )
 
@@ -915,8 +919,6 @@ class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
 
         return plotters.PhasorPlotter(self)
 
-    
-
 
 class STFT(_InitMixin["Grid2D"], _ArithmeticReprOnGrid["Grid2D"]):
     """Time-frequency representation."""
@@ -1057,7 +1059,7 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
     ):
         """Create a WDM representation from time and frequency grids and entries."""
         return cls(
-            grid=(Linspace.make(times), Linspace.make(frequencies)), entries=entries
+            grid=(Linspace.make(frequencies), Linspace.make(times)), entries=entries
         )
 
     def is_critically_sampled(self):
@@ -1162,7 +1164,7 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
         if mask is not None:
             freqs = np.ma.masked_where(mask, freqs)  # type: ignore
             entries = np.ma.masked_where(mask, entries)  # type: ignore
-        return FrequencySeries((freqs,), entries)  # type: ignore
+        return FrequencySeries((freqs,), entries[None, None, None, None, ...])  # type: ignore
 
     @property
     def nyquist(self) -> float:
@@ -1174,7 +1176,7 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
     def from_pywWDM(cls, pywwv: pywWDM, /) -> Self:
         """Convert a pywWDM object to a WDM."""
         pywwv_any = cast(Any, pywwv)
-        entries = pywwv_any.data
+        entries = pywwv_any.data[None, None, None, None, ...]
         times = Linspace(
             pywwv_any.time[0],
             pywwv_any.time[1] - pywwv_any.time[0],
@@ -1191,7 +1193,7 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
         """Convert self to a pywWDM object."""
         xp = xpc.get_namespace(self.entries)
         return pywWDM(
-            data=self.entries,
+            data=self.entries.squeeze(),
             time=xp.array(self.times),
             freq=xp.array(self.frequencies),
         )

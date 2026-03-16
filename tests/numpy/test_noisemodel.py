@@ -12,7 +12,7 @@ from typed_lisa_toolkit.consumers.noisemodel import (
     FDNoiseModel,
     SpectralDensity,
     TFNoiseModel,
-    make_integration_policy,
+    _make_integration_policy,
 )
 from tests._shared.noisemodel_helpers import (
     build_fd_pair,
@@ -42,6 +42,15 @@ class TestSpectralDensity(unittest.TestCase):
 
         npt.assert_allclose(np.asarray(sub.get_kernel()), dense_kernel_2ch(np)[1:2])
 
+    def test_get_kernel_backend_argument_is_not_supported(self):
+        case = build_fd_pair(np)
+        psd = SpectralDensity(
+            case["frequencies"], dense_kernel_2ch(np), channel_order=["X", "Y"]
+        )
+
+        with self.assertRaises(NotImplementedError):
+            psd.get_kernel(backend="jax")
+
     def test_whitening_matrix_reconstructs_inverse_sdm(self):
         case = build_fd_pair(np)
         kernel = dense_kernel_2ch(np)
@@ -51,6 +60,15 @@ class TestSpectralDensity(unittest.TestCase):
         reconstructed = np.einsum("fji,fjk->fik", w.conj(), w)
 
         npt.assert_allclose(reconstructed, kernel, rtol=1e-12, atol=1e-12)
+
+    def test_whitening_matrix_invalid_kind_raises(self):
+        case = build_fd_pair(np)
+        psd = SpectralDensity(
+            case["frequencies"], dense_kernel_2ch(np), channel_order=["X", "Y"]
+        )
+
+        with self.assertRaises(NotImplementedError):
+            psd.get_whitening_matrix(kind="qr")
 
     def test_diagonal_from_fd_noise(self):
         case = build_fd_pair(np)
@@ -66,7 +84,7 @@ class TestSpectralDensity(unittest.TestCase):
 
 class TestFDNoiseModel(unittest.TestCase):
     def test_make_integration_policy_numpy(self):
-        ip = make_integration_policy(np)
+        ip = _make_integration_policy(np)
         y = np.array([0.0, 1.0, 2.0])
         x = np.array([0.0, 0.5, 1.0])
         self.assertEqual(ip.integrate(y, x=x), 1.0)
@@ -194,6 +212,20 @@ class TestFDNoiseModel(unittest.TestCase):
 
 
 class TestEvolutionarySpectralDensity(unittest.TestCase):
+    def test_is_valid_sdm_returns_false_without_raising(self):
+        self.assertFalse(
+            EvolutionarySpectralDensity.is_valid_sdm(
+                np.eye(2),
+                channel_order=["X", "Y"],
+            )
+        )
+        self.assertFalse(
+            EvolutionarySpectralDensity.is_valid_sdm(
+                np.broadcast_to(np.eye(2), (2, 2, 2, 2)).copy(),
+                channel_order=["X", "X"],
+            )
+        )
+
     def test_invalid_shape_raises(self):
         with self.assertRaises(ValueError):
             EvolutionarySpectralDensity(
@@ -237,6 +269,28 @@ class TestEvolutionarySpectralDensity(unittest.TestCase):
         reconstructed = np.einsum("ftji,ftjk->ftik", w.conj(), w)
 
         npt.assert_allclose(reconstructed, invevsdm, rtol=1e-12, atol=1e-12)
+
+    def test_get_kernel_backend_argument_is_not_supported(self):
+        esd = EvolutionarySpectralDensity(
+            frequencies=np.array([0.25, 0.5]),
+            times=np.array([0.0, 1.0]),
+            inverse_esdm=np.broadcast_to(np.eye(2), (2, 2, 2, 2)).copy(),
+            channel_order=["X", "Y"],
+        )
+
+        with self.assertRaises(NotImplementedError):
+            esd.get_kernel(backend="jax")
+
+    def test_whitening_matrix_invalid_kind_raises(self):
+        esd = EvolutionarySpectralDensity(
+            frequencies=np.array([0.25, 0.5]),
+            times=np.array([0.0, 1.0]),
+            inverse_esdm=np.broadcast_to(np.eye(2), (2, 2, 2, 2)).copy(),
+            channel_order=["X", "Y"],
+        )
+
+        with self.assertRaises(NotImplementedError):
+            esd.get_whitening_matrix(kind="qr")
 
 
 class TestTFNoiseModel(unittest.TestCase):
@@ -311,5 +365,8 @@ class TestTFNoiseModel(unittest.TestCase):
         expected_e = np.einsum("ftij,bftj->bfti", w, left_e)
         expected = np.moveaxis(expected_e, -1, 1)
 
-        self.assertEqual(got.shape, (2, 2, 2, 3))
+        self.assertEqual(
+            got.shape,
+            (2, 2, len(case["frequencies"]), len(case["times"])),
+        )
         npt.assert_allclose(got, expected, rtol=1e-12, atol=1e-12)

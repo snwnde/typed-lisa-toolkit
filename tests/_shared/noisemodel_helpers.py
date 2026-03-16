@@ -40,13 +40,16 @@ def build_fd_pair(xp):
 
 
 def build_wdm_pair(xp):
-    times = xp.asarray([0.0, 1.0, 2.0], dtype=xp.float64)
-    frequencies = xp.asarray([0.25, 0.5], dtype=xp.float64)
+    nt, nf = 20, 16
+    dt = 0.12891289
+    df = 1.0 / (2.0 * dt)
+    times = xp.asarray(dt * np.arange(nt), dtype=xp.float64)
+    frequencies = xp.asarray(df * np.arange(nf), dtype=xp.float64)
 
-    left_x = xp.asarray([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=xp.float64)
-    left_y = xp.asarray([[0.5, 1.5, 2.5], [3.5, 4.5, 5.5]], dtype=xp.float64)
-    right_x = xp.asarray([[2.0, 0.0, 1.0], [1.0, 0.0, 2.0]], dtype=xp.float64)
-    right_y = xp.asarray([[1.0, 1.0, 0.0], [0.0, 2.0, 1.0]], dtype=xp.float64)
+    left_x = xp.outer(xp.cos(frequencies), xp.sin(times))
+    left_y = xp.ones((nf, nt), dtype=xp.float64)
+    right_x = left_x
+    right_y = left_y
 
     left = WDMData.from_dict(
         {
@@ -246,18 +249,16 @@ def dense_kernel_2ch(xp):
 
 
 def dense_esdm_2ch(xp):
-    return xp.asarray(
-        [
-            [
-                [[2.0, 0.2], [0.2, 1.1]],
-                [[1.8, -0.1], [-0.1, 1.3]],
-                [[2.2, 0.05], [0.05, 0.9]],
-            ],
-            [
-                [[1.5, 0.15], [0.15, 1.4]],
-                [[1.7, -0.08], [-0.08, 1.0]],
-                [[1.9, 0.12], [0.12, 1.2]],
-            ],
-        ],
-        dtype=xp.float64,
-    )
+    case = build_wdm_pair(xp)
+    n_freq = len(case["frequencies"])
+    n_time = len(case["times"])
+    fi = xp.arange(n_freq, dtype=xp.float64)[:, None]
+    ti = xp.arange(n_time, dtype=xp.float64)[None, :]
+
+    a = 1.8 + 0.05 * xp.cos(0.3 * fi) + 0.03 * xp.sin(0.2 * ti)
+    d = 1.2 + 0.04 * xp.sin(0.25 * fi) + 0.02 * xp.cos(0.35 * ti)
+    b = 0.08 * xp.cos(0.15 * fi + 0.1 * ti)
+
+    row0 = xp.stack([a, b], axis=-1)
+    row1 = xp.stack([b, d], axis=-1)
+    return xp.stack([row0, row1], axis=-2)

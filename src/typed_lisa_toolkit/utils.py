@@ -146,24 +146,21 @@ def trim_interp(interpolator: Interpolator):
         entries: Array,
     ) -> ArrayFunc:
         support_slice = get_support_slice(entries)
-        try:
-            min, max = grid[support_slice][[0, -1]]
-        except IndexError:
+        xp = xpc.get_namespace(entries)
+        trimmed_grid = grid[support_slice]
+        if trimmed_grid.size == 0:
             log.warning("Empty array. Returning a zero interpolator.")
-            xp = xpc.get_namespace(entries)
             return lambda target_entries: xp.zeros_like(target_entries)
+        min = float(trimmed_grid[0])
+        max = float(trimmed_grid[-1])
 
-        def _interpolated(
-            target_grid: Array,
-        ) -> Array:
-            """Return the interpolated entries at the target grid."""
+
+        def _interpolated(target_grid: Array) -> Array:
+            """Return the interpolated entries at the target grid, zero outside support."""
             target_support_slice = get_subset_slice(target_grid, min, max)
             interp_grid = target_grid[target_support_slice]
-            interpolated = interpolator(grid[support_slice], entries[support_slice])(
-                interp_grid
-            )
-            target_entries = extend_to(target_grid)(interp_grid, interpolated)
-            return target_entries
+            interpolated = interpolator(grid[support_slice], entries[support_slice])(interp_grid)
+            return extend_to(target_grid)(interp_grid, interpolated)
 
         return _interpolated
 
