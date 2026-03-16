@@ -10,11 +10,10 @@ Classes
     :members:
 """
 
-import logging
 import abc
+import logging
 import operator
-from typing import Self, Any
-
+from typing import Any, Self
 
 log = logging.getLogger(__name__)
 

@@ -44,10 +44,12 @@ Entities
 """
 
 from __future__ import annotations
+
 import abc
-import logging
 import copy
-from typing import Self, Literal, Any
+import logging
+from typing import Any, Literal, Self
+
 import matplotlib.axes
 import matplotlib.figure
 import matplotlib.pyplot as plt

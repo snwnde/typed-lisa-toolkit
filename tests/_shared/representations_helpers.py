@@ -5,14 +5,8 @@ import numpy as np
 import numpy.testing as npt
 
 from typed_lisa_toolkit.containers.representations import (
-    FrequencySeries,
-    Linspace,
-    STFT,
-    TimeSeries,
-    WDM,
-    _check_entry_grid_compatibility,
-    _take_subset,
-)
+    STFT, WDM, FrequencySeries, Linspace, TimeSeries,
+    _check_entry_grid_compatibility, _take_subset)
 
 
 def _randn_array(xp, shape):

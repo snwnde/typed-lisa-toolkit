@@ -11,10 +11,13 @@
 """
 
 import logging
-from typing import Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
+from ..containers import data as dm
+from ..containers import modes
+from ..containers import representations as reps
+from ..containers import waveforms as wf
 from . import noisemodel as nm
-from ..containers import data as dm, representations as reps, waveforms as wf, modes
 
 if TYPE_CHECKING:
     Array = reps.Array

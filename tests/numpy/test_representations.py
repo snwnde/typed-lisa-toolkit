@@ -2,32 +2,21 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import unittest
+
 import numpy as np
 import numpy.testing as npt
-from l2d_interface.validators import (  # type: ignore[import-untyped]
-    validate_representation,
-)
-from typed_lisa_toolkit.containers.representations import (
-    TimeSeries,
-    FrequencySeries,
-    STFT,
-    Linspace,
-    _take_subset,
-    _get_subset_slice,
-    _get_full_slice,
-)
-from typed_lisa_toolkit.containers.data import TSData
-from typed_lisa_toolkit import utils
+from l2d_interface.validators import \
+    validate_representation  # type: ignore[import-untyped]
+
 from tests._shared.representations_helpers import (
-    AdvancedRepresentationMethodsMixin,
-    HelperFunctionsMixin,
-    LinspaceExtraPropertiesMixin,
-    WDMPropertiesAndMethodsMixin,
-    build_canonical_representations,
-)
+    AdvancedRepresentationMethodsMixin, HelperFunctionsMixin,
+    LinspaceExtraPropertiesMixin, WDMPropertiesAndMethodsMixin,
+    build_canonical_representations)
+from typed_lisa_toolkit import utils
+from typed_lisa_toolkit.containers.data import TSData
 from typed_lisa_toolkit.containers.representations import (  # extra symbols for coverage tests
-    Phasor,
-)
+    STFT, FrequencySeries, Linspace, Phasor, TimeSeries, _get_full_slice,
+    _get_subset_slice, _take_subset)
 
 
 class TestCanonicalShape(unittest.TestCase):

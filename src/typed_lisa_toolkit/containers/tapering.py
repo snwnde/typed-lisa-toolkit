@@ -28,12 +28,12 @@ Tapering Functions
 """
 
 import logging
-from typing import Protocol, ParamSpec, Generic, TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, ParamSpec, Protocol
 
 import numpy as np
 import numpy.typing as npt
-from scipy.signal.windows import _windows  # type: ignore[import]
 import scipy.special  # type: ignore[import]
+from scipy.signal.windows import _windows  # type: ignore[import]
 
 if TYPE_CHECKING:
     import jax

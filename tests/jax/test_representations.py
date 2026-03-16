@@ -9,32 +9,26 @@ All tests should pass with JAX arrays.
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import unittest
-import numpy as np
-import numpy.testing as npt
 
 import jax
+import numpy as np
+import numpy.testing as npt
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from typed_lisa_toolkit.containers.representations import (
-    TimeSeries,
-    FrequencySeries,
-    STFT,
-    Linspace,
-    Phasor,
-    _take_subset,
-    _get_subset_slice,
-    _get_full_slice,
-)
-from typed_lisa_toolkit import utils
 from tests._shared.representations_helpers import (
-    AdvancedRepresentationMethodsMixin,
-    HelperFunctionsMixin,
-    LinspaceExtraPropertiesMixin,
-    WDMPropertiesAndMethodsMixin,
-    build_canonical_representations,
-)
+    AdvancedRepresentationMethodsMixin, HelperFunctionsMixin,
+    LinspaceExtraPropertiesMixin, WDMPropertiesAndMethodsMixin,
+    build_canonical_representations)
+from typed_lisa_toolkit import utils
+from typed_lisa_toolkit.containers.representations import (STFT,
+                                                           FrequencySeries,
+                                                           Linspace, Phasor,
+                                                           TimeSeries,
+                                                           _get_full_slice,
+                                                           _get_subset_slice,
+                                                           _take_subset)
 
 
 class TestCanonicalShapeJAX(unittest.TestCase):

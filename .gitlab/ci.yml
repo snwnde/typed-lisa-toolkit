@@ -25,7 +25,7 @@ pages:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
   script:
-    - pip install -q --root-user-action=ignore
+    - pip install -q --root-user-action=ignore uv
     - uv sync --group doc
     - make -C docs clean html
     - mv docs/_build/html public

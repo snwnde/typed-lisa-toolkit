@@ -37,20 +37,21 @@ including NumPy and JAX.
 """
 
 from __future__ import annotations
-from collections.abc import Callable
+
 import logging
-from typing import Self, Union, TYPE_CHECKING, Any, Literal, cast
 import warnings
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal, Self, Union, cast
+
+import array_api_compat as xpc
 import numpy as np
 import scipy.signal  # type: ignore[import-untyped]
-import array_api_compat as xpc
-
 from l2d_interface.contract import LinspaceLike
 
 if TYPE_CHECKING:
-    from .. import utils
-
     import numpy.typing as npt
+
+    from .. import utils
 
     Array = utils.Array
     Axis = Union[Array, "Linspace"]
@@ -61,15 +62,11 @@ if TYPE_CHECKING:
 
     from types import ModuleType
 
-from pywavelet.types import (  # type: ignore[import-untyped]
-    FrequencySeries as pywFS,
-    Wavelet as pywWDM,
-)
 from pywavelet import set_backend as _pyw_set_backend  # type: ignore[import-untyped]
-from pywavelet.transforms import (  # type: ignore[import-untyped]
-    from_freq_to_wavelet as _pyw_f2w,
-    from_wavelet_to_freq as _pyw_w2f,
-)
+from pywavelet.transforms import from_freq_to_wavelet as _pyw_f2w  # type: ignore[import-untyped]
+from pywavelet.transforms import from_wavelet_to_freq as _pyw_w2f  # type: ignore[import-untyped]
+from pywavelet.types import FrequencySeries as pywFS  # type: ignore[import-untyped]
+from pywavelet.types import Wavelet as pywWDM  # type: ignore[import-untyped]
 
 # NOTE We could also import the individual transformation routines from
 # pywavelet (written in numpy, cupy, jax) for finer control
@@ -80,7 +77,7 @@ _pyw_set_backend("numpy", "float64")
 # pyw_set_precision("float64")  # by default pywavelet uses float32.
 
 
-from .. import utils, lib
+from .. import lib, utils
 from . import tapering
 
 log = logging.getLogger(__name__)

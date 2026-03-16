@@ -4,7 +4,7 @@
 import numpy as np
 
 from typed_lisa_toolkit.containers.data import FSData, WDMData
-from typed_lisa_toolkit.containers.representations import FrequencySeries, WDM
+from typed_lisa_toolkit.containers.representations import WDM, FrequencySeries
 
 
 def build_fd_pair(xp):

@@ -2,26 +2,20 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import unittest
-from unittest.mock import patch, MagicMock
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit.containers import modes
-from typed_lisa_toolkit.containers.waveforms import (
-    get_dense_maker,
-    sum_harmonics,
-)
 from tests._shared.waveforms_helpers import (
+    FakeHarmonicWaveform, build_fake_harmonic_projected_waveform,
     build_harmonic_projected_frequency_waveform,
     build_harmonic_waveform_frequency_series,
-    build_nonhomogeneous_harmonic_projected_frequency_waveform,
-)
-from tests._shared.waveforms_helpers import (
-    FakeHarmonicWaveform,
-    build_fake_harmonic_projected_waveform,
-)
+    build_nonhomogeneous_harmonic_projected_frequency_waveform)
+from typed_lisa_toolkit.containers import modes
+from typed_lisa_toolkit.containers.waveforms import (get_dense_maker,
+                                                     sum_harmonics)
 
 
 class TestHarmonicWaveformNumpy(unittest.TestCase):

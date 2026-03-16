@@ -47,18 +47,12 @@ Noise Models
 
 import logging
 from types import ModuleType
-from typing import (
-    Protocol,
-    Self,
-    Literal,
-    TYPE_CHECKING,
-    Any,
-    Sequence,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, Sequence, Union
 
-from ..containers import data as dm, waveforms, representations as reps
 from .. import utils
+from ..containers import data as dm
+from ..containers import representations as reps
+from ..containers import waveforms
 
 
 def _import_quadax() -> ModuleType:

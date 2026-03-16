@@ -15,13 +15,15 @@ Functions
 """
 
 from __future__ import annotations
-from collections.abc import Mapping
+
 import logging
-from typing import TYPE_CHECKING, Self, Any, Iterator
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Iterator, Self
+
 import array_api_compat as xpc
 
-from . import representations as reps, data, modes
-
+from . import data, modes
+from . import representations as reps
 
 Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
 Mode = modes.Harmonic | modes.QNM

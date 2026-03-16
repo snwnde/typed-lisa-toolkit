@@ -32,18 +32,20 @@ Functions
 """
 
 from __future__ import annotations
-from collections.abc import Mapping, Iterator, Callable, Iterable
+
 import logging
 import pathlib
-from typing import Self, Literal, overload, Any, cast, TYPE_CHECKING
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
 
-import numpy as np
-import numpy.typing as npt
 import array_api_compat as xpc
 import h5py
+import numpy as np
+import numpy.typing as npt
 
-from . import representations as reps, tapering
 from .. import lib
+from . import representations as reps
+from . import tapering
 
 if TYPE_CHECKING:
     from . import waveforms as wf
