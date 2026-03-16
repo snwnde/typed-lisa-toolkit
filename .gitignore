@@ -12,3 +12,5 @@ _version.py
 sandbox
 .pytest_cache
 _build
+.coverage
+coverage.xml

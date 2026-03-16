@@ -77,6 +77,12 @@ convention = "numpy"
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
 
+[tool.coverage.report]
+omit = [
+    "*/typed_lisa_toolkit/viz/*",
+    "*/typed_lisa_toolkit/lib/*",
+]
+
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 

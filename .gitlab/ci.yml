@@ -1,25 +1,35 @@
 stages:
-  - docs
+  - test
+  - deploy
 
-variables:
-  SPHINX_VERSION: "8.0.2"
+pytest:
+  stage: test
+  image: python:3.13
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - pip install -q --root-user-action=ignore uv
+    - uv sync --all-extras
+    - source .venv/bin/activate
+    - pytest --cov=typed_lisa_toolkit --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=90 tests
+  artifacts:
+    paths:
+      - coverage.xml
+    expire_in: 1 week
 
 pages:
-  stage: docs
-  image: ghcr.io/sphinx-doc/sphinx:$SPHINX_VERSION
+  stage: deploy
+  image: python:3.13
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
   script:
-    - apt-get update
-    - apt-get -y --no-install-recommends install git gcc libc-dev
-    - pip install --root-user-action=ignore --upgrade pip
-    - pip install --root-user-action=ignore -r docs/docs-requirements.txt
-    - pip install --root-user-action=ignore .
-    - cd docs
-    - make clean html
-    - cd ..
+    - pip install -q --root-user-action=ignore
+    - uv sync --group doc
+    - make -C docs clean html
     - mv docs/_build/html public
   artifacts:
     paths:
       - public
+    expire_in: 1 week
