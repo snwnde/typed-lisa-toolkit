@@ -11,11 +11,11 @@ choosing the parameters. Refer to the section "Tapering Functions" for a list.
 
 .. currentmodule:: typed_lisa_toolkit.containers.tapering
 
-Types
------
-.. autoclass:: P
-.. autoprotocol:: Tapering
-.. autoprotocol:: LenWindow
+Protocols
+---------
+
+.. autoclass:: Tapering
+.. autoclass:: LenWindow
 
 Utility Functions
 -----------------
@@ -28,12 +28,21 @@ Tapering Functions
 """
 
 import logging
-from typing import Protocol, ParamSpec, Generic
+from typing import TYPE_CHECKING, Generic, ParamSpec, Protocol
 
 import numpy as np
 import numpy.typing as npt
-from scipy.signal.windows import _windows  # type: ignore[import]
 import scipy.special  # type: ignore[import]
+from scipy.signal.windows import _windows  # type: ignore[import]
+
+if TYPE_CHECKING:
+    import jax
+    import jax.typing as jpt
+    import numpy as np
+    import numpy.typing as npt
+
+    ArrayLike = jpt.ArrayLike | npt.ArrayLike
+    Array = jax.Array | npt.NDArray[np.number]
 
 log = logging.getLogger(__name__)
 
@@ -44,10 +53,9 @@ P = ParamSpec("P")
 class Tapering(Protocol):
     """Protocol for tapering functions."""
 
-    def __call__(
-        self, __array: npt.NDArray[np.number]
-    ) -> npt.NDArray[np.floating]:  # pyright: ignore[reportReturnType]
+    def __call__(self, __array: "Array") -> "Array":
         """Return the tapering window to apply on the array."""
+        ...
 
 
 class LenWindow(Protocol, Generic[P]):
@@ -55,7 +63,7 @@ class LenWindow(Protocol, Generic[P]):
 
     def __call__(  # noqa: D102
         self, __len: int, *args: P.args, **kwargs: P.kwargs
-    ) -> npt.NDArray[np.floating]: ...
+    ) -> "Array": ...
 
 
 # class _ScipyWindow(Protocol, Generic[P]):
@@ -97,7 +105,7 @@ class ldc_window(Tapering):
         self.margin = margin
         self.kap = kap
 
-    def __call__(self, grid: npt.NDArray[np.number]) -> npt.NDArray[np.floating]:
+    def __call__(self, grid: "Array") -> npt.NDArray[np.floating]:
         """Return the tapering window to apply on the array."""
         xr = grid[-1] - self.margin
         xl = grid[0] + self.margin
@@ -130,9 +138,7 @@ class planck_window(Tapering):
         self.xl = left_margin
         self.xr = right_margin
 
-    def __call__(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self, grid: npt.NDArray[np.number]
-    ):
+    def __call__(self, grid: "Array"):
         """Return the tapering window to apply on the array."""
         # https://arxiv.org/abs/1003.2939
         win = np.ones_like(grid)
@@ -149,7 +155,7 @@ class planck_window(Tapering):
         return win
 
 
-def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwargs):
+def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwargs):  # type: ignore
     """Return a callable tapering function.
 
     This function wraps the given window function with their arguments (if any)
@@ -166,14 +172,14 @@ def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwa
 
     """
     if not isinstance(window, str):
-        return lambda x: window(len(x), *args, **kwargs)
+        return lambda x: window(len(x), *args, **kwargs)  # type: ignore
     try:
-        winfunc = _windows._win_equiv[window]
+        winfunc = _windows._win_equiv[window]  # type: ignore
     except AttributeError:
         try:
-            winfunc = _windows._WIN_FUNCS[window][0]
+            winfunc = _windows._WIN_FUNCS[window][0]  # type: ignore
         except KeyError as e:
             raise ValueError("Unknown window type.") from e
     except KeyError as e:
         raise ValueError("Unknown window type.") from e
-    return get_tapering_func(winfunc, *args, **kwargs)
+    return get_tapering_func(winfunc, *args, **kwargs)  # type: ignore

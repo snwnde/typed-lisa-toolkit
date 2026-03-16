@@ -29,8 +29,6 @@ extensions = [
     'sphinx.ext.extlinks',
     "myst_nb",
     "sphinx.ext.mathjax",
-    "sphinx_toolbox.more_autodoc.autoprotocol",
-    "sphinx_toolbox.more_autodoc.autonamedtuple",
 ]
 
 python_use_unqualified_type_names = True
@@ -65,24 +63,24 @@ napoleon_use_param = True
 napoleon_preprocess_types = True
 
 # We need to get the python version and the numpy version for intersphinx.
-import platform
-import numpy as np
-import scipy.version  # type: ignore[import]
+# import platform
+# import numpy as np
+# import scipy.version  # type: ignore[import]
 
-py_version_tuple = platform.python_version_tuple()
-py_version = "{}.{}".format(*py_version_tuple[:2])
-np_version_tuple = np.version.version.split(".")
-np_version = "{}.{}".format(*np_version_tuple[:2])
+# py_version_tuple = platform.python_version_tuple()
+# py_version = "{}.{}".format(*py_version_tuple[:2])
+# np_version_tuple = np.version.version.split(".")
+# np_version = "{}.{}".format(*np_version_tuple[:2])
 
 
-intersphinx_mapping = {
-    "python": (f"https://docs.python.org/{py_version}", None),
-    "numpy": (f"https://numpy.org/doc/{np_version}/", None),
-    "scipy": (
-        f"https://docs.scipy.org/doc/scipy-{scipy.version.version}/",
-        None,
-    ),
-}
+# intersphinx_mapping = {
+#     "python": (f"https://docs.python.org/{py_version}", None),
+#     "numpy": (f"https://numpy.org/doc/{np_version}/", None),
+#     "scipy": (
+#         f"https://docs.scipy.org/doc/scipy-{scipy.version.version}/",
+#         None,
+#     ),
+# }
 
 
 latex_engine = "xelatex"
@@ -94,8 +92,4 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 html_permalinks_icon = "§"
-html_theme = "insipid"
-html_static_path = ["_static"]
-http_theme_options = {
-    "body_max_width": None,
-}
+html_theme = "furo"
