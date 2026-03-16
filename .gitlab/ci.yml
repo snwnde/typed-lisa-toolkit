@@ -11,10 +11,20 @@ pytest:
     - pip install -q --root-user-action=ignore uv
     - uv sync --all-extras
     - source .venv/bin/activate
-    - pytest --cov=typed_lisa_toolkit --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=90 tests
+    - pytest --cov=typed_lisa_toolkit --cov-branch --cov-report=term-missing
+        --cov-report=xml:coverage.xml --junitxml=report.xml 
+        --cov-fail-under=90 tests
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     paths:
       - coverage.xml
+      - report.xml
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
     expire_in: 1 week
 
 pages:
@@ -27,6 +37,7 @@ pages:
   script:
     - pip install -q --root-user-action=ignore uv
     - uv sync --group doc
+    - source .venv/bin/activate
     - make -C docs clean html
     - mv docs/_build/html public
   artifacts:

@@ -1,9 +1,9 @@
 Typed LISA Toolkit
 ==================
 
-The goal of the Typed LISA Toolkit is to provide a set of fully typed interfaces for LISA data
-analysis workflows. It serves as an abstraction layer for LISA data analysis pipelines and
-also provides implementations for some common high-level operations.
+Typed LISA Toolkit provides a concrete implementation for the data
+analysis workflow components within CU L2D. It follows the API
+contracts defined in `l2d-interface`.
 
 .. toctree::
    :maxdepth: 2

@@ -995,7 +995,6 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
 
     Currently, transformations to/from FrequencySeries are allowed,
     but only for full series --- all frequencies and all times.
-    See :meth:`.from_freqseries` and :meth:`to_freqseries`.
 
     .. warning::
         Elsewhere in this codebase, a grid of N points is considered to have N-1 bins,
