@@ -612,9 +612,24 @@ class FrequencySeries(
     def irfft(
         self,
         time_grid: "Array",
+        *args: tapering.Tapering | None,
         tapering: tapering.Tapering | None = None,
     ):
         """Inverse real FFT of the series."""
+        if len(args) > 1:
+            raise TypeError("irfft() accepts at most one positional optional argument.")
+        if len(args) == 1:
+            if tapering is not None:
+                raise TypeError(
+                    "irfft() received `tapering` as both positional and keyword arguments."
+                )
+            warnings.warn(
+                "Passing `tapering` positionally to `irfft` is deprecated and will be removed "
+                "in 0.7.0; pass it as a keyword argument instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            tapering = args[0]
         self_frequencies = to_array(self.frequencies)
         tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
         dt = float(time_grid[1] - time_grid[0])
@@ -643,7 +658,7 @@ class FrequencySeries(
 
         return plotters.FSPlotter(self)
 
-    def to_WDM(
+    def to_wdm(
         self,
         /,
         *,
@@ -696,6 +711,26 @@ class FrequencySeries(
         )
         return WDM.from_pywWDM(_pyw_f2w(fs, Nf=Nf, Nt=Nt, nx=nx))
 
+    def to_WDM(
+        self,
+        /,
+        *,
+        Nf: int | None = None,
+        Nt: int | None = None,
+        nx: float = 4.0,
+    ) -> WDM:
+        """Return :meth:`to_wdm` while warning about deprecation.
+
+        This alias will be removed in 0.7.0.
+        """
+        warnings.warn(
+            "`to_WDM` is deprecated and will be removed in 0.7.0; "
+            "use `to_wdm` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.to_wdm(Nf=Nf, Nt=Nt, nx=nx)
+
 
 class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1DMixin):
     """A series of numbers on a time grid."""
@@ -730,7 +765,11 @@ class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1
         """The time step. Alias for :attr:`.resolution`."""
         return self.resolution
 
-    def rfft(self, tapering: tapering.Tapering | None = None):
+    def rfft(
+        self,
+        *args: tapering.Tapering | None,
+        tapering: tapering.Tapering | None = None,
+    ):
         """Fast Fourier transform of the series.
 
         .. note::
@@ -739,6 +778,20 @@ class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1
             primary representations for DATA, in the sense that they are the most directly
             related to what we measure.
         """
+        if len(args) > 1:
+            raise TypeError("rfft() accepts at most one positional optional argument.")
+        if len(args) == 1:
+            if tapering is not None:
+                raise TypeError(
+                    "rfft() received `tapering` as both positional and keyword arguments."
+                )
+            warnings.warn(
+                "Passing `tapering` positionally to `rfft` is deprecated and will be removed "
+                "in 0.7.0; pass it as a keyword argument instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            tapering = args[0]
         self_times = self.xp.array(self.times)
         tapering_window = (
             tapering(self_times)
@@ -1136,7 +1189,7 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
     fs = sample_rate
     """Alias for :attr:`.sample_rate`."""
 
-    def to_freqseries(
+    def to_frequency_series(
         self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
     ) -> FrequencySeries:
         """Perform an inverse wavelet transform to the frequency domain.
@@ -1161,6 +1214,21 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
             freqs = np.ma.masked_where(mask, freqs)  # type: ignore
             entries = np.ma.masked_where(mask, entries)  # type: ignore
         return FrequencySeries((freqs,), entries[None, None, None, None, ...])  # type: ignore
+
+    def to_freqseries(
+        self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
+    ) -> FrequencySeries:
+        """Return :meth:`to_frequency_series` while warning about deprecation.
+
+        This alias will be removed in 0.7.0.
+        """
+        warnings.warn(
+            "`to_freqseries` is deprecated and will be removed in 0.7.0; "
+            "use `to_frequency_series` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.to_frequency_series(nx=nx, mask=mask)
 
     @property
     def nyquist(self) -> float:
