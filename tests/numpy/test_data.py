@@ -47,7 +47,7 @@ class TestDataContainersNumpy(unittest.TestCase):
         _, _, _, tsdata = _build_tsdata_numpy()
         fsdata = tsdata.to_fsdata(keep_times=False)
 
-        wdmdata = fsdata.to_WDMdata(Nf=2, Nt=2)
+        wdmdata = fsdata.to_wdm_data(Nf=2, Nt=2)
         recovered = wdmdata.to_fsdata()
 
         self.assertIsInstance(wdmdata, WDMData)
@@ -65,7 +65,7 @@ class TestDataContainersNumpy(unittest.TestCase):
         nf, nt = wdmdata["X"].Nf, wdmdata["X"].Nt
 
         fsdata = wdmdata.to_fsdata()
-        roundtrip = fsdata.to_WDMdata(Nf=nf, Nt=nt)
+        roundtrip = fsdata.to_wdm_data(Nf=nf, Nt=nt)
 
         self.assertIsInstance(roundtrip, WDMData)
         self.assertEqual(roundtrip.channel_names, wdmdata.channel_names)
@@ -81,6 +81,55 @@ class TestDataContainersNumpy(unittest.TestCase):
             np.asarray(wdmdata.get_kernel()),
             rtol=1e-7,
             atol=1e-7,
+        )
+
+    def test_phase2_deprecated_aliases_emit_warnings(self):
+        _, _, _, tsdata = _build_tsdata_numpy()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+
+        with self.assertWarns(DeprecationWarning):
+            wdm_old = fsdata.to_WDMdata(Nf=2, Nt=2)
+        wdm_new = fsdata.to_wdm_data(Nf=2, Nt=2)
+        self.assertEqual(wdm_old.channel_names, wdm_new.channel_names)
+
+        fs_from_new = wdm_new.to_fsdata()
+        with self.assertWarns(DeprecationWarning):
+            fs_from_old_repr = wdm_new["X"].to_freqseries()
+        fs_from_new_repr = wdm_new["X"].to_frequency_series()
+        npt.assert_allclose(
+            np.asarray(fs_from_old_repr.entries),
+            np.asarray(fs_from_new_repr.entries),
+        )
+        self.assertEqual(fs_from_new.channel_names, fsdata.channel_names)
+
+        with self.assertWarns(DeprecationWarning):
+            wdm_old_repr = fsdata["X"].to_WDM(Nf=2, Nt=2)
+        wdm_new_repr = fsdata["X"].to_wdm(Nf=2, Nt=2)
+        self.assertEqual(wdm_old_repr.shape, wdm_new_repr.shape)
+
+    def test_phase3_positional_optional_args_emit_warnings(self):
+        times, _, _, tsdata = _build_tsdata_numpy()
+        fsdata = tsdata.to_fsdata(keep_times=False)
+
+        with self.assertWarns(DeprecationWarning):
+            wdm_pos = fsdata.to_wdm_data(2, 2, 4.0)
+        wdm_kw = fsdata.to_wdm_data(Nf=2, Nt=2, nx=4.0)
+        self.assertEqual(wdm_pos.channel_names, wdm_kw.channel_names)
+
+        with self.assertWarns(DeprecationWarning):
+            fs_from_ts_pos = tsdata.representation.rfft(None)
+        fs_from_ts_kw = tsdata.representation.rfft(tapering=None)
+        npt.assert_allclose(
+            np.asarray(fs_from_ts_pos.entries),
+            np.asarray(fs_from_ts_kw.entries),
+        )
+
+        with self.assertWarns(DeprecationWarning):
+            ts_from_fs_pos = fsdata.representation.irfft(np.asarray(times), None)
+        ts_from_fs_kw = fsdata.representation.irfft(np.asarray(times), tapering=None)
+        npt.assert_allclose(
+            np.asarray(ts_from_fs_pos.entries),
+            np.asarray(ts_from_fs_kw.entries),
         )
 
     def test_fsdata_frequencies_and_df(self):

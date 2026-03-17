@@ -51,7 +51,7 @@ class TestDataContainersJAX(unittest.TestCase):
         _, tsdata = _build_tsdata_jax()
         fsdata = tsdata.to_fsdata(keep_times=False)
 
-        wdmdata = fsdata.to_WDMdata(Nf=2, Nt=2)
+        wdmdata = fsdata.to_wdm_data(Nf=2, Nt=2)
         recovered = wdmdata.to_fsdata()
 
         self.assertIsInstance(wdmdata, WDMData)
@@ -69,7 +69,7 @@ class TestDataContainersJAX(unittest.TestCase):
         nf, nt = wdmdata["X"].Nf, wdmdata["X"].Nt
 
         fsdata = wdmdata.to_fsdata()
-        roundtrip = fsdata.to_WDMdata(Nf=nf, Nt=nt)
+        roundtrip = fsdata.to_wdm_data(Nf=nf, Nt=nt)
 
         self.assertIsInstance(roundtrip, WDMData)
         self.assertEqual(roundtrip.channel_names, wdmdata.channel_names)
