@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.1 - 2026-03-17
+#### Continuous Integration
+- optimize job runs - (442ffeb) - Senwen Deng
+#### Miscellaneous Chores
+- added a license - (928b9a5) - Senwen Deng
+#### Style
+- consitent interface - (a627ae7) - Senwen Deng
+
+- - -
+
 ## 0.5.0 - 2026-03-16
 #### Features
 - multiple array backends - (5941deb) - Senwen Deng
