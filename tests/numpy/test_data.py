@@ -11,11 +11,16 @@ import numpy.testing as npt
 
 from tests._shared.data_helpers import DataAbstractBranchesMixin
 from tests._shared.noisemodel_helpers import build_fd_pair, build_wdm_pair
-from tests._shared.waveforms_helpers import \
-    build_harmonic_projected_frequency_waveform
-from typed_lisa_toolkit.containers.data import (FSData, STFTData, TimedFSData,
-                                                TSData, WDMData, load_data,
-                                                load_ldc_data)
+from tests._shared.waveforms_helpers import build_harmonic_projected_frequency_waveform
+from typed_lisa_toolkit.containers.data import (
+    FSData,
+    STFTData,
+    TimedFSData,
+    TSData,
+    WDMData,
+    load_data,
+    load_ldc_data,
+)
 from typed_lisa_toolkit.containers.representations import TimeSeries
 
 

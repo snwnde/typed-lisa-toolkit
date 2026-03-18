@@ -2,6 +2,37 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.2 - 2026-03-18
+#### Bug Fixes
+- slice, channel names, phasor shape - (9d69110) - Senwen Deng
+
+- - -
+
+## 0.5.2 - 2026-03-18
+#### Bug Fixes
+- slice, channel names, phasor shape - (c0ed2c9) - Senwen Deng
+
+- - -
+
+## 0.5.2 - 2026-03-17
+#### Bug Fixes
+- phasor shape - (cfdd0e8) - Senwen Deng
+
+- - -
+
+## 0.5.3 - 2026-03-17
+#### Bug Fixes
+- phasor shape - (a579174) - Senwen Deng
+
+- - -
+
+## 0.5.2 - 2026-03-17
+#### Bug Fixes
+- phasor make - (d230cba) - Senwen Deng
+- dangling np - (1ba9fc1) - Senwen Deng
+
+- - -
+
 ## 0.5.1 - 2026-03-17
 #### Continuous Integration
 - optimize job runs - (442ffeb) - Senwen Deng

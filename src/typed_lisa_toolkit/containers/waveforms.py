@@ -199,11 +199,12 @@ def get_dense_maker[ModeT: Mode](
     ):
 
         def do_phasor(wf: reps.Phasor):
+            _slice = utils.get_subset_slice(frequencies, wf.f_min, wf.f_max)
             freqs = frequencies[utils.get_subset_slice(frequencies, wf.f_min, wf.f_max)]
             nwf = wf.get_interpolated(freqs, interpolator)
             if not embed:
                 return nwf
-            return nwf.get_embedded(frequencies)
+            return nwf.get_embedded(frequencies, known_slices=(_slice,))
 
         def do_response(resp: ProjectedWaveform[reps.Phasor]):
             return ProjectedWaveform[reps.Phasor].from_dict(

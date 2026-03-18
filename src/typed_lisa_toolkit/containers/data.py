@@ -137,7 +137,7 @@ class _ChannelMapping[RepT: Reps](Mapping[str, RepT], lib.mixins.NDArrayMixin):
                 "Data containers require n_harmonics=1 in the representation entries."
             )
         self.representation = representation
-        self.channel_names = channels
+        self.channel_names = tuple(channels)
         self._channel_to_idx = {chn: i for i, chn in enumerate(channels)}
         self.name = name
 

@@ -18,17 +18,23 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
 from tests._shared.representations_helpers import (
-    AdvancedRepresentationMethodsMixin, HelperFunctionsMixin,
-    LinspaceExtraPropertiesMixin, WDMPropertiesAndMethodsMixin,
-    build_canonical_representations)
+    AdvancedRepresentationMethodsMixin,
+    HelperFunctionsMixin,
+    LinspaceExtraPropertiesMixin,
+    WDMPropertiesAndMethodsMixin,
+    build_canonical_representations,
+)
 from typed_lisa_toolkit import utils
-from typed_lisa_toolkit.containers.representations import (STFT,
-                                                           FrequencySeries,
-                                                           Linspace, Phasor,
-                                                           TimeSeries,
-                                                           _get_full_slice,
-                                                           _get_subset_slice,
-                                                           _take_subset)
+from typed_lisa_toolkit.containers.representations import (
+    STFT,
+    FrequencySeries,
+    Linspace,
+    Phasor,
+    TimeSeries,
+    _get_full_slice,
+    _get_subset_slice,
+    _take_subset,
+)
 
 
 class TestCanonicalShapeJAX(unittest.TestCase):
@@ -1488,7 +1494,9 @@ class TestHelperFunctionsJAX(HelperFunctionsMixin, unittest.TestCase):
     xp = jnp
 
 
-class TestAdvancedRepresentationMethodsJAX(AdvancedRepresentationMethodsMixin, unittest.TestCase):
+class TestAdvancedRepresentationMethodsJAX(
+    AdvancedRepresentationMethodsMixin, unittest.TestCase
+):
     """FrequencySeries/TimeSeries/STFT method tests (shared via mixin)."""
 
     xp = jnp
@@ -1561,13 +1569,13 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
 class TestPhasorJAX(unittest.TestCase):
     def setUp(self):
         self.freqs = jnp.linspace(1e-4, 1e-2, 20, dtype=jnp.float64)
-        self.amps = jnp.ones((1, 1, 1, 20), dtype=jnp.complex128)
+        self.amps = jnp.ones(20, dtype=jnp.complex128)[None, None, None, None, :]
         self.phases = jnp.linspace(0, jnp.pi, 20, dtype=jnp.float64)[
-            None, None, None, :
+            None, None, None, None, :
         ]
-        entries = jnp.zeros((1, 1, 2, 1, 20), dtype=jnp.complex128)
-        entries = entries.at[:, :, 0, 0, :].set(self.amps[:, :, 0, :])
-        entries = entries.at[:, :, 1, 0, :].set(self.phases[:, :, 0, :])
+        entries = jnp.zeros((1, 1, 1, 2, 20), dtype=jnp.complex128)
+        entries = entries.at[:, :, :, slice(0, 1), :].set(self.amps)
+        entries = entries.at[:, :, :, slice(1, 2), :].set(self.phases)
         self.phasor = Phasor(grid=(self.freqs,), entries=entries)
 
     def test_domain_and_kind(self):

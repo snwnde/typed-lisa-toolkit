@@ -71,7 +71,11 @@ def get_support_slice(array: Array):
     return slice(non_zero_indices[0], non_zero_indices[-1] + 1)
 
 
-def extend_to[ArrayT: Array](target_grid: tuple[ArrayT, ...] | ArrayT):
+def extend_to[ArrayT: Array](
+    target_grid: tuple[ArrayT, ...] | ArrayT,
+    *,
+    known_slices: tuple[slice, ...] | None = None,
+):
     """Return a function that extends the entries to the target grid.
 
     The returned function has the signature:
@@ -88,6 +92,15 @@ def extend_to[ArrayT: Array](target_grid: tuple[ArrayT, ...] | ArrayT):
 
     The entries are assumed to have canonical shape:
     ``(n_batches, n_channels, n_harmonics, n_features, *grid_dims)``
+
+    Arguments
+    ---------
+    target_grid: The grid to which the entries should be extended. Can be a tuple
+        of arrays or a single array (for 1D grid).
+    known_slices: Optional tuple of slices for the support of the input grid in the target grid.
+        If provided, it will be used directly instead of computing the
+        support slices from the input grid.
+
 
     Examples
     --------
@@ -116,10 +129,13 @@ def extend_to[ArrayT: Array](target_grid: tuple[ArrayT, ...] | ArrayT):
         # Create extended array with target_grid lengths in the grid dimensions
         extended_shape = entries.shape[:4] + tuple(len(g) for g in _target_grid)
         extended_entries = xp.zeros(extended_shape, dtype=entries.dtype)
-        support_slices = tuple(
-            get_subset_slice(target_g, float(g[0]), float(g[-1]))
-            for target_g, g in zip(_target_grid, _grid)
-        )
+        if known_slices is not None:
+            support_slices = known_slices
+        else:
+            support_slices = tuple(
+                get_subset_slice(target_g, float(g[0]), float(g[-1]))
+                for target_g, g in zip(_target_grid, _grid)
+            )
         # Build full indexing tuple for canonical shape
         index = (slice(None),) * 4 + support_slices
 

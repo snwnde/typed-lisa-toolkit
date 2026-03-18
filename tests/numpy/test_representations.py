@@ -5,18 +5,27 @@ import unittest
 
 import numpy as np
 import numpy.testing as npt
-from l2d_interface.validators import \
-    validate_representation  # type: ignore[import-untyped]
+from l2d_interface.validators import validate_representation  # type: ignore[import-untyped]
 
 from tests._shared.representations_helpers import (
-    AdvancedRepresentationMethodsMixin, HelperFunctionsMixin,
-    LinspaceExtraPropertiesMixin, WDMPropertiesAndMethodsMixin,
-    build_canonical_representations)
+    AdvancedRepresentationMethodsMixin,
+    HelperFunctionsMixin,
+    LinspaceExtraPropertiesMixin,
+    WDMPropertiesAndMethodsMixin,
+    build_canonical_representations,
+)
 from typed_lisa_toolkit import utils
 from typed_lisa_toolkit.containers.data import TSData
 from typed_lisa_toolkit.containers.representations import (  # extra symbols for coverage tests
-    STFT, FrequencySeries, Linspace, Phasor, TimeSeries, _get_full_slice,
-    _get_subset_slice, _take_subset)
+    STFT,
+    FrequencySeries,
+    Linspace,
+    Phasor,
+    TimeSeries,
+    _get_full_slice,
+    _get_subset_slice,
+    _take_subset,
+)
 
 
 class TestCanonicalShape(unittest.TestCase):
@@ -1426,7 +1435,9 @@ class TestHelperFunctions(HelperFunctionsMixin, unittest.TestCase):
     xp = np
 
 
-class TestAdvancedRepresentationMethods(AdvancedRepresentationMethodsMixin, unittest.TestCase):
+class TestAdvancedRepresentationMethods(
+    AdvancedRepresentationMethodsMixin, unittest.TestCase
+):
     """FrequencySeries/TimeSeries/STFT method tests (shared via mixin)."""
 
     xp = np
@@ -1517,11 +1528,13 @@ class TestPhasor(unittest.TestCase):
 
     def setUp(self):
         self.freqs = np.linspace(1e-4, 1e-2, 20)
-        self.amps = np.ones((1, 1, 1, 20), dtype=np.complex128)
-        self.phases = np.linspace(0, np.pi, 20, dtype=np.float64)[None, None, None, :]
-        entries = np.zeros((1, 1, 2, 1, 20), dtype=np.complex128)
-        entries[:, :, 0, 0, :] = self.amps[:, :, 0, :]
-        entries[:, :, 1, 0, :] = self.phases[:, :, 0, :]
+        self.amps = np.ones(20, dtype=np.complex128)[None, None, None, None, :]
+        self.phases = np.linspace(0, np.pi, 20, dtype=np.float64)[
+            None, None, None, None, :
+        ]
+        entries = np.zeros((1, 1, 1, 2, 20), dtype=np.complex128)
+        entries[:, :, :, slice(0, 1), :] = self.amps
+        entries[:, :, :, slice(1, 2), :] = self.phases
         self.phasor = Phasor(grid=(self.freqs,), entries=entries)
 
     def test_domain_and_kind(self):

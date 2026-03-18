@@ -5,8 +5,14 @@ import numpy as np
 import numpy.testing as npt
 
 from typed_lisa_toolkit.containers.representations import (
-    STFT, WDM, FrequencySeries, Linspace, TimeSeries,
-    _check_entry_grid_compatibility, _take_subset)
+    STFT,
+    WDM,
+    FrequencySeries,
+    Linspace,
+    TimeSeries,
+    _check_entry_grid_compatibility,
+    _take_subset,
+)
 
 
 def _randn_array(xp, shape):
@@ -163,13 +169,17 @@ class HelperFunctionsMixin:
     def test_non_uniform_grid_stays_array(self):
         xp = self.xp  # type: ignore[attr-defined]
         non_uniform = xp.asarray(np.array([0.0, 1.0, 3.0, 7.0]))
-        ts = TimeSeries(grid=(non_uniform,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4))))
+        ts = TimeSeries(
+            grid=(non_uniform,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4)))
+        )
         self.assertNotIsInstance(ts.grid[0], Linspace)  # type: ignore[attr-defined]
 
     def test_axis_onset_and_end_from_plain_arrays(self):
         xp = self.xp  # type: ignore[attr-defined]
         freqs = xp.asarray(np.array([0.01, 0.02, 0.03, 0.04]))
-        fs = FrequencySeries(grid=(freqs,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4))))
+        fs = FrequencySeries(
+            grid=(freqs,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4)))
+        )
         self.assertAlmostEqual(fs.f_min, 0.01)  # type: ignore[attr-defined]
         self.assertAlmostEqual(fs.f_max, 0.04)  # type: ignore[attr-defined]
 
@@ -187,9 +197,9 @@ class AdvancedRepresentationMethodsMixin:
         xp = self.xp  # type: ignore[attr-defined]
         n, dt = 32, 1.0 / 128
         freqs = xp.asarray(np.fft.rfftfreq(n, d=dt))
-        entries_fs = xp.asarray(
-            np.fft.rfft(np.sin(2 * np.pi * np.arange(n) * dt))
-        )[None, None, None, None, :]
+        entries_fs = xp.asarray(np.fft.rfft(np.sin(2 * np.pi * np.arange(n) * dt)))[
+            None, None, None, None, :
+        ]
         fs = FrequencySeries(grid=(freqs,), entries=entries_fs)
         shifted = fs.get_time_shifted(2 * dt)
         self.assertIsInstance(shifted, FrequencySeries)  # type: ignore[attr-defined]

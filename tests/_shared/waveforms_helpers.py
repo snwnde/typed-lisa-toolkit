@@ -6,9 +6,11 @@ from unittest.mock import MagicMock
 
 from typed_lisa_toolkit.containers import modes
 from typed_lisa_toolkit.containers import representations as reps
-from typed_lisa_toolkit.containers.waveforms import (HarmonicProjectedWaveform,
-                                                     HarmonicWaveform,
-                                                     ProjectedWaveform)
+from typed_lisa_toolkit.containers.waveforms import (
+    HarmonicProjectedWaveform,
+    HarmonicWaveform,
+    ProjectedWaveform,
+)
 
 # ---------------------------------------------------------------------------
 # Fake container stubs for dense-maker tests (no real arrays needed)

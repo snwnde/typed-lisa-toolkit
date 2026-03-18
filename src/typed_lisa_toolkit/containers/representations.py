@@ -236,10 +236,7 @@ def _take_subset[GridT: "Grid1D" | "Grid2D"](
         )
     _check_entry_grid_compatibility(grid, entries)
     # Slice each grid dimension
-    _grid = tuple(
-        g[s] if isinstance(g, LinspaceLike) else cast("Axis", np.asarray(g)[s])
-        for g, s in zip(grid, grid_slices)
-    )
+    _grid = tuple(g[s] for g, s in zip(grid, grid_slices))
     entries_sliced = entries[_get_full_slice(grid_slices)]
     return cast(GridT, _grid), entries_sliced
 
@@ -340,7 +337,7 @@ class _EmbedMixin[GridT: "Grid1D" | "Grid2D"]:
         raise NotImplementedError("This mixin should not be instantiated directly.")
 
     def get_embedded(
-        self, embedding_grid: "Grid1D" | "Grid2D" | Axis | Linspace
+        self, embedding_grid: "Grid1D" | "Grid2D" | Axis | Linspace, *, known_slices: tuple[slice, ...] | None = None
     ) -> Self:
         """Return the series embedded in a new grid."""
         if not isinstance(embedding_grid, tuple):
@@ -348,7 +345,7 @@ class _EmbedMixin[GridT: "Grid1D" | "Grid2D"]:
 
         _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
         _self_grid = tuple(to_array(sg) for sg in self.grid)
-        entries = utils.extend_to(_embedding_grid)(_self_grid, self.entries)
+        entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(_self_grid, self.entries)
         __embedding_grid = cast(GridT, _embedding_grid)  # type: ignore[assignment]
         # This cast is necessary for two reasons:
         # 1. the static type checker does not want to determine the length of tuple(... for ...)
@@ -900,12 +897,12 @@ class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
     @property
     def phases(self) -> "Array":
         """The phases of the phasors."""
-        return self.entries[..., 1, :, :]
+        return self.entries[..., slice(1, 2), :]
 
     @property
     def amplitudes(self) -> "Array":
         """The amplitudes of the phasors."""
-        return self.entries[..., 0, :, :]
+        return self.entries[..., slice(0, 1), :]
 
     @property
     def frequencies(self) -> Axis | Linspace:
@@ -931,7 +928,11 @@ class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
     ) -> Phasor:
         """Create a phasor from amplitudes and phases."""
         xp = xpc.get_namespace(amplitudes, phases)
-        return cls(grid=(frequencies,), entries=xp.stack((amplitudes, phases), axis=-1))
+        # We assume input amplitudes and phases are 1D arrays
+        return cls(
+            grid=(frequencies,),
+            entries=xp.stack((amplitudes, phases), axis=0)[None, None, None, ...],
+        )
 
     def __setitem__(self, slice: _slice, value: Any) -> None:
         """Set the entries and phases of a subset of the phasor."""
@@ -947,20 +948,27 @@ class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
         interpolator: Callable[[Any, Any], Callable[[Any], Any]],
     ):
         """Get the phasors interpolated to the given frequencies."""
-        self_freq = to_array(self.frequencies)
-        amp_real = self.amplitudes.real
-        amp_imag = self.amplitudes.imag
+        xp = xpc.get_namespace(self.amplitudes, self.phases)
+        self_freq = to_array(self.frequencies, xp=xp)
+        if self.entries.shape != (1, 1, 1, 2, len(self_freq)):
+            raise ValueError(
+                f"Only 1D phasors with shape (1, 1, 1, 2, {len(self_freq)}) are supported"
+                f"for interpolation, but got shape {self.entries.shape}."
+            )
+        amp_real = self.amplitudes.real.squeeze()
+        amp_imag = self.amplitudes.imag.squeeze()
         amplitudes_real = interpolator(self_freq, amp_real)(frequencies)
         amplitudes_imag = interpolator(self_freq, amp_imag)(frequencies)
         amplitudes = amplitudes_real + 1j * amplitudes_imag
-        phases = interpolator(self_freq, self.phases)(frequencies)
+        phases = interpolator(self_freq, self.phases.squeeze())(frequencies)
         return type(self).make(frequencies, amplitudes, phases)
 
     def to_frequency_series(self) -> FrequencySeries:
         """Get the :class:`.FrequencySeries` representation of the waveform."""
+        xp = xpc.get_namespace(self.amplitudes, self.phases)
         return FrequencySeries(
             (self.frequencies,),
-            self.amplitudes * np.exp(1j * self.phases),
+            self.amplitudes * xp.exp(1j * self.phases),
         )
 
     def get_plotter(self) -> plotters.PhasorPlotter:

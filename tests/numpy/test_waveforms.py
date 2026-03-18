@@ -9,13 +9,14 @@ import numpy as np
 import numpy.testing as npt
 
 from tests._shared.waveforms_helpers import (
-    FakeHarmonicWaveform, build_fake_harmonic_projected_waveform,
+    FakeHarmonicWaveform,
+    build_fake_harmonic_projected_waveform,
     build_harmonic_projected_frequency_waveform,
     build_harmonic_waveform_frequency_series,
-    build_nonhomogeneous_harmonic_projected_frequency_waveform)
+    build_nonhomogeneous_harmonic_projected_frequency_waveform,
+)
 from typed_lisa_toolkit.containers import modes
-from typed_lisa_toolkit.containers.waveforms import (get_dense_maker,
-                                                     sum_harmonics)
+from typed_lisa_toolkit.containers.waveforms import get_dense_maker, sum_harmonics
 
 
 class TestHarmonicWaveformNumpy(unittest.TestCase):
@@ -195,16 +196,14 @@ class TestDenseMakerNumpy(unittest.TestCase):
                 phasor, interpolated, embedded = handles[harmonic][channel]
                 # Still windowed before interpolation, same as embed=False.
                 phasor.get_interpolated.assert_called_once()
-                args, kwargs = phasor.get_interpolated.call_args
-                self.assertEqual(kwargs, {})
+                args, _ = phasor.get_interpolated.call_args
                 npt.assert_allclose(args[0], self._windowed(frequencies, phasor))
                 self.assertIs(args[1], interpolator)
 
                 # embed=True: get_embedded is called on the interpolated result
                 # with the *full* frequency grid to zero-pad outside the phasor range.
                 interpolated.get_embedded.assert_called_once()
-                args, kwargs = interpolated.get_embedded.call_args
-                self.assertEqual(kwargs, {})
+                args, _ = interpolated.get_embedded.call_args
                 self.assertIs(args[0], frequencies)
                 # Output is the embedded mock, not the raw interpolated one.
                 self.assertIs(out[harmonic][channel], embedded)

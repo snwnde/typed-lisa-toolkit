@@ -6,15 +6,23 @@ import unittest
 import numpy as np
 import numpy.testing as npt
 
-from tests._shared.noisemodel_helpers import (build_fd_pair,
-                                              build_fd_pair_batched_2x2,
-                                              build_wdm_pair,
-                                              build_wdm_pair_batched_2x2,
-                                              dense_esdm_2ch, dense_kernel_2ch,
-                                              diagonal_kernel_2ch)
+from tests._shared.noisemodel_helpers import (
+    build_fd_pair,
+    build_fd_pair_batched_2x2,
+    build_wdm_pair,
+    build_wdm_pair_batched_2x2,
+    dense_esdm_2ch,
+    dense_kernel_2ch,
+    diagonal_kernel_2ch,
+)
 from typed_lisa_toolkit.consumers.noisemodel import (
-    DiagonalSpectralDensity, EvolutionarySpectralDensity, FDNoiseModel,
-    SpectralDensity, TFNoiseModel, _make_integration_policy)
+    DiagonalSpectralDensity,
+    EvolutionarySpectralDensity,
+    FDNoiseModel,
+    SpectralDensity,
+    TFNoiseModel,
+    _make_integration_policy,
+)
 
 
 class _FlatFDNoise:
@@ -185,8 +193,7 @@ class TestFDNoiseModel(unittest.TestCase):
         x = np.array([1.0 + 0.0j, 0.5 + 0.25j, -0.25 + 0.5j, 0.1 - 0.2j, 0.05 + 0.0j])
         y = np.array([0.5 + 0.0j, -0.2 + 0.1j, 0.3 - 0.4j, -0.1 + 0.2j, 0.01 + 0.0j])
         from typed_lisa_toolkit.containers.data import FSData
-        from typed_lisa_toolkit.containers.representations import \
-            FrequencySeries
+        from typed_lisa_toolkit.containers.representations import FrequencySeries
 
         fs = FSData.from_dict(
             {

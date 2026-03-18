@@ -252,7 +252,7 @@ class DiagonalSpectralDensity(SpectralDensity):
         cls,
         fd_noise: _StationaryFDNoise,
         frequencies: "Array",
-        channel_names: list[ChnName],
+        channel_names: tuple[ChnName, ...],
     ):
         """Create a SpectralDensity instance from a frequency domain noise model and a frequency grid."""
         _dict = {
@@ -607,23 +607,6 @@ class TFNoiseModel:
     The covariance matrix is diagonal in the chosen time-frequency representation.
     The model allows correlations between TDI channels. In other words, we have a 3x3
     symmetric matrix at each location in the time-frequency plane.
-
-    Parameters
-    ----------
-    invevsdm: The inverse evolutionary spectral density matrix of
-        shape (n_freq, n_time, n_channels, n_channels).
-        The last two dimensions are symmetric and represent the correlations
-        between TDI channels.
-        The first two dimensions represent the time-frequency plane. The number
-        of TDI channels is at most 3.
-
-    channel_order: list of strings specifying both the TDI channels and their order.
-        For example, ["X", "Y", "Z"].
-
-    invert_sdm: if True, invert the passed spectral density matrix before storing it.
-        This is a convenience flag to be used when you have the evolutionary spectral
-        density rather than its inverse. For performance, it could be useful to perform the inversion
-        yourself before passing it here (see :meth:`invert_sdm`). Defaults to False.
     """
 
     def __init__(
