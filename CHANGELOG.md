@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. See [conven
 - - -
 ## 0.5.2 - 2026-03-18
 #### Bug Fixes
+- slice, channel names, phasor shape - (9d29d88) - Senwen Deng
+
+- - -
+
+## 0.5.2 - 2026-03-18
+#### Bug Fixes
 - slice, channel names, phasor shape - (9d69110) - Senwen Deng
 
 - - -
