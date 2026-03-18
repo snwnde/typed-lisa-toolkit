@@ -4,7 +4,7 @@ dynamic = ["version"]
 authors = [{ name = "Sen-wen Deng", email = "deng@apc.in2p3.fr" }]
 description = "Fully typed interfaces for LISA data analysis"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -15,7 +15,7 @@ dependencies = [
     "pywavelet == 0.2.8",
     "h5py",
     "array-api-compat >= 1.13.0",
-    "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@54c789fe0a2bd5fb5e2230d23c3e7663dd734334",
+    "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@a5e33e1477374f946ed3295c77fbac3abae0a6e5",
 ]
 
 [dependency-groups]

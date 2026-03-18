@@ -19,9 +19,11 @@ from typed_lisa_toolkit.containers.data import TSData
 from typed_lisa_toolkit.containers.representations import (  # extra symbols for coverage tests
     STFT,
     FrequencySeries,
+    UniformFrequencySeries,
     Linspace,
     Phasor,
     TimeSeries,
+    UniformTimeSeries,
     _get_full_slice,
     _get_subset_slice,
     _take_subset,
@@ -1098,7 +1100,7 @@ class TestPropertiesAndAliases(unittest.TestCase):
             self.n_features,
             self.len_freq_long,
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = UniformFrequencySeries(grid=(freqs,), entries=entries)
 
         # Check df
         self.assertEqual(fs.df, 1e-3)
@@ -1122,7 +1124,7 @@ class TestPropertiesAndAliases(unittest.TestCase):
             self.n_features,
             self.len_time,
         )
-        ts = TimeSeries(grid=(times,), entries=entries)
+        ts = UniformTimeSeries(grid=(times,), entries=entries)
 
         # Check dt
         self.assertEqual(ts.dt, 0.01)

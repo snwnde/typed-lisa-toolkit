@@ -11,7 +11,7 @@
 """
 
 import logging
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, Any
 
 from ..containers import data as dm
 from ..containers import modes
@@ -21,40 +21,42 @@ from . import noisemodel as nm
 
 if TYPE_CHECKING:
     Array = reps.Array
+    Axis = reps.Axis
+    Linspace = reps.Linspace
+    Reps = reps.Representation
+
 
 ChnName = str
-Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
+# Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
 Modes = modes.Harmonic | modes.QNM
+FDUniformHomogeneous = (
+    dm.Data[reps.FrequencySeries["Linspace"]]
+    | wf.ProjectedWaveform[reps.FrequencySeries["Linspace"]]
+    | wf.HomogeneousHarmonicProjectedWaveform[Modes, reps.FrequencySeries["Linspace"]]
+)
 
 log = logging.getLogger(__name__)
 
 
-class Likelihood[ModeT: Modes, RepT: Reps](Protocol):
+class Likelihood[TemplateT: Any](Protocol):
     """Protocol for likelihoods."""
 
     def get_log_likelihood(
         self,
-        template: dm.Data[RepT]
-        | wf.ProjectedWaveform[RepT]
-        | wf.HarmonicProjectedWaveform[ModeT, RepT],
+        template: TemplateT,
     ) -> "Array":
         """Get the log likelihood."""
         ...
 
     def get_log_likelihood_ratio(
         self,
-        template: dm.Data[RepT]
-        | wf.ProjectedWaveform[RepT]
-        | wf.HarmonicProjectedWaveform[ModeT, RepT],
+        template: TemplateT,
     ) -> "Array":
         """Get the log likelihood ratio."""
         ...
 
 
-class FDWhittleLikelihood[
-    DensityT: nm.SpectralDensity,
-    ModeT: Modes,
-](Likelihood[ModeT, reps.FrequencySeries]):
+class FDWhittleLikelihood(Likelihood[FDUniformHomogeneous]):
     r"""Whittle likelihood for frequency-domain data.
 
     Assuming the noise is additive, stationary and Gaussian.
@@ -74,9 +76,9 @@ class FDWhittleLikelihood[
     The term :math:`\left( d \middle| d \right)` is computed upon initialization and is constant.
     """
 
-    def __init__(self, data: dm.FSData, noisemodel: nm.FDNoiseModel[DensityT]):
+    def __init__(self, data: dm.FSData, noisemodel: nm.FDNoiseModelLike):
         self.data = data
-        self.noisemodel = noisemodel.reset()
+        self.noisemodel = noisemodel#.reset()
         self.data_square = self.noisemodel.get_scalar_product(data, data)
 
     @classmethod
@@ -91,9 +93,7 @@ class FDWhittleLikelihood[
 
     def get_log_likelihood(
         self,
-        template: dm.Data[reps.FrequencySeries]
-        | wf.ProjectedWaveform[reps.FrequencySeries]
-        | wf.HarmonicProjectedWaveform[ModeT, reps.FrequencySeries],
+        template: FDUniformHomogeneous,
     ):
         """Get the log likelihood."""
         return self.log_likelihood(
@@ -103,9 +103,7 @@ class FDWhittleLikelihood[
 
     def get_log_likelihood_ratio(
         self,
-        template: dm.Data[reps.FrequencySeries]
-        | wf.ProjectedWaveform[reps.FrequencySeries]
-        | wf.HarmonicProjectedWaveform[ModeT, reps.FrequencySeries],
+        template: FDUniformHomogeneous,
     ):
         """Get the log likelihood ratio."""
         template_waveform, f_interval = self._process(template)
@@ -115,9 +113,7 @@ class FDWhittleLikelihood[
 
     def get_cross_product(
         self,
-        template: dm.Data[reps.FrequencySeries]
-        | wf.ProjectedWaveform[reps.FrequencySeries]
-        | wf.HarmonicProjectedWaveform[ModeT, reps.FrequencySeries],
+        template: FDUniformHomogeneous,
     ):
         r"""Get the cross product.
 
@@ -128,9 +124,7 @@ class FDWhittleLikelihood[
 
     def get_template_square(
         self,
-        template: dm.Data[reps.FrequencySeries]
-        | wf.ProjectedWaveform[reps.FrequencySeries]
-        | wf.HarmonicProjectedWaveform[ModeT, reps.FrequencySeries],
+        template: FDUniformHomogeneous,
     ):
         r"""Get the template square.
 
@@ -161,13 +155,11 @@ class FDWhittleLikelihood[
 
     def _process(
         self,
-        template: dm.Data[reps.FrequencySeries]
-        | wf.ProjectedWaveform[reps.FrequencySeries]
-        | wf.HarmonicProjectedWaveform[ModeT, reps.FrequencySeries],
+        template: FDUniformHomogeneous,
     ):
         """Process the template."""
         xp = template.__xp__()
-        if isinstance(template, wf.HarmonicProjectedWaveform):
+        if isinstance(template, wf.HomogeneousHarmonicProjectedWaveform):
             __temp = wf.sum_harmonics(template)
             freqs = reps.to_array(__temp.representation.frequencies, xp)
             _temp = dm.FSData(__temp.representation, __temp.channel_names)

@@ -81,11 +81,22 @@ log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     Array = reps.Array
+    Axis = reps.Axis
+    Linspace = reps.Linspace
+
 
 ChnName = str
-FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries]
+FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries["Axis"]]
 TFEntry = dm.WDMData | waveforms.ProjectedWaveform[reps.WDM]
 IntegrationMethod = Literal["trapezoid", "simpson"]
+
+
+def _first_frequencies(__x: FDEntry):
+    return next(iter(__x.values())).frequencies  # type: ignore[attr-defined] # mypy complains mistakenly
+
+
+def _first_entries(__x: FDEntry):
+    return next(iter(__x.values())).entries  # type: ignore[attr-defined] # mypy complains mistakenly
 
 
 class IntegrationPolicy(Protocol):
@@ -287,6 +298,26 @@ class DiagonalSpectralDensity(SpectralDensity):
         )
 
 
+class FDNoiseModelLike(Protocol):
+    """Protocol for frequency domain noise models."""
+
+    def get_scalar_product(
+        self,
+        left: FDEntry,
+        right: FDEntry,
+    ) -> "Array":
+        """Return the scalar product."""
+        ...
+
+    def whiten(self, _data: FDEntry) -> FDEntry:
+        """Whiten the data according to the noise model."""
+        ...
+
+    def to_subband(self, f_interval: tuple[float, float]) -> Self:
+        """Return a new noise model with the frequency grid restricted to the given subband."""
+        ...
+
+
 class FDNoiseModel[DensityT: SpectralDensity]:
     """Frequency domain noise model.
 
@@ -367,8 +398,8 @@ class FDNoiseModel[DensityT: SpectralDensity]:
 
             \langle d, h \rangle = 4 \int_{f_\text{min}}^{f_\text{max}} \frac{d^*(f) h(f)}{S_n(f)} \, \mathrm{d} f.
         """
-        frequencies = next(iter(left.values())).frequencies
-        xp = next(iter(left.values())).entries.__array_namespace__()
+        frequencies = _first_frequencies(left)
+        xp = _first_entries(left).__array_namespace__()
         return self._ip.integrate(
             self.get_integrand(left, right), x=reps.to_array(frequencies, xp=xp)
         )
@@ -388,8 +419,8 @@ class FDNoiseModel[DensityT: SpectralDensity]:
 
             F \mapsto 4\int_{f_\text{min}}^{F} \frac{d^*(f) h(f)}{S_n(f)} \, \mathrm{d} f.
         """
-        frequencies = next(iter(left.values())).frequencies
-        xp = next(iter(left.values())).entries.__array_namespace__()
+        frequencies = _first_frequencies(left)
+        xp = _first_entries(left).__array_namespace__()
         return self._ip.cumulative(
             self.get_integrand(left, right),
             x=reps.to_array(frequencies, xp=xp),
@@ -463,7 +494,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         that the input arrays :math:`d(f)` and :math:`h(f)` are one-sided, and the negative frequencies are
         populated by **zero** before the inverse Fourier transform.
         """
-        xp = next(iter(left.values())).entries.__array_namespace__()
+        xp = _first_entries(left).__array_namespace__()
         two_sided_freq = xp.fft.fftshift(
             xp.fft.fftfreq(len(left.times), left.times.step)
         )
@@ -479,7 +510,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
             axis=-1,
         )
         return dm.TSData(
-            reps.TimeSeries((left.times,), cross_correlation), left.channel_names
+            reps.UniformTimeSeries((left.times,), cross_correlation), left.channel_names
         )
 
     def whiten(self, _data: FDEntry):
@@ -506,7 +537,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
 
             \frac{\langle d, h \rangle}{\sqrt{\langle d, d \rangle \langle h, h \rangle}}.
         """
-        xp = next(iter(left.values())).entries.__array_namespace__()
+        xp = _first_entries(left).__array_namespace__()
         return self.get_scalar_product(left, right) / xp.sqrt(
             self.get_scalar_product(left, left) * self.get_scalar_product(right, right)
         )

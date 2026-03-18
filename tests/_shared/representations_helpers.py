@@ -7,9 +7,9 @@ import numpy.testing as npt
 from typed_lisa_toolkit.containers.representations import (
     STFT,
     WDM,
-    FrequencySeries,
+    UniformFrequencySeries,
     Linspace,
-    TimeSeries,
+    UniformTimeSeries,
     _check_entry_grid_compatibility,
     _take_subset,
 )
@@ -37,13 +37,13 @@ def build_canonical_representations(
         xp,
         (n_batches, n_channels, n_harmonics, n_features, len_freq),
     )
-    fs = FrequencySeries(grid=(freqs,), entries=entries_fs)
+    fs = UniformFrequencySeries(grid=(freqs,), entries=entries_fs)
 
     entries_ts = _randn_array(
         xp,
         (n_batches, n_channels, n_harmonics, n_features, len_time),
     )
-    ts = TimeSeries(grid=(times,), entries=entries_ts)
+    ts = UniformTimeSeries(grid=(times,), entries=entries_ts)
 
     if tf_grid_order == "freq_time":
         entries_tf = _randn_array(
@@ -169,7 +169,7 @@ class HelperFunctionsMixin:
     def test_non_uniform_grid_stays_array(self):
         xp = self.xp  # type: ignore[attr-defined]
         non_uniform = xp.asarray(np.array([0.0, 1.0, 3.0, 7.0]))
-        ts = TimeSeries(
+        ts = UniformTimeSeries(
             grid=(non_uniform,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4)))
         )
         self.assertNotIsInstance(ts.grid[0], Linspace)  # type: ignore[attr-defined]
@@ -177,7 +177,7 @@ class HelperFunctionsMixin:
     def test_axis_onset_and_end_from_plain_arrays(self):
         xp = self.xp  # type: ignore[attr-defined]
         freqs = xp.asarray(np.array([0.01, 0.02, 0.03, 0.04]))
-        fs = FrequencySeries(
+        fs = UniformFrequencySeries(
             grid=(freqs,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4)))
         )
         self.assertAlmostEqual(fs.f_min, 0.01)  # type: ignore[attr-defined]
@@ -185,7 +185,7 @@ class HelperFunctionsMixin:
 
 
 class AdvancedRepresentationMethodsMixin:
-    """Mix-in for FrequencySeries/TimeSeries/STFT method tests.
+    """Mix-in for UniformFrequencySeries/UniformTimeSeries/STFT method tests.
 
     Subclass must provide ``xp`` (numpy or jax.numpy).
     Tests that use only plain numpy arrays need no ``xp``.
@@ -200,9 +200,9 @@ class AdvancedRepresentationMethodsMixin:
         entries_fs = xp.asarray(np.fft.rfft(np.sin(2 * np.pi * np.arange(n) * dt)))[
             None, None, None, None, :
         ]
-        fs = FrequencySeries(grid=(freqs,), entries=entries_fs)
+        fs = UniformFrequencySeries(grid=(freqs,), entries=entries_fs)
         shifted = fs.get_time_shifted(2 * dt)
-        self.assertIsInstance(shifted, FrequencySeries)  # type: ignore[attr-defined]
+        self.assertIsInstance(shifted, UniformFrequencySeries)  # type: ignore[attr-defined]
         self.assertEqual(shifted.entries.shape, fs.entries.shape)  # type: ignore[attr-defined]
 
     def test_frequency_series_angle(self):
@@ -211,9 +211,9 @@ class AdvancedRepresentationMethodsMixin:
         z = xp.asarray(np.exp(1j * np.linspace(0, 4 * np.pi, 10)))[
             None, None, None, None, :
         ]
-        fs = FrequencySeries(grid=(freqs,), entries=z)
+        fs = UniformFrequencySeries(grid=(freqs,), entries=z)
         angles = fs.angle()
-        self.assertIsInstance(angles, FrequencySeries)  # type: ignore[attr-defined]
+        self.assertIsInstance(angles, UniformFrequencySeries)  # type: ignore[attr-defined]
         self.assertEqual(angles.entries.shape, fs.entries.shape)  # type: ignore[attr-defined]
 
     def test_time_series_stfft(self):
@@ -222,7 +222,7 @@ class AdvancedRepresentationMethodsMixin:
         times = Linspace(0.0, 1.0 / 128, n)
         signal = xp.asarray(np.sin(2 * np.pi * np.arange(n) / 16).astype(float))
         entries = signal[None, None, None, None, :]
-        ts = TimeSeries(grid=(times,), entries=entries)
+        ts = UniformTimeSeries(grid=(times,), entries=entries)
         win = np.hanning(16).astype(float)
         stft = ts.stfft(win, hop=8)
         self.assertIsInstance(stft, STFT)  # type: ignore[attr-defined]
@@ -249,9 +249,9 @@ class AdvancedRepresentationMethodsMixin:
         xp = self.xp  # type: ignore[attr-defined]
         freqs = Linspace(0.0, 1e-3, 20)
         entries = xp.asarray(np.ones((1, 1, 1, 1, 20)))
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = UniformFrequencySeries(grid=(freqs,), entries=entries)
         r = repr(fs)
-        self.assertIn("FrequencySeries", r)  # type: ignore[attr-defined]
+        self.assertIn("UniformFrequencySeries", r)  # type: ignore[attr-defined]
         self.assertEqual(fs.grid_shape, (20,))  # type: ignore[attr-defined]
 
 
