@@ -37,7 +37,7 @@ import logging
 import pathlib
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload, Protocol
 
 import array_api_compat as xpc
 import h5py
@@ -50,15 +50,27 @@ from . import tapering
 
 if TYPE_CHECKING:
     from . import waveforms as wf
+    from .representations import Linspace, Representation as AnyReps
+
+    class _SubsettableRep(AnyReps, Protocol):
+        def get_subset(
+            self,
+            *,
+            interval: tuple[float, float] | None = None,
+            slice: slice | None = None,
+        ) -> Self: ...
+
+    class _EmbeddableRep(AnyReps, Protocol):
+        def get_embedded(self, embedding_grid: npt.NDArray[np.number]) -> Self: ...
+
 
 log = logging.getLogger(__name__)
 
-Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
+
+# Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
 
 
-class _GetSubsetMixin[RepT: reps.TimeSeries | reps.FrequencySeries | reps.Phasor](
-    Mapping[str, RepT]
-):
+class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
     """Mixin class to provide get_subset method for data containers."""
 
     representation: RepT
@@ -101,9 +113,7 @@ class _GetSubsetMixin[RepT: reps.TimeSeries | reps.FrequencySeries | reps.Phasor
         )
 
 
-class _EmbeddableMixin[RepT: reps.TimeSeries | reps.FrequencySeries](
-    Mapping[str, RepT]
-):
+class _EmbeddableMixin[RepT: "_EmbeddableRep"](Mapping[str, RepT]):
     """Mixin class to provide get_embedded method for data containers."""
 
     representation: RepT
@@ -120,14 +130,14 @@ class _EmbeddableMixin[RepT: reps.TimeSeries | reps.FrequencySeries](
         # mypy's inference is confused
 
 
-class _ChannelMapping[RepT: Reps](Mapping[str, RepT], lib.mixins.NDArrayMixin):
+class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMixin):
     def __init__(
         self,
-        representation: RepT,
+        representation: "AnyReps",
         channels: tuple[str, ...],
         name: str | None = None,
     ):
-        entries = cast(Any, representation.entries)
+        entries = representation.entries
         if entries.shape[1] != len(channels):
             raise ValueError(
                 "Channel count mismatch between representation entries and channel names."
@@ -136,10 +146,13 @@ class _ChannelMapping[RepT: Reps](Mapping[str, RepT], lib.mixins.NDArrayMixin):
             raise ValueError(
                 "Data containers require n_harmonics=1 in the representation entries."
             )
-        self.representation = representation
+        self._init_repr(representation)
         self.channel_names = tuple(channels)
         self._channel_to_idx = {chn: i for i, chn in enumerate(channels)}
         self.name = name
+
+    def _init_repr(self, representation: "AnyReps"):
+        self.representation = cast(RepT, representation)
 
     def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
         """Create a new instance with a representation and channels."""
@@ -287,7 +300,7 @@ class _ChannelMapping[RepT: Reps](Mapping[str, RepT], lib.mixins.NDArrayMixin):
         return self.representation.entries
 
 
-class Data[RepT: Reps](_ChannelMapping[RepT]):
+class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
     """Channel-indexed data containers.
 
     Stores a single homogeneous representation with channels as the first dimension,
@@ -353,15 +366,20 @@ class Data[RepT: Reps](_ChannelMapping[RepT]):
         return cls(waveform.representation, waveform.channel_names)
 
 
-class _SeriesData[RepT: reps.TimeSeries | reps.FrequencySeries](
+class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
     Data[RepT], _GetSubsetMixin[RepT], _EmbeddableMixin[RepT]
 ): ...
 
 
-class TSData(_SeriesData[reps.TimeSeries]):
+class TSData(_SeriesData[reps.UniformTimeSeries]):
     """Multi-channel time series data container."""
 
-    _reps_type = reps.TimeSeries
+    _reps_type = reps.UniformTimeSeries
+
+    def _init_repr(self, representation: "AnyReps"):
+        self.representation = reps.UniformTimeSeries(
+            representation.grid, representation.entries
+        )
 
     @property
     def times(self) -> npt.NDArray[np.floating[Any]]:
@@ -432,7 +450,7 @@ class TSData(_SeriesData[reps.TimeSeries]):
         tfrepr = self.representation.stfft(win, hop)
         tf_entries = cast(Any, tfrepr.entries)
         tfdict = {
-            chn: reps.STFT(
+            chn: reps.STFT["Linspace", "Linspace"](
                 tfrepr.grid,
                 tf_entries[:, idx : idx + 1, 0:1, ...],
             )
@@ -467,7 +485,7 @@ class TSData(_SeriesData[reps.TimeSeries]):
             mode="constant",
         )
 
-        padded_repr = reps.TimeSeries(padded_time, padded_signal)
+        padded_repr = reps.UniformTimeSeries(padded_time, padded_signal)
         return self.create_new(padded_repr, self.channel_names)
 
     def _get_plotter(self):
@@ -476,10 +494,15 @@ class TSData(_SeriesData[reps.TimeSeries]):
         return plotters.TSDataPlotter
 
 
-class FSData(_SeriesData[reps.FrequencySeries]):
+class FSData(_SeriesData[reps.UniformFrequencySeries]):
     """Multi-channel frequency series data container."""
 
-    _reps_type = reps.FrequencySeries
+    _reps_type = reps.UniformFrequencySeries
+
+    def _init_repr(self, representation: "AnyReps"):
+        self.representation = reps.UniformFrequencySeries(
+            representation.grid, representation.entries
+        )
 
     @property
     def frequencies(self):
@@ -551,7 +574,7 @@ class FSData(_SeriesData[reps.FrequencySeries]):
             if len(args) >= 2:
                 Nt = args[1] if args[1] is None else int(args[1])
             if len(args) == 3:
-                nx = float(args[2])  # type: ignore[assignment]
+                nx = float(args[2])  # type: ignore[arg-type]
 
         wdmdict = {
             chn: self[chn].to_wdm(Nf=Nf, Nt=Nt, nx=nx) for chn in self.channel_names
@@ -582,7 +605,7 @@ class TimedFSData(FSData):
 
     def __init__(
         self,
-        representation: reps.FrequencySeries,
+        representation: reps.UniformFrequencySeries,
         channels: tuple[str, ...],
         times: reps.Linspace | npt.NDArray[np.floating[Any]] | None = None,
         name: str | None = None,
@@ -611,7 +634,7 @@ class TimedFSData(FSData):
         return self
 
     def create_new(
-        self, representation: reps.FrequencySeries, channels: tuple[str, ...]
+        self, representation: reps.UniformFrequencySeries, channels: tuple[str, ...]
     ):
         """Create a new instance preserving times."""
         new = type(self)(representation, channels, times=self.times, name=self.name)
@@ -633,7 +656,7 @@ class TimedFSData(FSData):
         return TSData(tsrepr, self.channel_names, self.name)
 
 
-class STFTData(Data[reps.STFT]):
+class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
     """Dictionary data container of short-time Fourier transform data."""
 
     def get_subset(
@@ -743,10 +766,10 @@ def load_ldc_data(
     """Load the data from LDC dataset."""
 
     def XYZ2AET(
-        X: reps.TimeSeries,
-        Y: reps.TimeSeries,
-        Z: reps.TimeSeries,
-    ) -> tuple[reps.TimeSeries, reps.TimeSeries, reps.TimeSeries]:
+        X: reps.UniformTimeSeries,
+        Y: reps.UniformTimeSeries,
+        Z: reps.UniformTimeSeries,
+    ) -> tuple[reps.UniformTimeSeries, reps.UniformTimeSeries, reps.UniformTimeSeries]:
         A, E, T = (
             (Z - X) / np.sqrt(2.0),
             (X - 2.0 * Y + Z) / np.sqrt(6.0),
@@ -755,10 +778,10 @@ def load_ldc_data(
         return A, E, T
 
     def AET2XYZ(
-        A: reps.TimeSeries,
-        E: reps.TimeSeries,
-        T: reps.TimeSeries,
-    ) -> tuple[reps.TimeSeries, reps.TimeSeries, reps.TimeSeries]:
+        A: reps.UniformTimeSeries,
+        E: reps.UniformTimeSeries,
+        T: reps.UniformTimeSeries,
+    ) -> tuple[reps.UniformTimeSeries, reps.UniformTimeSeries, reps.UniformTimeSeries]:
         X, Y, Z = [
             -1 / np.sqrt(2.0) * A + 1 / np.sqrt(6.0) * E + 1 / np.sqrt(3.0) * T,
             -np.sqrt(2.0 / 3.0) * E + 1 / np.sqrt(3.0) * T,
@@ -790,7 +813,7 @@ def load_ldc_data(
         if domain == "t":
             tsdata = TSData.from_dict(
                 {
-                    chnname: reps.TimeSeries(
+                    chnname: reps.UniformTimeSeries(
                         grid=(dataset[domain].squeeze(),),
                         entries=dataset[chnname].squeeze()[None, None, None, None, :],
                     )

@@ -11,6 +11,13 @@ including NumPy and JAX.
    :members:
    :special-members: __eq__, __len__, __array__, __getitem__
 
+.. autofunction:: frequency_series
+.. autofunction:: time_series
+.. autofunction:: phasor
+.. autofunction:: stft
+.. autofunction:: wdm
+
+
 .. autoclass:: TimeSeries
    :members:
    :member-order: bysource
@@ -41,7 +48,7 @@ from __future__ import annotations
 import logging
 import warnings
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, Self, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Self, Union, cast, Protocol
 
 import array_api_compat as xpc
 import numpy as np
@@ -55,12 +62,33 @@ if TYPE_CHECKING:
 
     Array = utils.Array
     Axis = Union[Array, "Linspace"]
-    Grid1D = tuple[Axis]
-    Grid2D = tuple[Axis, Axis]
+    type Grid1D[AxisT: Axis] = tuple[AxisT]
+    type Grid2D[Axis0: Axis, Axis1: Axis] = tuple[Axis0, Axis1]
+    UniformGrid2D = Grid2D["Linspace", "Linspace"]
+    AnyGrid = Grid1D[Axis] | Grid2D[Axis, Axis]
     Domain = Literal["time", "frequency", "time-frequency"]
-    Grid = Grid1D | Grid2D
 
     from types import ModuleType
+
+    from l2d_interface import contract
+
+    class Representation(
+        contract.Representation[Domain, AnyGrid, str | None], Protocol
+    ):
+        """Protocol for any representation type."""
+
+        entries: Array  # type: ignore[assignment] # Necessary due to missing data array API
+
+        def __init__(
+            self,
+            grid: AnyGrid,
+            entries: "Array",
+        ): ...
+
+        def create_like(self, entries: Any) -> Self:
+            """Create a new instance with the same grid and type but different entries."""
+            ...
+
 
 from pywavelet import set_backend as _pyw_set_backend  # type: ignore[import-untyped]
 from pywavelet.transforms import from_freq_to_wavelet as _pyw_f2w  # type: ignore[import-untyped]
@@ -209,7 +237,7 @@ def _get_entry_grid_shape(entries: "Array") -> tuple[int, ...]:
     return entries.shape[4:]  # Remove batch, channels, harmonics, features dimensions
 
 
-def _check_entry_grid_compatibility(grid: Grid, entries: "Array") -> None:
+def _check_entry_grid_compatibility(grid: AnyGrid, entries: "Array") -> None:
     grid_shape = tuple(len(g) for g in grid)
     entry_grid_shape = _get_entry_grid_shape(entries)
     if grid_shape != entry_grid_shape:
@@ -225,7 +253,7 @@ def _get_full_slice(grid_slices: tuple[_slice, ...]) -> tuple[_slice, ...]:
     ) * 4 + grid_slices  # batch, channels, harmonics, features stay intact
 
 
-def _take_subset[GridT: "Grid1D" | "Grid2D"](
+def _take_subset[GridT: AnyGrid](
     grid: GridT,
     entries: "Array",
     grid_slices: tuple[_slice, ...],
@@ -296,11 +324,11 @@ def _get_axis_end(axis: Axis) -> float:
         return float(axis[-1])  # type: ignore[union-index, arg-type]
 
 
-class _Subset1DMixin:
-    grid: "Grid1D"
+class _Subset1DMixin[GridT: "Grid1D[Axis]"]:
+    grid: GridT
     entries: "Array"
 
-    def __init__(self, grid: "Grid1D", entries: "Array") -> None:
+    def __init__(self, grid: "Grid1D[Axis]", entries: "Array") -> None:
         del grid, entries
         raise NotImplementedError("This mixin should not be instantiated directly.")
 
@@ -328,7 +356,7 @@ class _Subset1DMixin:
         _set_value(self.entries, slice, value)
 
 
-class _EmbedMixin[GridT: "Grid1D" | "Grid2D"]:
+class _EmbedMixin[GridT: "AnyGrid"]:
     grid: GridT
     entries: "Array"
 
@@ -337,7 +365,10 @@ class _EmbedMixin[GridT: "Grid1D" | "Grid2D"]:
         raise NotImplementedError("This mixin should not be instantiated directly.")
 
     def get_embedded(
-        self, embedding_grid: "Grid1D" | "Grid2D" | Axis | Linspace, *, known_slices: tuple[slice, ...] | None = None
+        self,
+        embedding_grid: "AnyGrid" | Axis | Linspace,
+        *,
+        known_slices: tuple[slice, ...] | None = None,
     ) -> Self:
         """Return the series embedded in a new grid."""
         if not isinstance(embedding_grid, tuple):
@@ -345,7 +376,9 @@ class _EmbedMixin[GridT: "Grid1D" | "Grid2D"]:
 
         _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
         _self_grid = tuple(to_array(sg) for sg in self.grid)
-        entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(_self_grid, self.entries)
+        entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
+            _self_grid, self.entries
+        )
         __embedding_grid = cast(GridT, _embedding_grid)  # type: ignore[assignment]
         # This cast is necessary for two reasons:
         # 1. the static type checker does not want to determine the length of tuple(... for ...)
@@ -394,7 +427,7 @@ class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin):
         return self.create_like(entries)
 
 
-class _InitMixin[GridT: Grid]:
+class _InitMixin[GridT: AnyGrid]:
     _domain: Domain
     _kind: str | None = None
     grid: GridT
@@ -402,7 +435,7 @@ class _InitMixin[GridT: Grid]:
 
     def __init__(
         self,
-        grid: GridT,
+        grid: AnyGrid,  # on purpose not GridT to allow more flexible input types
         entries: "Array",
     ):
         self.grid = cast(GridT, tuple(_to_linspace_if_possible(g) for g in grid))
@@ -447,9 +480,7 @@ class _InitMixin[GridT: Grid]:
         return _get_entry_grid_shape(self.entries)
 
 
-class _ArithmeticReprOnGrid[GridT: "Grid1D" | "Grid2D"](
-    _BinaryUnaryOpMixin, _EmbedMixin[GridT]
-):
+class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin, _EmbedMixin[GridT]):
     # Provides implementations for arithmetic operations
 
     def create_like(self, entries: "Array"):
@@ -485,14 +516,10 @@ class _ArithmeticReprOnGrid[GridT: "Grid1D" | "Grid2D"](
             other = cast(_ArithmeticReprOnGrid[GridT], other)
             if self._check_grid_compatibility(other):
                 return other.entries
-            raise ValueError(f"Grid mismatch: expected {self.grid}, got {other.grid}.")
+            raise ValueError(
+                f"AnyGrid mismatch: expected {self.grid}, got {other.grid}."
+            )
         return other
-
-    @property
-    def resolution(self) -> float:
-        if isinstance(self.grid[0], Linspace):
-            return self.grid[0].step
-        raise NotImplementedError("Resolution is only implemented for Linspace grids.")
 
     def add(self, other: Self, slice: _slice, inplace: bool = False) -> Self:
         """Add another series on a sub-grid with known slice.
@@ -567,8 +594,71 @@ class _ArithmeticReprOnGrid[GridT: "Grid1D" | "Grid2D"](
         return super().__iadd__(other)
 
 
-class FrequencySeries(
-    _InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1DMixin
+class _Uniform1DMixin:
+    grid: "Grid1D[Linspace]"
+
+    @property
+    def resolution(self) -> float:
+        return self.grid[0].step
+
+
+def frequency_series[AxisT: Axis](
+    frequencies: AxisT,
+    entries: "Array",
+) -> Union["FrequencySeries[AxisT]", "UniformFrequencySeries"]:
+    """Build a :class:`FrequencySeries` or :class:`UniformFrequencySeries`."""
+    try:
+        _frequencies = Linspace.make(frequencies)
+    except ValueError:
+        return FrequencySeries[AxisT]((frequencies,), entries)
+    else:
+        return UniformFrequencySeries((_frequencies,), entries)
+
+
+def time_series[AxisT: Axis](
+    times: AxisT,
+    entries: "Array",
+) -> Union["TimeSeries[AxisT]", "UniformTimeSeries"]:
+    """Build a :class:`TimeSeries` or :class:`UniformTimeSeries`."""
+    try:
+        _times = Linspace.make(times)
+    except ValueError:
+        return TimeSeries[AxisT]((times,), entries)
+    else:
+        return UniformTimeSeries((_times,), entries)
+
+
+def phasor[AxisT: Axis](
+    frequencies: AxisT,
+    amplitudes: "Array",
+    phases: "Array",
+) -> "Phasor[AxisT]":
+    """Build a :class:`Phasor`."""
+    return Phasor[AxisT].make(frequencies, amplitudes, phases)
+
+
+def stft[FreqAxisT: Axis, TimeAxisT: Axis](
+    frequencies: FreqAxisT,
+    times: TimeAxisT,
+    entries: "Array",
+) -> "STFT[FreqAxisT, TimeAxisT]":
+    """Build an :class:`STFT`."""
+    return STFT[FreqAxisT, TimeAxisT]((frequencies, times), entries)
+
+
+def wdm(
+    frequencies: Axis,
+    times: Axis,
+    entries: "Array",
+) -> "WDM":
+    """Build a :class:`WDM`."""
+    return WDM((frequencies, times), entries)
+
+
+class FrequencySeries[AxisT: Axis](
+    _InitMixin["Grid1D[AxisT]"],
+    _ArithmeticReprOnGrid["Grid1D[AxisT]"],
+    _Subset1DMixin["Grid1D[AxisT]"],
 ):
     """A series of numbers on a frequency grid."""
 
@@ -587,11 +677,6 @@ class FrequencySeries(
         return super().angle(**kwargs).unwrap(period=2 * self.xp.pi)
 
     @property
-    def df(self) -> float:
-        """The frequency spacing. Alias for :attr:`.resolution`."""
-        return self.resolution
-
-    @property
     def frequencies(self) -> Axis | Linspace:
         """The frequencies of the series."""
         return self.grid[0]
@@ -605,6 +690,27 @@ class FrequencySeries(
     def f_max(self) -> float:
         """The maximum frequency of the series."""
         return _get_axis_end(self.frequencies)
+
+    def get_time_shifted(self, shift: float) -> Self:
+        """Shift the series in time."""
+        return self * self.xp.exp(
+            -2j * self.xp.pi * self.xp.array(self.frequencies) * shift
+        )
+
+    def get_plotter(self):
+        """Return the plotter for the series."""
+        from ..viz import plotters
+
+        return plotters.FSPlotter(self)
+
+
+class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
+    """A frequency series on a uniform frequency grid."""
+
+    @property
+    def df(self) -> float:
+        """The frequency spacing. Alias for :attr:`.resolution`."""
+        return self.resolution
 
     def irfft(
         self,
@@ -636,24 +742,12 @@ class FrequencySeries(
             # probably related to the (n-1)/2 in the last frequency in rfftfreq
             warnings.warn("The time grid is denser than the Nyquist limit.")
 
-        return TimeSeries(
+        return UniformTimeSeries(
             grid=(time_grid,),
             entries=self.xp.fft.irfft(
                 self.entries * tapering_window / dt, n=len(time_grid)
             ),
         )
-
-    def get_time_shifted(self, shift: float) -> Self:
-        """Shift the series in time."""
-        return self * self.xp.exp(
-            -2j * self.xp.pi * self.xp.array(self.frequencies) * shift
-        )
-
-    def get_plotter(self) -> plotters.FSPlotter:
-        """Return the plotter for the series."""
-        from ..viz import plotters
-
-        return plotters.FSPlotter(self)
 
     def to_wdm(
         self,
@@ -729,7 +823,11 @@ class FrequencySeries(
         return self.to_wdm(Nf=Nf, Nt=Nt, nx=nx)
 
 
-class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1DMixin):
+class TimeSeries[AxisT: Axis](
+    _InitMixin["Grid1D[AxisT]"],
+    _ArithmeticReprOnGrid["Grid1D[AxisT]"],
+    _Subset1DMixin["Grid1D[AxisT]"],
+):
     """A series of numbers on a time grid."""
 
     @property
@@ -756,6 +854,16 @@ class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1
     def t_end(self) -> float:
         """The end time of the series."""
         return _get_axis_end(self.times)
+
+    def get_plotter(self):
+        """Return the plotter for the series."""
+        from ..viz import plotters
+
+        return plotters.TSPlotter(self)
+
+
+class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
+    """A time series on a uniform time grid."""
 
     @property
     def dt(self) -> float:
@@ -795,16 +903,10 @@ class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1
             if tapering is not None
             else self.xp.ones_like(self_times)
         )
-        return FrequencySeries(
+        return UniformFrequencySeries(
             grid=(self.xp.fft.rfftfreq(len(self.times), d=self.dt),),
             entries=self.xp.fft.rfft(self.entries * tapering_window * self.dt),
         )
-
-    def get_plotter(self) -> plotters.TSPlotter:
-        """Return the plotter for the series."""
-        from ..viz import plotters
-
-        return plotters.TSPlotter(self)
 
     # NOTE win cannot be a Tapering object. It's probably worth designing this
     # interface to be consistent with the rest of tlt and close to scipy's stft
@@ -814,7 +916,7 @@ class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1
         times = SFT.t(len(self.times)) + np.asarray(self.times)[0]
         freqs = SFT.f
         Sx = SFT.stft(np.asarray(self.entries) * self.dt)
-        return STFT(
+        return STFT[Linspace, Linspace](
             grid=(times, freqs),
             entries=Sx,
         )
@@ -868,7 +970,11 @@ class TimeSeries(_InitMixin["Grid1D"], _ArithmeticReprOnGrid["Grid1D"], _Subset1
     #     return WDM.from_pywWDM(_pyw_t2w(fs, Nf=Nf, Nt=Nt, nx=nx, mult=mult))
 
 
-class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
+class Phasor[AxisT: Axis](
+    _InitMixin["Grid1D[AxisT]"],
+    _Subset1DMixin["Grid1D[AxisT]"],
+    _EmbedMixin["Grid1D[AxisT]"],
+):
     """Phasor representation.
 
     A phasor is a couple of amplitude and phase that represent a complex number.
@@ -922,10 +1028,10 @@ class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
     @classmethod
     def make(
         cls,
-        frequencies: "Array",
+        frequencies: "AxisT",
         amplitudes: "Array",
         phases: "Array",
-    ) -> Phasor:
+    ):
         """Create a phasor from amplitudes and phases."""
         xp = xpc.get_namespace(amplitudes, phases)
         # We assume input amplitudes and phases are 1D arrays
@@ -942,13 +1048,14 @@ class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
         """Create a new series with the same grid as the current one."""
         return type(self)(grid=self.grid, entries=entries)
 
-    def get_interpolated(
+    def get_interpolated[AT: Axis](
         self,
-        frequencies: "Array",
+        frequencies: AT,
         interpolator: Callable[[Any, Any], Callable[[Any], Any]],
-    ):
+    ) -> "Phasor[AT]":
         """Get the phasors interpolated to the given frequencies."""
         xp = xpc.get_namespace(self.amplitudes, self.phases)
+        _frequencies = to_array(frequencies, xp=xp)
         self_freq = to_array(self.frequencies, xp=xp)
         if self.entries.shape != (1, 1, 1, 2, len(self_freq)):
             raise ValueError(
@@ -957,28 +1064,34 @@ class Phasor(_InitMixin["Grid1D"], _Subset1DMixin, _EmbedMixin["Grid1D"]):
             )
         amp_real = self.amplitudes.real.squeeze()
         amp_imag = self.amplitudes.imag.squeeze()
-        amplitudes_real = interpolator(self_freq, amp_real)(frequencies)
-        amplitudes_imag = interpolator(self_freq, amp_imag)(frequencies)
+        amplitudes_real = interpolator(self_freq, amp_real)(_frequencies)
+        amplitudes_imag = interpolator(self_freq, amp_imag)(_frequencies)
         amplitudes = amplitudes_real + 1j * amplitudes_imag
-        phases = interpolator(self_freq, self.phases.squeeze())(frequencies)
-        return type(self).make(frequencies, amplitudes, phases)
+        phases = interpolator(self_freq, self.phases.squeeze())(_frequencies)
+        return Phasor[AT].make(frequencies, amplitudes, phases)
 
-    def to_frequency_series(self) -> FrequencySeries:
+    def to_frequency_series(self) -> FrequencySeries[AxisT]:
         """Get the :class:`.FrequencySeries` representation of the waveform."""
         xp = xpc.get_namespace(self.amplitudes, self.phases)
-        return FrequencySeries(
+        return FrequencySeries[AxisT](
             (self.frequencies,),
             self.amplitudes * xp.exp(1j * self.phases),
         )
 
-    def get_plotter(self) -> plotters.PhasorPlotter:
+    def get_plotter(self):
         """Return the plotter for the phasor."""
         from ..viz import plotters
 
         return plotters.PhasorPlotter(self)
 
 
-class STFT(_InitMixin["Grid2D"], _ArithmeticReprOnGrid["Grid2D"]):
+class STFT[
+    FreqAxisT: Axis,
+    TimeAxisT: Axis,
+](
+    _InitMixin["Grid2D[FreqAxisT, TimeAxisT]"],
+    _ArithmeticReprOnGrid["Grid2D[FreqAxisT, TimeAxisT]"],
+):
     """Time-frequency representation."""
 
     @property
@@ -992,12 +1105,12 @@ class STFT(_InitMixin["Grid2D"], _ArithmeticReprOnGrid["Grid2D"]):
         return "stft"
 
     @property
-    def times(self) -> Axis | Linspace:
+    def times(self) -> TimeAxisT:
         """The time grid of the time-frequency representation."""
         return self.grid[1]
 
     @property
-    def frequencies(self) -> Axis | Linspace:
+    def frequencies(self) -> FreqAxisT:
         """The frequency grid of the time-frequency representation."""
         return self.grid[0]
 
@@ -1041,10 +1154,7 @@ class STFT(_InitMixin["Grid2D"], _ArithmeticReprOnGrid["Grid2D"]):
         )
 
 
-UniformGrid2D = tuple[Linspace, Linspace]
-
-
-class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
+class WDM(_InitMixin["UniformGrid2D"], _ArithmeticReprOnGrid["UniformGrid2D"]):
     """
     Wilson-Daubechies-Meyer (WDM) time-frequency representation.
 
@@ -1199,7 +1309,7 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
 
     def to_frequency_series(
         self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
-    ) -> FrequencySeries:
+    ) -> UniformFrequencySeries:
         """Perform an inverse wavelet transform to the frequency domain.
 
         Parameters
@@ -1221,11 +1331,11 @@ class WDM(_InitMixin[UniformGrid2D], _ArithmeticReprOnGrid[UniformGrid2D]):
         if mask is not None:
             freqs = np.ma.masked_where(mask, freqs)  # type: ignore
             entries = np.ma.masked_where(mask, entries)  # type: ignore
-        return FrequencySeries((freqs,), entries[None, None, None, None, ...])  # type: ignore
+        return UniformFrequencySeries((freqs,), entries[None, None, None, None, ...])  # type: ignore
 
     def to_freqseries(
         self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
-    ) -> FrequencySeries:
+    ) -> UniformFrequencySeries:
         """Return :meth:`to_frequency_series` while warning about deprecation.
 
         This alias will be removed in 0.7.0.

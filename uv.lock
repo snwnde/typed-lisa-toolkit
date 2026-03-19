@@ -1120,8 +1120,8 @@ wheels = [
 
 [[package]]
 name = "l2d-interface"
-version = "0.0.0.post24+54c789f"
-source = { git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=54c789fe0a2bd5fb5e2230d23c3e7663dd734334#54c789fe0a2bd5fb5e2230d23c3e7663dd734334" }
+version = "0.0.0.post26+a5e33e1"
+source = { git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=a5e33e1477374f946ed3295c77fbac3abae0a6e5#a5e33e1477374f946ed3295c77fbac3abae0a6e5" }
 dependencies = [
     { name = "array-api-typing" },
 ]
@@ -2891,7 +2891,7 @@ jax-dev = [
 requires-dist = [
     { name = "array-api-compat", specifier = ">=1.13.0" },
     { name = "h5py" },
-    { name = "l2d-interface", git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=54c789fe0a2bd5fb5e2230d23c3e7663dd734334" },
+    { name = "l2d-interface", git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=a5e33e1477374f946ed3295c77fbac3abae0a6e5" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "pywavelet", specifier = "==0.2.8" },
     { name = "scipy", specifier = ">=1.12.0" },

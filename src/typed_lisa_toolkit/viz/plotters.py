@@ -48,7 +48,7 @@ from __future__ import annotations
 import abc
 import copy
 import logging
-from typing import Any, Literal, Self
+from typing import Any, Literal, Self, TYPE_CHECKING
 
 import matplotlib.axes
 import matplotlib.figure
@@ -57,10 +57,16 @@ import numpy as np
 
 from ..containers import data, representations
 
+if TYPE_CHECKING:
+    Axis = representations.Axis
+    AnyReps = representations.Representation
+
 _1DRep = (
-    representations.TimeSeries
-    | representations.FrequencySeries
-    | representations.Phasor
+    representations.TimeSeries["Axis"]
+    | representations.FrequencySeries["Axis"]
+    | representations.Phasor["Axis"]
+    | representations.UniformTimeSeries
+    | representations.UniformFrequencySeries
 )
 logger = logging.getLogger(__name__)
 
@@ -161,7 +167,7 @@ def sieve_kwargs(keys_to_accept: list[str], **kwargs: Any) -> dict[str, Any]:
     return {k: v for k, v in kwargs.items() if k in keys_to_accept}
 
 
-class _1DPlotter[RepT: _1DRep](abc.ABC):
+class _1DPlotter[RepT: AnyReps](abc.ABC):
     def __init__(self, series: RepT) -> None:
         self.series = copy.deepcopy(series)
 
@@ -198,7 +204,7 @@ class _1DPlotter[RepT: _1DRep](abc.ABC):
         return fig
 
 
-class TSPlotter(_1DPlotter["representations.TimeSeries"]):
+class TSPlotter(_1DPlotter[representations.TimeSeries["Axis"]]):
     """Plotter for :class:`.containers.representations.TimeSeries`."""
 
     def plot(
@@ -237,7 +243,7 @@ class TSPlotter(_1DPlotter["representations.TimeSeries"]):
         return ax
 
 
-class FSPlotter(_1DPlotter["representations.FrequencySeries"]):
+class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
     """Plotter for :class:`.containers.representations.FrequencySeries`."""
 
     def plot(
@@ -307,7 +313,7 @@ class FSPlotter(_1DPlotter["representations.FrequencySeries"]):
         return fig
 
 
-class PhasorPlotter(_1DPlotter["representations.Phasor"]):
+class PhasorPlotter[AxisT: "Axis"](_1DPlotter["representations.Phasor[AxisT]"]):
     """Plotter for :class:`.containers.representations.Phasor`."""
 
     def plot(
@@ -421,9 +427,11 @@ class WDMPlotter:
 
 
 class _1DDataPlotter[
-    RepT: representations.TimeSeries | representations.FrequencySeries
+    RepT: representations.TimeSeries["Axis"] | representations.FrequencySeries["Axis"]
+    # | representations.UniformTimeSeries
+    # | representations.UniformFrequencySeries
 ](abc.ABC):
-    def __init__(self, data: data._SeriesData[RepT]) -> None:  # pyright: ignore[reportPrivateUsage]
+    def __init__(self, data: data.Data[RepT]) -> None:  # pyright: ignore[reportPrivateUsage]
         self.data = copy.deepcopy(data)
 
     def _draw(
@@ -510,7 +518,7 @@ class _1DDataPlotter[
     def compare(self, other: Self, **kwargs: Any) -> matplotlib.figure.Figure: ...
 
 
-class TSDataPlotter(_1DDataPlotter["representations.TimeSeries"]):
+class TSDataPlotter(_1DDataPlotter["representations.TimeSeries[Axis]"]):
     """Plotter for :class:`.containers.data.TSData`."""
 
     def draw(self, set_legend: bool = False, **kwargs: Any) -> matplotlib.figure.Figure:
@@ -524,7 +532,7 @@ class TSDataPlotter(_1DDataPlotter["representations.TimeSeries"]):
         return self._compare(plotter=TSPlotter, other=other, **kwargs)
 
 
-class FSDataPlotter(_1DDataPlotter["representations.FrequencySeries"]):
+class FSDataPlotter(_1DDataPlotter["representations.FrequencySeries[Axis]"]):
     """Plotter for :class:`.containers.data.FSData`."""
 
     def _draw_angle(

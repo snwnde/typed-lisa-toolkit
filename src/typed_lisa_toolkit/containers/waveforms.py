@@ -9,6 +9,10 @@
 Functions
 ---------
 
+.. autofunction:: harmonic_waveform
+.. autofunction:: projected_waveform
+.. autofunction:: harmonic_projected_waveform
+.. autofunction:: homogeneous_harmonic_projected_waveform
 .. autofunction:: sum_harmonics
 .. autofunction:: get_dense_maker
 
@@ -18,20 +22,23 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Iterator, Self
+from typing import TYPE_CHECKING, Any, Iterator, Self, cast, Callable
 
 import array_api_compat as xpc
 
 from . import data, modes
 from . import representations as reps
 
-Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
+
+# Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
 Mode = modes.Harmonic | modes.QNM
 
 from .. import utils
 
 if TYPE_CHECKING:
     Array = reps.Array
+    Axis = reps.Axis
+    from .representations import Representation as AnyReps
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +94,7 @@ class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
         return tuple(self._mapping.keys())
 
 
-class HarmonicWaveform[ModeT: Mode, RepT: Reps](_ModeMapping[ModeT, RepT]):
+class HarmonicWaveform[ModeT: Mode, RepT: AnyReps](_ModeMapping[ModeT, RepT]):
     """Waveform in different modes.
 
     This class is a mapping from modes to representations.
@@ -106,7 +113,7 @@ class HarmonicWaveform[ModeT: Mode, RepT: Reps](_ModeMapping[ModeT, RepT]):
         return self[next(iter(self))].domain
 
 
-class ProjectedWaveform[RepT: Reps](data._ChannelMapping[RepT]):  # pyright: ignore[reportPrivateUsage]
+class ProjectedWaveform[RepT: AnyReps](data._ChannelMapping[RepT]):  # pyright: ignore[reportPrivateUsage]
     """Projected waveform in a single mode or all modes summed together.
 
     This class is a mapping from channel names to representations. It is
@@ -115,7 +122,7 @@ class ProjectedWaveform[RepT: Reps](data._ChannelMapping[RepT]):  # pyright: ign
     """
 
 
-class HarmonicProjectedWaveform[ModeT: Mode, RepT: Reps](
+class HarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
     _ModeMapping[ModeT, ProjectedWaveform[RepT]]
 ):
     """Projected waveform in different modes.
@@ -141,36 +148,59 @@ class HarmonicProjectedWaveform[ModeT: Mode, RepT: Reps](
         """All channel names."""
         return tuple(self._first.keys())
 
-    @property
-    def is_homogeneous(self) -> bool:
-        """Whether the waveform is homogeneous across channels."""
-        return all(
-            self[harmonic].grid == self[next(iter(self))].grid
-            for harmonic in self.harmonics
-        )
+
+class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
+    HarmonicProjectedWaveform[ModeT, RepT]
+):
+    """Harmonic projected waveform where all harmonics have the same channel names."""
 
     def get_kernel(self):
         """Return an array of the conventional shape.
 
         The shape is ``(n_batches, n_channels, n_harmonics, n_features, *grid_like)``
         The returned array is suitable for downstream processing (e.g., by noise models to compute inner products).
-        This method is only valid when `is_homogeneous` is ``True``. Otherwise, this method should raise an error.
         """
-        if not self.is_homogeneous:
-            raise ValueError("The waveform is not homogeneous across channels.")
         xp = xpc.get_namespace(self._first.entries)
         return xp.stack([self[harmonic].entries for harmonic in self.harmonics], axis=2)
 
 
-def sum_harmonics[ModeT: Mode, RepT: reps.FrequencySeries](
-    wf: HarmonicProjectedWaveform[ModeT, RepT],
+def harmonic_waveform[ModeT: Mode, RepT: AnyReps](
+    modes_to_representations: Mapping[ModeT, RepT],
+) -> HarmonicWaveform[ModeT, RepT]:
+    """Build a harmonic waveform from mode-indexed representations."""
+    return HarmonicWaveform(modes_to_representations)
+
+
+def projected_waveform[RepT: AnyReps](
+    channels: Mapping[str, RepT],
 ) -> ProjectedWaveform[RepT]:
+    """Build a projected waveform from channel-indexed representations."""
+    return ProjectedWaveform[RepT].from_dict(channels)
+
+
+def harmonic_projected_waveform[ModeT: Mode, RepT: AnyReps](
+    modes_to_projected_waveforms: Mapping[ModeT, ProjectedWaveform[RepT]],
+) -> HarmonicProjectedWaveform[ModeT, RepT]:
+    """Build a harmonic projected waveform from mode-indexed projected waveforms."""
+    return HarmonicProjectedWaveform(modes_to_projected_waveforms)
+
+
+def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: AnyReps](
+    modes_to_projected_waveforms: Mapping[ModeT, ProjectedWaveform[RepT]],
+) -> HomogeneousHarmonicProjectedWaveform[ModeT, RepT]:
+    """Build a homogeneous harmonic projected waveform from mode-indexed projected waveforms."""
+    return HomogeneousHarmonicProjectedWaveform(modes_to_projected_waveforms)
+
+
+def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
+    wf: HomogeneousHarmonicProjectedWaveform[ModeT, reps.FrequencySeries[AxisT]],
+) -> ProjectedWaveform[reps.FrequencySeries[AxisT]]:
     """Sum over modes."""
     entries = wf.get_kernel().sum(axis=2)  # c.f. shape convention
     return wf._first.create_like(entries, wf.channel_names)  # pyright: ignore[reportPrivateUsage]
 
 
-def get_dense_maker[ModeT: Mode](
+def get_dense_maker(
     interpolator: utils.Interpolator,
 ):
     """Return a function to convert a sparse phasor projected waveform to a dense phasor projected waveform.
@@ -193,26 +223,36 @@ def get_dense_maker[ModeT: Mode](
     input waveform.
     """
 
-    def make(
-        frequencies: "Array",
+    def make[MT: Mode, AxisT: "Axis"](
+        frequencies: AxisT,
         embed: bool = False,
-    ):
+    ) -> Callable[
+        [HarmonicProjectedWaveform[MT, reps.Phasor["Axis"]]],
+        HarmonicProjectedWaveform[MT, reps.Phasor[AxisT]],
+    ]:
 
-        def do_phasor(wf: reps.Phasor):
-            _slice = utils.get_subset_slice(frequencies, wf.f_min, wf.f_max)
-            freqs = frequencies[utils.get_subset_slice(frequencies, wf.f_min, wf.f_max)]
+        def do_phasor(wf: reps.Phasor["Axis"]):
+            _frequencies = reps.to_array(frequencies, xpc.get_namespace(wf.entries))
+
+            _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
+            freqs = cast(
+                AxisT,
+                frequencies[utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)],
+            )
             nwf = wf.get_interpolated(freqs, interpolator)
             if not embed:
                 return nwf
             return nwf.get_embedded(frequencies, known_slices=(_slice,))
 
-        def do_response(resp: ProjectedWaveform[reps.Phasor]):
-            return ProjectedWaveform[reps.Phasor].from_dict(
+        def do_response(resp: ProjectedWaveform[reps.Phasor["Axis"]]):
+            return ProjectedWaveform[reps.Phasor[AxisT]].from_dict(
                 {chnname: do_phasor(resp[chnname]) for chnname in resp.channel_names}
             )
 
-        def do(wf: HarmonicProjectedWaveform[ModeT, reps.Phasor]):
-            return type(wf)({mode: do_response(wf[mode]) for mode in wf.harmonics})
+        def do[ModeT: Mode](wf: HarmonicProjectedWaveform[ModeT, reps.Phasor["Axis"]]):
+            return HarmonicProjectedWaveform[ModeT, reps.Phasor[AxisT]](
+                {mode: do_response(wf[mode]) for mode in wf.harmonics}
+            )
 
         return do
 

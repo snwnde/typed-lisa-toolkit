@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from typed_lisa_toolkit.containers import modes
 from typed_lisa_toolkit.containers import representations as reps
 from typed_lisa_toolkit.containers.waveforms import (
-    HarmonicProjectedWaveform,
+    HomogeneousHarmonicProjectedWaveform,
     HarmonicWaveform,
     ProjectedWaveform,
 )
@@ -114,44 +114,13 @@ def build_harmonic_projected_frequency_waveform(xp):
         }
     )
 
-    wf = HarmonicProjectedWaveform({mode_22: resp_22, mode_33: resp_33})
+    wf = HomogeneousHarmonicProjectedWaveform({mode_22: resp_22, mode_33: resp_33})
 
     return {
         "frequencies": frequencies,
         "mode_22": mode_22,
         "mode_33": mode_33,
         "wf": wf,
-        "resp_22": resp_22,
-        "resp_33": resp_33,
-    }
-
-
-def build_nonhomogeneous_harmonic_projected_frequency_waveform(xp):
-    frequencies_a = xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64)
-    frequencies_b = xp.asarray([1.5, 2.5, 3.5], dtype=xp.float64)
-
-    mode_22 = modes.Harmonic(2, 2)
-    mode_33 = modes.Harmonic(3, 3)
-
-    resp_22 = ProjectedWaveform.from_dict(
-        {
-            "X": _make_fs(xp, frequencies_a, [1.0 + 0.0j, 2.0 + 0.0j, 3.0 + 0.0j]),
-            "Y": _make_fs(xp, frequencies_a, [0.5 + 0.0j, 1.0 + 0.0j, 1.5 + 0.0j]),
-        }
-    )
-    resp_33 = ProjectedWaveform.from_dict(
-        {
-            "X": _make_fs(xp, frequencies_b, [0.2 + 0.0j, 0.4 + 0.0j, 0.6 + 0.0j]),
-            "Y": _make_fs(xp, frequencies_b, [1.0 + 0.0j, 1.2 + 0.0j, 1.4 + 0.0j]),
-        }
-    )
-
-    wf = HarmonicProjectedWaveform({mode_22: resp_22, mode_33: resp_33})
-
-    return {
-        "wf": wf,
-        "mode_22": mode_22,
-        "mode_33": mode_33,
         "resp_22": resp_22,
         "resp_33": resp_33,
     }

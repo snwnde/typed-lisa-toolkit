@@ -9,14 +9,19 @@ import numpy as np
 import numpy.testing as npt
 
 from tests._shared.waveforms_helpers import (
-    FakeHarmonicWaveform,
     build_fake_harmonic_projected_waveform,
     build_harmonic_projected_frequency_waveform,
     build_harmonic_waveform_frequency_series,
-    build_nonhomogeneous_harmonic_projected_frequency_waveform,
 )
 from typed_lisa_toolkit.containers import modes
-from typed_lisa_toolkit.containers.waveforms import get_dense_maker, sum_harmonics
+from typed_lisa_toolkit.containers.waveforms import (
+    get_dense_maker,
+    harmonic_projected_waveform,
+    harmonic_waveform,
+    homogeneous_harmonic_projected_waveform,
+    projected_waveform,
+    sum_harmonics,
+)
 
 
 class TestHarmonicWaveformNumpy(unittest.TestCase):
@@ -66,7 +71,6 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
 
         self.assertEqual(wf.domain, "frequency")
         self.assertEqual(wf.channel_names, ("X", "Y"))
-        self.assertTrue(wf.is_homogeneous)
 
         kernel = np.asarray(wf.get_kernel())
         self.assertEqual(kernel.shape, (1, 2, 2, 1, 1, 3))
@@ -79,14 +83,6 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
             axis=2,
         )
         npt.assert_allclose(kernel, expected)
-
-    def test_get_kernel_raises_for_nonhomogeneous_waveform(self):
-        case = build_nonhomogeneous_harmonic_projected_frequency_waveform(np)
-        wf = case["wf"]
-
-        self.assertFalse(wf.is_homogeneous)
-        with self.assertRaises(ValueError):
-            wf.get_kernel()
 
     def test_sum_harmonics_matches_manual_sum(self):
         case = build_harmonic_projected_frequency_waveform(np)
@@ -132,11 +128,18 @@ class TestDenseMakerNumpy(unittest.TestCase):
             ) : np.searchsorted(np.asarray(frequencies), phasor.f_max, side="right")
         ]
 
+    @staticmethod
+    def _bind_entries(handles, frequencies):
+        for channels in handles.values():
+            for phasor, _, _ in channels.values():
+                phasor.entries = frequencies
+
     def test_dense_maker_embed_false_calls_interpolated_only(self):
         # Full frequency grid passed to `make`; each phasor covers only a sub-range.
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         wf, handles = build_fake_harmonic_projected_waveform()
+        self._bind_entries(handles, frequencies)
 
         # Build the two-level closure: get_dense_maker binds the interpolator,
         # maker(frequencies) binds the target grid and embed flag.
@@ -152,7 +155,7 @@ class TestDenseMakerNumpy(unittest.TestCase):
             out = fn(wf)
 
         # from_dict must be called once per harmonic (2 modes → 2 calls).
-        self.assertIsInstance(out, FakeHarmonicWaveform)
+        self.assertEqual(type(out).__name__, "HarmonicProjectedWaveform")
         self.assertEqual(from_dict_mock.call_count, 2)
         # Output preserves harmonic and channel key order.
         self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
@@ -176,6 +179,7 @@ class TestDenseMakerNumpy(unittest.TestCase):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         wf, handles = build_fake_harmonic_projected_waveform()
+        self._bind_entries(handles, frequencies)
 
         maker = get_dense_maker(interpolator)
         fn = maker(frequencies, embed=True)
@@ -186,7 +190,7 @@ class TestDenseMakerNumpy(unittest.TestCase):
         ) as from_dict_mock:
             out = fn(wf)
 
-        self.assertIsInstance(out, FakeHarmonicWaveform)
+        self.assertEqual(type(out).__name__, "HarmonicProjectedWaveform")
         self.assertEqual(from_dict_mock.call_count, 2)
         self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
 
@@ -203,7 +207,41 @@ class TestDenseMakerNumpy(unittest.TestCase):
                 # embed=True: get_embedded is called on the interpolated result
                 # with the *full* frequency grid to zero-pad outside the phasor range.
                 interpolated.get_embedded.assert_called_once()
-                args, _ = interpolated.get_embedded.call_args
+                args, kwargs = interpolated.get_embedded.call_args
                 self.assertIs(args[0], frequencies)
+                self.assertIn("known_slices", kwargs)
+                self.assertEqual(len(kwargs["known_slices"]), 1)
                 # Output is the embedded mock, not the raw interpolated one.
                 self.assertIs(out[harmonic][channel], embedded)
+
+
+class TestWaveformConstructorsNumpy(unittest.TestCase):
+    def test_harmonic_waveform_constructor(self):
+        case = build_harmonic_waveform_frequency_series(np)
+        wf = harmonic_waveform({case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]})
+
+        self.assertEqual(type(wf).__name__, "HarmonicWaveform")
+        self.assertEqual(tuple(wf.keys()), (case["mode_22"], case["mode_33"]))
+
+    def test_projected_waveform_constructor(self):
+        case = build_harmonic_projected_frequency_waveform(np)
+        resp = projected_waveform({"X": case["resp_22"]["X"], "Y": case["resp_22"]["Y"]})
+
+        self.assertEqual(type(resp).__name__, "ProjectedWaveform")
+        self.assertEqual(resp.channel_names, ("X", "Y"))
+
+    def test_harmonic_projected_waveform_constructor(self):
+        case = build_harmonic_projected_frequency_waveform(np)
+        wf = harmonic_projected_waveform({case["mode_22"]: case["resp_22"], case["mode_33"]: case["resp_33"]})
+
+        self.assertEqual(type(wf).__name__, "HarmonicProjectedWaveform")
+        self.assertEqual(tuple(wf.keys()), (case["mode_22"], case["mode_33"]))
+
+    def test_homogeneous_harmonic_projected_waveform_constructor(self):
+        case = build_harmonic_projected_frequency_waveform(np)
+        wf = homogeneous_harmonic_projected_waveform(
+            {case["mode_22"]: case["resp_22"], case["mode_33"]: case["resp_33"]}
+        )
+
+        self.assertEqual(type(wf).__name__, "HomogeneousHarmonicProjectedWaveform")
+        self.assertEqual(wf.channel_names, ("X", "Y"))
