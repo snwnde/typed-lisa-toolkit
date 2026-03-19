@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.3 - 2026-03-19
+#### Refactoring
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>homogeneous harmonic projected waveform - (6d7b537) - Senwen Deng
+
+- - -
+
 ## 0.5.2 - 2026-03-18
 #### Bug Fixes
 - slice, channel names, phasor shape - (9d29d88) - Senwen Deng
