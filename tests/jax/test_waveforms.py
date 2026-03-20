@@ -22,7 +22,11 @@ from typed_lisa_toolkit.containers.waveforms import (
     get_dense_maker,
     harmonic_projected_waveform,
     harmonic_waveform,
+    hhpw,
+    hpw,
+    hw,
     homogeneous_harmonic_projected_waveform,
+    pw,
     projected_waveform,
     sum_harmonics,
 )
@@ -219,6 +223,12 @@ class TestDenseMakerJAX(unittest.TestCase):
 
 
 class TestWaveformConstructorsJAX(unittest.TestCase):
+    def test_constructor_aliases(self):
+        self.assertIs(hw, harmonic_waveform)
+        self.assertIs(pw, projected_waveform)
+        self.assertIs(hpw, harmonic_projected_waveform)
+        self.assertIs(hhpw, homogeneous_harmonic_projected_waveform)
+
     def test_harmonic_waveform_constructor(self):
         case = build_harmonic_waveform_frequency_series(jnp)
         wf = harmonic_waveform({case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]})

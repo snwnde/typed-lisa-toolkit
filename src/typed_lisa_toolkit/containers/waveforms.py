@@ -16,6 +16,16 @@ Functions
 .. autofunction:: sum_harmonics
 .. autofunction:: get_dense_maker
 
+Alias Constructors
+------------------
+Use these as convenience shorthands; canonical names remain preferred in library code.
+
+.. autofunction:: hw
+.. autofunction:: pw
+.. autofunction:: hpw
+.. autofunction:: hhpw
+
+
 """
 
 from __future__ import annotations
@@ -190,6 +200,13 @@ def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: AnyReps](
 ) -> HomogeneousHarmonicProjectedWaveform[ModeT, RepT]:
     """Build a homogeneous harmonic projected waveform from mode-indexed projected waveforms."""
     return HomogeneousHarmonicProjectedWaveform(modes_to_projected_waveforms)
+
+
+# Convenience aliases for notebook ergonomics while keeping canonical names.
+hw = harmonic_waveform
+pw = projected_waveform
+hpw = harmonic_projected_waveform
+hhpw = homogeneous_harmonic_projected_waveform
 
 
 def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
