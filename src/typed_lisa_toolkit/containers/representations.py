@@ -48,7 +48,7 @@ from __future__ import annotations
 import logging
 import warnings
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, Union, cast, overload
 
 import array_api_compat as xpc
 import numpy as np
@@ -72,12 +72,15 @@ if TYPE_CHECKING:
 
     from l2d_interface import contract
 
-    class Representation(
-        contract.Representation[Domain, AnyGrid, str | None], Protocol
+    class Representation[GridT: AnyGrid](
+        contract.Representation[Domain, GridT, str | None], Protocol
     ):
         """Protocol for any representation type."""
 
         entries: Array  # type: ignore[assignment] # Necessary due to missing data array API
+
+        @property
+        def grid(self) -> GridT: ...  # noqa: D102
 
         def __init__(
             self,
@@ -325,8 +328,11 @@ def _get_axis_end(axis: Axis) -> float:
 
 
 class _Subset1DMixin[GridT: "Grid1D[Axis]"]:
-    grid: GridT
     entries: "Array"
+
+    @property
+    def grid(self) -> GridT:
+        raise NotImplementedError("This property must be implemented by subclass.")
 
     def __init__(self, grid: "Grid1D[Axis]", entries: "Array") -> None:
         del grid, entries
@@ -416,15 +422,18 @@ class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin):
 class _InitMixin[GridT: AnyGrid]:
     _domain: Domain
     _kind: str | None = None
-    grid: GridT
     entries: "Array"
+
+    @property
+    def grid(self) -> GridT:
+        return cast(GridT, self._grid)
 
     def __init__(
         self,
         grid: AnyGrid,  # on purpose not GridT to allow more flexible input types
         entries: "Array",
     ):
-        self.grid = cast(GridT, tuple(_to_linspace_if_possible(g) for g in grid))
+        self._grid = tuple(_to_linspace_if_possible(g) for g in grid)
         self.entries = entries
 
     def __repr__(self) -> str:
@@ -468,10 +477,13 @@ class _InitMixin[GridT: AnyGrid]:
 
 class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin):
     # Provides implementations for arithmetic operations
-    grid: GridT
     entries: "Array"
 
-    def __init__(self, grid: GridT, entries: "Array") -> None:
+    @property
+    def grid(self) -> GridT:
+        raise NotImplementedError("This property must be implemented by subclass.")
+
+    def __init__(self, grid: "AnyGrid", entries: "Array") -> None:
         del grid, entries
         raise NotImplementedError("This mixin should not be instantiated directly.")
 
@@ -587,11 +599,27 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin):
 
 
 class _Uniform1DMixin:
-    grid: "Grid1D[Linspace]"
+    @property
+    def grid(self) -> "Grid1D[Linspace]":
+        raise NotImplementedError("This property must be implemented by subclass.")
 
     @property
     def resolution(self) -> float:
         return self.grid[0].step
+
+
+@overload
+def frequency_series(
+    frequencies: "Linspace",
+    entries: "Array",
+) -> "UniformFrequencySeries": ...
+
+
+@overload
+def frequency_series[AxisT: Axis](
+    frequencies: AxisT,
+    entries: "Array",
+) -> "FrequencySeries[AxisT]": ...
 
 
 def frequency_series[AxisT: Axis](
@@ -605,6 +633,20 @@ def frequency_series[AxisT: Axis](
         return FrequencySeries[AxisT]((frequencies,), entries)
     else:
         return UniformFrequencySeries((_frequencies,), entries)
+
+
+@overload
+def time_series(
+    times: "Linspace",
+    entries: "Array",
+) -> "UniformTimeSeries": ...
+
+
+@overload
+def time_series[AxisT: Axis](
+    times: AxisT,
+    entries: "Array",
+) -> "TimeSeries[AxisT]": ...
 
 
 def time_series[AxisT: Axis](
@@ -669,7 +711,7 @@ class FrequencySeries[AxisT: Axis](
         return super().angle(**kwargs).unwrap(period=2 * self.xp.pi)
 
     @property
-    def frequencies(self) -> Axis | Linspace:
+    def frequencies(self):
         """The frequencies of the series."""
         return self.grid[0]
 
@@ -1049,7 +1091,7 @@ class Phasor[AxisT: Axis](
     @classmethod
     def make(
         cls,
-        frequencies: "AxisT",
+        frequencies: "Axis",
         amplitudes: "Array",
         phases: "Array",
     ):
@@ -1106,11 +1148,19 @@ class Phasor[AxisT: Axis](
         phases = interpolator(self_freq, self.phases.squeeze())(_frequencies)
         return Phasor[AT].make(frequencies, amplitudes, phases)
 
-    def to_frequency_series(self) -> FrequencySeries[AxisT]:
+    @overload
+    def to_frequency_series(self: "Phasor[Linspace]") -> "UniformFrequencySeries": ...
+
+    @overload
+    def to_frequency_series[AT: "Axis"](
+        self: "Phasor[AT]",
+    ) -> "FrequencySeries[AT]": ...
+
+    def to_frequency_series(self):
         """Get the :class:`.FrequencySeries` representation of the waveform."""
         xp = xpc.get_namespace(self.amplitudes, self.phases)
-        return FrequencySeries[AxisT](
-            (self.frequencies,),
+        return frequency_series(
+            self.frequencies,
             self.amplitudes * xp.exp(1j * self.phases),
         )
 

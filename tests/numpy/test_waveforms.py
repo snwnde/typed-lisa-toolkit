@@ -12,9 +12,17 @@ from tests._shared.waveforms_helpers import (
     build_fake_harmonic_projected_waveform,
     build_harmonic_projected_frequency_waveform,
     build_harmonic_waveform_frequency_series,
+    make_mock_phasor,
 )
 from typed_lisa_toolkit.containers import modes
 from typed_lisa_toolkit.containers.waveforms import (
+    phasor_to_fs_hpw,
+    phasor_to_fs_hw,
+    phasor_to_fs_pw,
+    densify_phasor,
+    densify_phasor_hpw,
+    densify_phasor_hw,
+    densify_phasor_pw,
     get_dense_maker,
     harmonic_projected_waveform,
     harmonic_waveform,
@@ -221,6 +229,163 @@ class TestDenseMakerNumpy(unittest.TestCase):
                 self.assertIs(out[harmonic][channel], embedded)
 
 
+class TestDensifyHelpersNumpy(unittest.TestCase):
+    def test_densify_phasor_embed_false(self):
+        frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
+        interpolator = MagicMock(name="interpolator")
+        phasor, interpolated, _ = make_mock_phasor(f_min=1.0, f_max=3.0)
+        phasor.entries = frequencies
+
+        out = densify_phasor(phasor, interpolator, frequencies, embed=False)
+
+        phasor.get_interpolated.assert_called_once()
+        args, kwargs = phasor.get_interpolated.call_args
+        self.assertEqual(kwargs, {})
+        npt.assert_allclose(args[0], np.array([1.0, 2.0, 3.0]))
+        self.assertIs(args[1], interpolator)
+        interpolated.get_embedded.assert_not_called()
+        self.assertIs(out, interpolated)
+
+    def test_densify_phasor_embed_true(self):
+        frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
+        interpolator = MagicMock(name="interpolator")
+        phasor, interpolated, embedded = make_mock_phasor(f_min=1.0, f_max=3.0)
+        phasor.entries = frequencies
+
+        out = densify_phasor(phasor, interpolator, frequencies, embed=True)
+
+        interpolated.get_embedded.assert_called_once()
+        args, kwargs = interpolated.get_embedded.call_args
+        self.assertIs(args[0][0], frequencies)
+        self.assertIn("known_slices", kwargs)
+        self.assertEqual(len(kwargs["known_slices"]), 1)
+        self.assertIs(out, embedded)
+
+    def test_densify_phasor_pw_preserves_channels(self):
+        frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
+        interpolator = MagicMock(name="interpolator")
+        fake_hpw, handles = build_fake_harmonic_projected_waveform()
+        mode = fake_hpw.harmonics[0]
+        wf = fake_hpw[mode]
+        for phasor, _, _ in handles[mode].values():
+            phasor.entries = frequencies
+
+        with patch(
+            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            side_effect=lambda d: d,  # type: ignore
+        ):
+            out = densify_phasor_pw(wf, interpolator, frequencies, embed=False)
+
+        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
+        for channel in wf.channel_names:
+            _, interpolated, _ = handles[mode][channel]
+            self.assertIs(out[channel], interpolated)
+
+    def test_densify_phasor_hw_preserves_harmonics(self):
+        frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
+        interpolator = MagicMock(name="interpolator")
+        mode_22 = modes.Harmonic(2, 2)
+        mode_33 = modes.Harmonic(3, 3)
+        p22, i22, _ = make_mock_phasor(f_min=1.0, f_max=3.0)
+        p33, i33, _ = make_mock_phasor(f_min=0.5, f_max=2.0)
+        p22.entries = frequencies
+        p33.entries = frequencies
+        wf = harmonic_waveform({mode_22: p22, mode_33: p33})
+
+        out = densify_phasor_hw(wf, interpolator, frequencies, embed=False)
+
+        self.assertEqual(type(out).__name__, "HomogeneousHarmonicWaveform")
+        self.assertEqual(tuple(out.keys()), (mode_22, mode_33))
+        self.assertIs(out[mode_22], i22)
+        self.assertIs(out[mode_33], i33)
+
+    def test_densify_phasor_hpw_returns_homogeneous_container(self):
+        frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
+        interpolator = MagicMock(name="interpolator")
+        wf, handles = build_fake_harmonic_projected_waveform()
+        for channels in handles.values():
+            for phasor, _, _ in channels.values():
+                phasor.entries = frequencies
+
+        with patch(
+            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            side_effect=lambda d: d,  # type: ignore
+        ):
+            out = densify_phasor_hpw(wf, interpolator, frequencies, embed=False)
+
+        self.assertEqual(type(out).__name__, "HomogeneousHarmonicProjectedWaveform")
+        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
+        self.assertEqual(out.channel_names, ("X", "Y"))
+        for mode in wf.harmonics:
+            for channel in wf[mode].channel_names:
+                _, interpolated, _ = handles[mode][channel]
+                self.assertIs(out[mode][channel], interpolated)
+
+
+class TestCombineHelpersNumpy(unittest.TestCase):
+    def test_phasor_to_fs_hw_converts_each_mode(self):
+        mode_22 = modes.Harmonic(2, 2)
+        mode_33 = modes.Harmonic(3, 3)
+        p22 = MagicMock(name="p22")
+        p33 = MagicMock(name="p33")
+        fs22 = MagicMock(name="fs22")
+        fs33 = MagicMock(name="fs33")
+        p22.to_frequency_series.return_value = fs22
+        p33.to_frequency_series.return_value = fs33
+        wf = harmonic_waveform({mode_22: p22, mode_33: p33})
+
+        out = phasor_to_fs_hw(wf)
+
+        self.assertEqual(type(out).__name__, "HarmonicWaveform")
+        self.assertIs(out[mode_22], fs22)
+        self.assertIs(out[mode_33], fs33)
+
+    def test_phasor_to_fs_pw_converts_each_channel(self):
+        p_x = MagicMock(name="p_x")
+        p_y = MagicMock(name="p_y")
+        fs_x = MagicMock(name="fs_x")
+        fs_y = MagicMock(name="fs_y")
+        p_x.to_frequency_series.return_value = fs_x
+        p_y.to_frequency_series.return_value = fs_y
+        fake_hpw, _ = build_fake_harmonic_projected_waveform()
+        wf = fake_hpw[fake_hpw.harmonics[0]]
+        wf["X"] = p_x
+        wf["Y"] = p_y
+
+        with patch(
+            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            side_effect=lambda d: d,  # type: ignore
+        ):
+            out = phasor_to_fs_pw(wf)
+
+        self.assertEqual(tuple(out.keys()), ("X", "Y"))
+        self.assertIs(out["X"], fs_x)
+        self.assertIs(out["Y"], fs_y)
+
+    def test_phasor_to_fs_hpw_converts_nested_leaves(self):
+        wf, _ = build_fake_harmonic_projected_waveform()
+        expected = {}
+        for mode in wf.harmonics:
+            expected[mode] = {}
+            for channel in wf[mode].channel_names:
+                p = wf[mode][channel]
+                fs = MagicMock(name=f"fs_{mode}_{channel}")
+                p.to_frequency_series.return_value = fs
+                expected[mode][channel] = fs
+
+        with patch(
+            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            side_effect=lambda d: d,  # type: ignore
+        ):
+            out = phasor_to_fs_hpw(wf)
+
+        self.assertEqual(type(out).__name__, "HarmonicProjectedWaveform")
+        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
+        for mode in wf.harmonics:
+            for channel in wf[mode].channel_names:
+                self.assertIs(out[mode][channel], expected[mode][channel])
+
+
 class TestWaveformConstructorsNumpy(unittest.TestCase):
     def test_constructor_aliases(self):
         self.assertIs(hw, harmonic_waveform)
@@ -230,21 +395,27 @@ class TestWaveformConstructorsNumpy(unittest.TestCase):
 
     def test_harmonic_waveform_constructor(self):
         case = build_harmonic_waveform_frequency_series(np)
-        wf = harmonic_waveform({case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]})
+        wf = harmonic_waveform(
+            {case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]}
+        )
 
         self.assertEqual(type(wf).__name__, "HarmonicWaveform")
         self.assertEqual(tuple(wf.keys()), (case["mode_22"], case["mode_33"]))
 
     def test_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(np)
-        resp = projected_waveform({"X": case["resp_22"]["X"], "Y": case["resp_22"]["Y"]})
+        resp = projected_waveform(
+            {"X": case["resp_22"]["X"], "Y": case["resp_22"]["Y"]}
+        )
 
         self.assertEqual(type(resp).__name__, "ProjectedWaveform")
         self.assertEqual(resp.channel_names, ("X", "Y"))
 
     def test_harmonic_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(np)
-        wf = harmonic_projected_waveform({case["mode_22"]: case["resp_22"], case["mode_33"]: case["resp_33"]})
+        wf = harmonic_projected_waveform(
+            {case["mode_22"]: case["resp_22"], case["mode_33"]: case["resp_33"]}
+        )
 
         self.assertEqual(type(wf).__name__, "HarmonicProjectedWaveform")
         self.assertEqual(tuple(wf.keys()), (case["mode_22"], case["mode_33"]))

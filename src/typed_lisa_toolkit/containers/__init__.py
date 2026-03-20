@@ -9,6 +9,7 @@ from .waveforms import (
     homogeneous_harmonic_projected_waveform,
     hpw,
     hw,
+    hhw,
     projected_waveform,
     pw,
 )
@@ -29,6 +30,7 @@ __all__ = [
     "harmonic_projected_waveform",
     "homogeneous_harmonic_projected_waveform",
     "hw",
+    "hhw",
     "pw",
     "hpw",
     "hhpw",

@@ -51,7 +51,11 @@ from . import tapering
 if TYPE_CHECKING:
     from . import waveforms as wf
     from .representations import Linspace
-    from .representations import Representation as AnyReps
+
+    AnyGrid = reps.AnyGrid
+    from .representations import Representation
+
+    AnyReps = Representation[AnyGrid]
 
     Axis = reps.Axis
 
@@ -73,8 +77,12 @@ log = logging.getLogger(__name__)
 class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
     """Mixin class to provide get_subset method for data containers."""
 
-    representation: RepT
     channel_names: tuple[str, ...]
+
+    @property
+    def representation(self) -> RepT:
+        """Return the underlying representation."""
+        raise NotImplementedError("This property must be implemented by subclass.")
 
     def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
         del representation, channels
@@ -120,8 +128,10 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         channels: tuple[str, ...],
         name: str | None = None,
     ):
-        entries = representation.entries
-        if entries.shape[1] != len(channels):
+        self.channel_names = tuple(channels)
+        self._init_repr(representation)
+        entries = self.representation.entries
+        if entries.shape[1] != len(self.channel_names):
             raise ValueError(
                 "Channel count mismatch between representation entries and channel names."
             )
@@ -129,15 +139,18 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
             raise ValueError(
                 "Data containers require n_harmonics=1 in the representation entries."
             )
-        self._init_repr(representation)
-        self.channel_names = tuple(channels)
         self._channel_to_idx = {chn: i for i, chn in enumerate(channels)}
         self.name = name
 
-    def _init_repr(self, representation: "AnyReps"):
-        self.representation = cast(RepT, representation)
+    @property
+    def representation(self) -> RepT:
+        """Return the underlying representation."""
+        return cast(RepT, self._representation)
 
-    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
+    def _init_repr(self, representation: "AnyReps"):
+        self._representation = representation
+
+    def create_new(self, representation: "AnyReps", channels: tuple[str, ...]) -> Self:
         """Create a new instance with a representation and channels."""
         return type(self)(representation, channels, self.name)
 
@@ -162,7 +175,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         del kwargs  # Unused
 
         if isinstance(other, _ChannelMapping):
-            other = cast(_ChannelMapping[Any], other)
+            other = cast("_ChannelMapping[AnyReps]", other)
             if self.channel_names != other.channel_names:
                 raise ValueError("Cannot operate on data with different channel sets.")
             if reflected:
@@ -177,7 +190,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
                 new_repr = op(self.representation, other)
 
         if inplace:
-            self.representation = cast(RepT, new_repr)
+            self._representation = cast("AnyReps", new_repr)
             return self
 
         return self.create_new(cast(RepT, new_repr), self.channel_names)
@@ -211,7 +224,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         return self.create_new(picked_repr, channels)
 
     @classmethod
-    def from_dict(cls, data_dict: Mapping[str, RepT]) -> Self:
+    def from_dict[RT: "AnyReps"](cls, data_dict: Mapping[str, RT]) -> Self:
         """Create a new instance from a dictionary of channel names to representations."""
         if len(data_dict) == 0:
             raise ValueError("Cannot build data container from an empty mapping.")
@@ -253,6 +266,11 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         if self.name is not None:
             return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
         return f"{self.__class__.__name__}({items!r})"
+
+    @overload # type: ignore[misc]
+    def grid[GridT: AnyGrid](  # pyright: ignore[reportInconsistentOverload]
+        self: _ChannelMapping["Representation[GridT]"],
+    ) -> GridT: ...
 
     @property
     def grid(self):
@@ -360,7 +378,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     _reps_type = reps.UniformTimeSeries
 
     def _init_repr(self, representation: "AnyReps"):
-        self.representation = reps.UniformTimeSeries(
+        self._representation = reps.UniformTimeSeries(
             representation.grid, representation.entries
         )
 
@@ -491,7 +509,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     _reps_type = reps.UniformFrequencySeries
 
     def _init_repr(self, representation: "AnyReps"):
-        self.representation = reps.UniformFrequencySeries(
+        self._representation = reps.UniformFrequencySeries(
             representation.grid, representation.entries
         )
 
@@ -604,7 +622,7 @@ class TimedFSData(FSData):
 
     def __init__(
         self,
-        representation: reps.UniformFrequencySeries,
+        representation: "AnyReps",
         channels: tuple[str, ...],
         times: reps.Linspace | npt.NDArray[np.floating[Any]] | None = None,
         name: str | None = None,
@@ -632,9 +650,7 @@ class TimedFSData(FSData):
         self.dt = self.times.step
         return self
 
-    def create_new(
-        self, representation: reps.UniformFrequencySeries, channels: tuple[str, ...]
-    ):
+    def create_new(self, representation: "AnyReps", channels: tuple[str, ...]):
         """Create a new instance preserving times."""
         new = type(self)(representation, channels, times=self.times, name=self.name)
         return new
