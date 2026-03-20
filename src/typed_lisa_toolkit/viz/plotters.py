@@ -48,7 +48,7 @@ from __future__ import annotations
 import abc
 import copy
 import logging
-from typing import Any, Literal, Self, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 import matplotlib.axes
 import matplotlib.figure

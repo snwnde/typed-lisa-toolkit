@@ -215,7 +215,9 @@ class TestDenseMakerJAX(unittest.TestCase):
                 # with the *full* frequency grid to zero-pad outside the phasor range.
                 interpolated.get_embedded.assert_called_once()
                 args, kwargs = interpolated.get_embedded.call_args
-                self.assertIs(args[0], frequencies)
+                self.assertIsInstance(args[0], tuple)
+                self.assertEqual(len(args[0]), 1)
+                self.assertIs(args[0][0], frequencies)
                 self.assertIn("known_slices", kwargs)
                 self.assertEqual(len(kwargs["known_slices"]), 1)
                 # Output is the embedded mock, not the raw interpolated one.

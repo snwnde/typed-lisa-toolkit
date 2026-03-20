@@ -213,7 +213,7 @@ class TestDataContainersNumpy(unittest.TestCase):
         case = build_fd_pair(np)
         embedding = np.array([0.5, 1.0, 2.0, 4.0, 5.0])
 
-        embedded = case["left"].get_embedded(embedding)
+        embedded = case["left"].get_embedded((embedding,))
         got = np.asarray(embedded.get_kernel())
         source = np.asarray(case["left"].get_kernel())
 

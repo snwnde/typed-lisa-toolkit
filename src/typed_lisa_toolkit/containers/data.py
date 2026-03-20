@@ -37,7 +37,7 @@ import logging
 import pathlib
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, cast, overload
 
 import array_api_compat as xpc
 import h5py
@@ -50,7 +50,10 @@ from . import tapering
 
 if TYPE_CHECKING:
     from . import waveforms as wf
-    from .representations import Linspace, Representation as AnyReps
+    from .representations import Linspace
+    from .representations import Representation as AnyReps
+
+    Axis = reps.Axis
 
     class _SubsettableRep(AnyReps, Protocol):
         def get_subset(
@@ -59,9 +62,6 @@ if TYPE_CHECKING:
             interval: tuple[float, float] | None = None,
             slice: slice | None = None,
         ) -> Self: ...
-
-    class _EmbeddableRep(AnyReps, Protocol):
-        def get_embedded(self, embedding_grid: npt.NDArray[np.number]) -> Self: ...
 
 
 log = logging.getLogger(__name__)
@@ -111,23 +111,6 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
         return plotter(self.get_subset(interval=interval)).compare(
             plotter(compare_to.get_subset(interval=interval)), **kwargs
         )
-
-
-class _EmbeddableMixin[RepT: "_EmbeddableRep"](Mapping[str, RepT]):
-    """Mixin class to provide get_embedded method for data containers."""
-
-    representation: RepT
-    channel_names: tuple[str, ...]
-
-    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
-        del representation, channels
-        raise NotImplementedError("This mixin should not be instantiated directly.")
-
-    def get_embedded(self, embedding_grid: npt.NDArray[np.number]) -> Self:
-        """Return the embedded data."""
-        embedded_repr = self.representation.get_embedded(embedding_grid)
-        return self.create_new(embedded_repr, self.channel_names)  # type: ignore[arg-type]
-        # mypy's inference is confused
 
 
 class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMixin):
@@ -367,7 +350,7 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
 
 
 class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
-    Data[RepT], _GetSubsetMixin[RepT], _EmbeddableMixin[RepT]
+    Data[RepT], _GetSubsetMixin[RepT]
 ): ...
 
 
@@ -405,6 +388,14 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     def get_frequencies(self):
         """Return the frequencies grid matching the time grid."""
         return np.fft.rfftfreq(len(self.times), d=self.dt)
+
+    def get_embedded(self, embedding_grid: "reps.Grid1D[Axis]"):
+        """Return data embedded on a new 1D grid."""
+        embedded = self.representation.get_embedded(embedding_grid)
+        return type(self)(
+            embedded,
+            self.channel_names,
+        ).set_name(self.name)
 
     @overload
     def to_fsdata(
@@ -527,6 +518,14 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     def set_times(self, times: npt.NDArray[np.floating[Any]]):
         """Set the time grid."""
         return TimedFSData(self.representation, self.channel_names, times)
+
+    def get_embedded(self, embedding_grid: "reps.Grid1D[Axis]"):
+        """Return data embedded on a new 1D grid."""
+        embedded = self.representation.get_embedded(embedding_grid)
+        return type(self)(
+            embedded,
+            self.channel_names,
+        ).set_name(self.name)
 
     def to_tsdata(
         self,

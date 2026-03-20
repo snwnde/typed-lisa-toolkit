@@ -5,12 +5,12 @@ from .representations import frequency_series, phasor, stft, time_series, wdm
 from .waveforms import (
     harmonic_projected_waveform,
     harmonic_waveform,
-    homogeneous_harmonic_projected_waveform,
     hhpw,
+    homogeneous_harmonic_projected_waveform,
     hpw,
     hw,
-    pw,
     projected_waveform,
+    pw,
 )
 
 __all__ = [

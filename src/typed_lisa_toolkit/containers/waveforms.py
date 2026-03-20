@@ -32,13 +32,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Iterator, Self, cast, Callable
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Self, cast
 
 import array_api_compat as xpc
 
 from . import data, modes
 from . import representations as reps
-
 
 # Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
 Mode = modes.Harmonic | modes.QNM
@@ -202,7 +201,7 @@ def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: AnyReps](
     return HomogeneousHarmonicProjectedWaveform(modes_to_projected_waveforms)
 
 
-# Convenience aliases for notebook ergonomics while keeping canonical names.
+# Convenience aliases
 hw = harmonic_waveform
 pw = projected_waveform
 hpw = harmonic_projected_waveform
@@ -259,7 +258,7 @@ def get_dense_maker(
             nwf = wf.get_interpolated(freqs, interpolator)
             if not embed:
                 return nwf
-            return nwf.get_embedded(frequencies, known_slices=(_slice,))
+            return nwf.get_embedded((frequencies,), known_slices=(_slice,))
 
         def do_response(resp: ProjectedWaveform[reps.Phasor["Axis"]]):
             return ProjectedWaveform[reps.Phasor[AxisT]].from_dict(

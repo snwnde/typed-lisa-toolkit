@@ -550,7 +550,7 @@ class TestEmbedOperationsJAX(unittest.TestCase):
         )
 
         # Embed
-        fs_large = fs_small.get_embedded(freqs_large)
+        fs_large = fs_small.get_embedded((freqs_large,))
 
         # Check grid
         self.assertEqual(len(fs_large.grid), 1)
@@ -580,12 +580,13 @@ class TestEmbedOperationsJAX(unittest.TestCase):
         times_large = Linspace(0.0, 0.1, 100)
 
         # Embed
-        ts_large = ts_small.get_embedded(times_large)
+        ts_large = ts_small.get_embedded((times_large,))
 
-        # Check grid is tuple with converted array
+        # Check helper-based construction preserves Linspace semantics
         self.assertIsInstance(ts_large.grid, tuple)
         self.assertEqual(len(ts_large.grid), 1)
-        npt.assert_array_equal(np.array(ts_large.grid[0]), np.array(times_large))
+        self.assertIsInstance(ts_large.grid[0], Linspace)
+        self.assertEqual(ts_large.grid[0], times_large)
 
         # Check shape
         self.assertEqual(ts_large.entries.shape, (2, 1, 1, 1, 100))
