@@ -267,7 +267,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
             return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
         return f"{self.__class__.__name__}({items!r})"
 
-    @overload # type: ignore[misc]
+    @overload  # type: ignore[misc]
     def grid[GridT: AnyGrid](  # pyright: ignore[reportInconsistentOverload]
         self: _ChannelMapping["Representation[GridT]"],
     ) -> GridT: ...
@@ -486,7 +486,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             end_values=time_end_values,
         )
 
-        tapering_window = cast(Any, tapering(self.times)) if tapering is not None else 1
+        tapering_window = tapering(self.times) if tapering is not None else 1
         signal = self.entries * tapering_window
         padded_signal = xp.pad(
             signal,
@@ -494,7 +494,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             mode="constant",
         )
 
-        padded_repr = reps.UniformTimeSeries(padded_time, padded_signal)
+        padded_repr = reps.UniformTimeSeries((padded_time,), padded_signal)
         return self.create_new(padded_repr, self.channel_names)
 
     def _get_plotter(self):

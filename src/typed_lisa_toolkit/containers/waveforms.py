@@ -154,7 +154,7 @@ class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: AnyReps](
         The shape is ``(n_batches, n_channels, n_harmonics, n_features, *grid_like)``
         """
         xp = self.__xp__()
-        return xp.stack([self[harmonic].entries for harmonic in self.harmonics], axis=2)
+        return xp.concat([self[harmonic].entries for harmonic in self.harmonics], axis=2)
 
 
 class ProjectedWaveform[RepT: AnyReps](data._ChannelMapping[RepT]):  # pyright: ignore[reportPrivateUsage]
@@ -205,7 +205,7 @@ class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
         The returned array is suitable for downstream processing (e.g., by noise models to compute inner products).
         """
         xp = xpc.get_namespace(self._first.entries)
-        return xp.stack([self[harmonic].entries for harmonic in self.harmonics], axis=2)
+        return xp.concat([self[harmonic].entries for harmonic in self.harmonics], axis=2)
 
 
 def harmonic_waveform[ModeT: Mode, RepT: AnyReps](
@@ -255,7 +255,7 @@ def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
     wf: HomogeneousHarmonicProjectedWaveform[ModeT, reps.FrequencySeries[AxisT]],
 ) -> ProjectedWaveform[reps.FrequencySeries[AxisT]]:
     """Sum over modes."""
-    entries = wf.get_kernel().sum(axis=2)  # c.f. shape convention
+    entries = wf.get_kernel().sum(axis=2, keepdims=True)  # c.f. shape convention
     return wf._first.create_like(entries, wf.channel_names)  # pyright: ignore[reportPrivateUsage]
 
 

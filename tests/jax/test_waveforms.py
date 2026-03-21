@@ -88,9 +88,9 @@ class TestHarmonicProjectedWaveformJAX(unittest.TestCase):
         self.assertEqual(wf.channel_names, ("X", "Y"))
 
         kernel = np.asarray(wf.get_kernel())
-        self.assertEqual(kernel.shape, (1, 2, 2, 1, 1, 3))
+        self.assertEqual(kernel.shape, (1, 2, 2, 1, 3))
 
-        expected = np.stack(
+        expected = np.concatenate(
             [
                 np.asarray(case["resp_22"].entries),
                 np.asarray(case["resp_33"].entries),
@@ -105,7 +105,7 @@ class TestHarmonicProjectedWaveformJAX(unittest.TestCase):
 
         summed = sum_harmonics(wf)
         got = np.asarray(summed.get_kernel())
-        manual = np.asarray(wf.get_kernel()).sum(axis=2)
+        manual = np.asarray(wf.get_kernel()).sum(axis=2, keepdims=True)
 
         self.assertEqual(summed.channel_names, ("X", "Y"))
         self.assertEqual(got.shape, (1, 2, 1, 1, 3))

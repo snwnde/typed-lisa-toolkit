@@ -398,8 +398,16 @@ class TestDataContainersNumpy(unittest.TestCase):
 
     def test_tsdata_get_zero_padded(self):
         _, _, _, tsdata = _build_tsdata_numpy()
-        with self.assertRaises(TypeError):
-            tsdata.get_zero_padded((tsdata.dt, 2 * tsdata.dt))
+        padded = tsdata.get_zero_padded((tsdata.dt, 2 * tsdata.dt))
+
+        self.assertIsInstance(padded, TSData)
+        self.assertEqual(np.asarray(padded.entries).shape[-1], np.asarray(tsdata.entries).shape[-1] + 3)
+        npt.assert_allclose(
+            np.asarray(padded.entries)[..., 1:-2],
+            np.asarray(tsdata.entries),
+        )
+        npt.assert_allclose(np.asarray(padded.entries)[..., :1], 0.0)
+        npt.assert_allclose(np.asarray(padded.entries)[..., -2:], 0.0)
 
     def test_load_data_unknown_type_raises(self):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
