@@ -224,7 +224,9 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         return self.create_new(picked_repr, channels)
 
     @classmethod
-    def from_dict[RT: "AnyReps"](cls, data_dict: Mapping[str, RT]) -> Self:
+    def from_dict[RT: "AnyReps"](
+        cls, data_dict: Mapping[str, RT], **additions: Any
+    ) -> Self:
         """Create a new instance from a dictionary of channel names to representations."""
         if len(data_dict) == 0:
             raise ValueError("Cannot build data container from an empty mapping.")
@@ -234,7 +236,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         entries = xp.concatenate([data_dict[chn].entries for chn in channels], axis=1)
         # Assume all representations have the same grid and type
         first = next(iter(data_dict.values()))
-        return cls(first.create_like(entries), channels)
+        return cls(first.create_like(entries), channels, **additions)
 
     def set_name(self, name: str | None) -> Self:
         """Set the name of the data container.
@@ -349,8 +351,25 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
         return {}
 
     @classmethod
-    def load(cls, file_path: str | pathlib.Path) -> Self:
+    def _load_legacy(cls, file_path: str | pathlib.Path) -> Self:
         """Load the data from an HDF5 file."""
+        with h5py.File(str(file_path), "r") as f:
+            additions = cls._additional_load(f)
+            dict_ = {
+                chnname: cls._reps_type(
+                    grid=(f[chnname]["grid"][...],),  # type: ignore
+                    entries=f[chnname]["entries"][...][None, None, None, None, ...],  # type: ignore
+                )
+                for chnname in f
+                if isinstance(f[chnname], h5py.Group)
+            }
+        return cls.from_dict(dict_, **additions)
+
+    @classmethod
+    def load(cls, file_path: str | pathlib.Path, legacy: bool = False) -> Self:
+        """Load the data from an HDF5 file."""
+        if legacy:
+            return cls._load_legacy(file_path)
         with h5py.File(str(file_path), "r") as f:
             channels_attr = cast(Iterable[Any], f.attrs["channels"])
             channels = tuple(str(ch) for ch in channels_attr)
@@ -758,16 +777,16 @@ class WDMData(Data[reps.WDM]):
         return plotter.draw(**kwargs)
 
 
-def load_data(file_path: str | pathlib.Path):
+def load_data(file_path: str | pathlib.Path, legacy: bool = False):
     """Load the data from a saved HDF5 file."""
     with h5py.File(str(file_path), "r") as f:
         data_type = str(f.attrs["type"])
     if data_type == "TSData":
-        return TSData.load(file_path)
+        return TSData.load(file_path, legacy=legacy)
     if data_type == "FSData":
-        return FSData.load(file_path)
+        return FSData.load(file_path, legacy=legacy)
     if data_type == "TimedFSData":
-        return TimedFSData.load(file_path)
+        return TimedFSData.load(file_path, legacy=legacy)
     raise ValueError(f"Unknown data type: {data_type}")
 
 
