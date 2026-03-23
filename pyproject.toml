@@ -4,7 +4,7 @@ dynamic = ["version"]
 authors = [{ name = "Sen-wen Deng", email = "deng@apc.in2p3.fr" }]
 description = "Fully typed interfaces for LISA data analysis"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
