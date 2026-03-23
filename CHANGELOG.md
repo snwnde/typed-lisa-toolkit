@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.4 - 2026-03-23
+#### Features
+- add waveform helpers - (35696e7) - Senwen Deng
+- short name waveform constructors - (4b1e04a) - Senwen Deng
+#### Bug Fixes
+- py version - (97a1b65) - Senwen Deng
+- legacy load - (d88f396) - Senwen Deng
+- sum harmonics - (ab0b94b) - Senwen Deng
+#### Refactoring
+- better api - (45ec1d1) - Senwen Deng
+
+- - -
+
 ## 0.5.3 - 2026-03-19
 #### Refactoring
 - <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>homogeneous harmonic projected waveform - (6d7b537) - Senwen Deng
