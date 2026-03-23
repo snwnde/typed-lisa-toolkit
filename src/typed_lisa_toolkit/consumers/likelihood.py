@@ -11,7 +11,7 @@
 """
 
 import logging
-from typing import TYPE_CHECKING, Protocol, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..containers import data as dm
 from ..containers import modes
@@ -78,7 +78,7 @@ class FDWhittleLikelihood(Likelihood[FDUniformHomogeneous]):
 
     def __init__(self, data: dm.FSData, noisemodel: nm.FDNoiseModelLike):
         self.data = data
-        self.noisemodel = noisemodel#.reset()
+        self.noisemodel = noisemodel  # .reset()
         self.data_square = self.noisemodel.get_scalar_product(data, data)
 
     @classmethod

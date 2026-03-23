@@ -37,7 +37,7 @@ import logging
 import pathlib
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from typing import TYPE_CHECKING, Any, Literal, Self, cast, overload, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, cast, overload
 
 import array_api_compat as xpc
 import h5py
@@ -50,7 +50,14 @@ from . import tapering
 
 if TYPE_CHECKING:
     from . import waveforms as wf
-    from .representations import Linspace, Representation as AnyReps
+    from .representations import Linspace
+
+    AnyGrid = reps.AnyGrid
+    from .representations import Representation
+
+    AnyReps = Representation[AnyGrid]
+
+    Axis = reps.Axis
 
     class _SubsettableRep(AnyReps, Protocol):
         def get_subset(
@@ -59,9 +66,6 @@ if TYPE_CHECKING:
             interval: tuple[float, float] | None = None,
             slice: slice | None = None,
         ) -> Self: ...
-
-    class _EmbeddableRep(AnyReps, Protocol):
-        def get_embedded(self, embedding_grid: npt.NDArray[np.number]) -> Self: ...
 
 
 log = logging.getLogger(__name__)
@@ -73,8 +77,12 @@ log = logging.getLogger(__name__)
 class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
     """Mixin class to provide get_subset method for data containers."""
 
-    representation: RepT
     channel_names: tuple[str, ...]
+
+    @property
+    def representation(self) -> RepT:
+        """Return the underlying representation."""
+        raise NotImplementedError("This property must be implemented by subclass.")
 
     def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
         del representation, channels
@@ -113,23 +121,6 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
         )
 
 
-class _EmbeddableMixin[RepT: "_EmbeddableRep"](Mapping[str, RepT]):
-    """Mixin class to provide get_embedded method for data containers."""
-
-    representation: RepT
-    channel_names: tuple[str, ...]
-
-    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
-        del representation, channels
-        raise NotImplementedError("This mixin should not be instantiated directly.")
-
-    def get_embedded(self, embedding_grid: npt.NDArray[np.number]) -> Self:
-        """Return the embedded data."""
-        embedded_repr = self.representation.get_embedded(embedding_grid)
-        return self.create_new(embedded_repr, self.channel_names)  # type: ignore[arg-type]
-        # mypy's inference is confused
-
-
 class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMixin):
     def __init__(
         self,
@@ -137,8 +128,10 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         channels: tuple[str, ...],
         name: str | None = None,
     ):
-        entries = representation.entries
-        if entries.shape[1] != len(channels):
+        self.channel_names = tuple(channels)
+        self._init_repr(representation)
+        entries = self.representation.entries
+        if entries.shape[1] != len(self.channel_names):
             raise ValueError(
                 "Channel count mismatch between representation entries and channel names."
             )
@@ -146,15 +139,18 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
             raise ValueError(
                 "Data containers require n_harmonics=1 in the representation entries."
             )
-        self._init_repr(representation)
-        self.channel_names = tuple(channels)
         self._channel_to_idx = {chn: i for i, chn in enumerate(channels)}
         self.name = name
 
-    def _init_repr(self, representation: "AnyReps"):
-        self.representation = cast(RepT, representation)
+    @property
+    def representation(self) -> RepT:
+        """Return the underlying representation."""
+        return cast(RepT, self._representation)
 
-    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
+    def _init_repr(self, representation: "AnyReps"):
+        self._representation = representation
+
+    def create_new(self, representation: "AnyReps", channels: tuple[str, ...]) -> Self:
         """Create a new instance with a representation and channels."""
         return type(self)(representation, channels, self.name)
 
@@ -179,7 +175,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         del kwargs  # Unused
 
         if isinstance(other, _ChannelMapping):
-            other = cast(_ChannelMapping[Any], other)
+            other = cast("_ChannelMapping[AnyReps]", other)
             if self.channel_names != other.channel_names:
                 raise ValueError("Cannot operate on data with different channel sets.")
             if reflected:
@@ -194,7 +190,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
                 new_repr = op(self.representation, other)
 
         if inplace:
-            self.representation = cast(RepT, new_repr)
+            self._representation = cast("AnyReps", new_repr)
             return self
 
         return self.create_new(cast(RepT, new_repr), self.channel_names)
@@ -228,7 +224,9 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         return self.create_new(picked_repr, channels)
 
     @classmethod
-    def from_dict(cls, data_dict: Mapping[str, RepT]) -> Self:
+    def from_dict[RT: "AnyReps"](
+        cls, data_dict: Mapping[str, RT], **additions: Any
+    ) -> Self:
         """Create a new instance from a dictionary of channel names to representations."""
         if len(data_dict) == 0:
             raise ValueError("Cannot build data container from an empty mapping.")
@@ -238,7 +236,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         entries = xp.concatenate([data_dict[chn].entries for chn in channels], axis=1)
         # Assume all representations have the same grid and type
         first = next(iter(data_dict.values()))
-        return cls(first.create_like(entries), channels)
+        return cls(first.create_like(entries), channels, **additions)
 
     def set_name(self, name: str | None) -> Self:
         """Set the name of the data container.
@@ -270,6 +268,11 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         if self.name is not None:
             return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
         return f"{self.__class__.__name__}({items!r})"
+
+    @overload  # type: ignore[misc]
+    def grid[GridT: AnyGrid](  # pyright: ignore[reportInconsistentOverload]
+        self: _ChannelMapping["Representation[GridT]"],
+    ) -> GridT: ...
 
     @property
     def grid(self):
@@ -348,8 +351,25 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
         return {}
 
     @classmethod
-    def load(cls, file_path: str | pathlib.Path) -> Self:
+    def _load_legacy(cls, file_path: str | pathlib.Path) -> Self:
         """Load the data from an HDF5 file."""
+        with h5py.File(str(file_path), "r") as f:
+            additions = cls._additional_load(f)
+            dict_ = {
+                chnname: cls._reps_type(
+                    grid=(f[chnname]["grid"][...],),  # type: ignore
+                    entries=f[chnname]["entries"][...][None, None, None, None, ...],  # type: ignore
+                )
+                for chnname in f
+                if isinstance(f[chnname], h5py.Group)
+            }
+        return cls.from_dict(dict_, **additions)
+
+    @classmethod
+    def load(cls, file_path: str | pathlib.Path, legacy: bool = False) -> Self:
+        """Load the data from an HDF5 file."""
+        if legacy:
+            return cls._load_legacy(file_path)
         with h5py.File(str(file_path), "r") as f:
             channels_attr = cast(Iterable[Any], f.attrs["channels"])
             channels = tuple(str(ch) for ch in channels_attr)
@@ -367,7 +387,7 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
 
 
 class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
-    Data[RepT], _GetSubsetMixin[RepT], _EmbeddableMixin[RepT]
+    Data[RepT], _GetSubsetMixin[RepT]
 ): ...
 
 
@@ -377,7 +397,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     _reps_type = reps.UniformTimeSeries
 
     def _init_repr(self, representation: "AnyReps"):
-        self.representation = reps.UniformTimeSeries(
+        self._representation = reps.UniformTimeSeries(
             representation.grid, representation.entries
         )
 
@@ -405,6 +425,14 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     def get_frequencies(self):
         """Return the frequencies grid matching the time grid."""
         return np.fft.rfftfreq(len(self.times), d=self.dt)
+
+    def get_embedded(self, embedding_grid: "reps.Grid1D[Axis]"):
+        """Return data embedded on a new 1D grid."""
+        embedded = self.representation.get_embedded(embedding_grid)
+        return type(self)(
+            embedded,
+            self.channel_names,
+        ).set_name(self.name)
 
     @overload
     def to_fsdata(
@@ -477,7 +505,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             end_values=time_end_values,
         )
 
-        tapering_window = cast(Any, tapering(self.times)) if tapering is not None else 1
+        tapering_window = tapering(self.times) if tapering is not None else 1
         signal = self.entries * tapering_window
         padded_signal = xp.pad(
             signal,
@@ -485,7 +513,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             mode="constant",
         )
 
-        padded_repr = reps.UniformTimeSeries(padded_time, padded_signal)
+        padded_repr = reps.UniformTimeSeries((padded_time,), padded_signal)
         return self.create_new(padded_repr, self.channel_names)
 
     def _get_plotter(self):
@@ -500,7 +528,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     _reps_type = reps.UniformFrequencySeries
 
     def _init_repr(self, representation: "AnyReps"):
-        self.representation = reps.UniformFrequencySeries(
+        self._representation = reps.UniformFrequencySeries(
             representation.grid, representation.entries
         )
 
@@ -527,6 +555,14 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     def set_times(self, times: npt.NDArray[np.floating[Any]]):
         """Set the time grid."""
         return TimedFSData(self.representation, self.channel_names, times)
+
+    def get_embedded(self, embedding_grid: "reps.Grid1D[Axis]"):
+        """Return data embedded on a new 1D grid."""
+        embedded = self.representation.get_embedded(embedding_grid)
+        return type(self)(
+            embedded,
+            self.channel_names,
+        ).set_name(self.name)
 
     def to_tsdata(
         self,
@@ -605,7 +641,7 @@ class TimedFSData(FSData):
 
     def __init__(
         self,
-        representation: reps.UniformFrequencySeries,
+        representation: "AnyReps",
         channels: tuple[str, ...],
         times: reps.Linspace | npt.NDArray[np.floating[Any]] | None = None,
         name: str | None = None,
@@ -633,9 +669,7 @@ class TimedFSData(FSData):
         self.dt = self.times.step
         return self
 
-    def create_new(
-        self, representation: reps.UniformFrequencySeries, channels: tuple[str, ...]
-    ):
+    def create_new(self, representation: "AnyReps", channels: tuple[str, ...]):
         """Create a new instance preserving times."""
         new = type(self)(representation, channels, times=self.times, name=self.name)
         return new
@@ -743,16 +777,16 @@ class WDMData(Data[reps.WDM]):
         return plotter.draw(**kwargs)
 
 
-def load_data(file_path: str | pathlib.Path):
+def load_data(file_path: str | pathlib.Path, legacy: bool = False):
     """Load the data from a saved HDF5 file."""
     with h5py.File(str(file_path), "r") as f:
         data_type = str(f.attrs["type"])
     if data_type == "TSData":
-        return TSData.load(file_path)
+        return TSData.load(file_path, legacy=legacy)
     if data_type == "FSData":
-        return FSData.load(file_path)
+        return FSData.load(file_path, legacy=legacy)
     if data_type == "TimedFSData":
-        return TimedFSData.load(file_path)
+        return TimedFSData.load(file_path, legacy=legacy)
     raise ValueError(f"Unknown data type: {data_type}")
 
 

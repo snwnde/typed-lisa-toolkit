@@ -48,7 +48,7 @@ from __future__ import annotations
 import logging
 import warnings
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, Self, Union, cast, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, Union, cast, overload
 
 import array_api_compat as xpc
 import numpy as np
@@ -72,12 +72,15 @@ if TYPE_CHECKING:
 
     from l2d_interface import contract
 
-    class Representation(
-        contract.Representation[Domain, AnyGrid, str | None], Protocol
+    class Representation[GridT: AnyGrid](
+        contract.Representation[Domain, GridT, str | None], Protocol
     ):
         """Protocol for any representation type."""
 
         entries: Array  # type: ignore[assignment] # Necessary due to missing data array API
+
+        @property
+        def grid(self) -> GridT: ...  # noqa: D102
 
         def __init__(
             self,
@@ -325,8 +328,11 @@ def _get_axis_end(axis: Axis) -> float:
 
 
 class _Subset1DMixin[GridT: "Grid1D[Axis]"]:
-    grid: GridT
     entries: "Array"
+
+    @property
+    def grid(self) -> GridT:
+        raise NotImplementedError("This property must be implemented by subclass.")
 
     def __init__(self, grid: "Grid1D[Axis]", entries: "Array") -> None:
         del grid, entries
@@ -356,34 +362,20 @@ class _Subset1DMixin[GridT: "Grid1D[Axis]"]:
         _set_value(self.entries, slice, value)
 
 
-class _EmbedMixin[GridT: "AnyGrid"]:
-    grid: GridT
-    entries: "Array"
-
-    def __init__(self, grid: GridT, entries: "Array") -> None:
-        del grid, entries
-        raise NotImplementedError("This mixin should not be instantiated directly.")
-
-    def get_embedded(
-        self,
-        embedding_grid: "AnyGrid" | Axis | Linspace,
-        *,
-        known_slices: tuple[slice, ...] | None = None,
-    ) -> Self:
-        """Return the series embedded in a new grid."""
-        if not isinstance(embedding_grid, tuple):
-            embedding_grid = (embedding_grid,)
-
-        _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
-        _self_grid = tuple(to_array(sg) for sg in self.grid)
-        entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
-            _self_grid, self.entries
-        )
-        __embedding_grid = cast(GridT, _embedding_grid)  # type: ignore[assignment]
-        # This cast is necessary for two reasons:
-        # 1. the static type checker does not want to determine the length of tuple(... for ...)
-        # 2. NDArray is not yet inferred as xpt."Array" by the static type checker
-        return type(self)(grid=__embedding_grid, entries=entries)
+def _embed_entries_to_grid[GT: "AnyGrid"](
+    source_grid: "AnyGrid",
+    source_entries: "Array",
+    embedding_grid: GT,
+    *,
+    known_slices: tuple[slice, ...] | None = None,
+) -> tuple[GT, "Array"]:
+    """Embed entries from source grid into a target grid."""
+    _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
+    _source_grid = tuple(to_array(sg) for sg in source_grid)
+    entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
+        _source_grid, source_entries
+    )
+    return embedding_grid, entries
 
 
 class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin):
@@ -430,15 +422,18 @@ class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin):
 class _InitMixin[GridT: AnyGrid]:
     _domain: Domain
     _kind: str | None = None
-    grid: GridT
     entries: "Array"
+
+    @property
+    def grid(self) -> GridT:
+        return cast(GridT, self._grid)
 
     def __init__(
         self,
         grid: AnyGrid,  # on purpose not GridT to allow more flexible input types
         entries: "Array",
     ):
-        self.grid = cast(GridT, tuple(_to_linspace_if_possible(g) for g in grid))
+        self._grid = tuple(_to_linspace_if_possible(g) for g in grid)
         self.entries = entries
 
     def __repr__(self) -> str:
@@ -480,8 +475,17 @@ class _InitMixin[GridT: AnyGrid]:
         return _get_entry_grid_shape(self.entries)
 
 
-class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin, _EmbedMixin[GridT]):
+class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin):
     # Provides implementations for arithmetic operations
+    entries: "Array"
+
+    @property
+    def grid(self) -> GridT:
+        raise NotImplementedError("This property must be implemented by subclass.")
+
+    def __init__(self, grid: "AnyGrid", entries: "Array") -> None:
+        del grid, entries
+        raise NotImplementedError("This mixin should not be instantiated directly.")
 
     def create_like(self, entries: "Array"):
         """Create a new instance with the same grid as the current one."""
@@ -595,11 +599,27 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin, _EmbedMixin[G
 
 
 class _Uniform1DMixin:
-    grid: "Grid1D[Linspace]"
+    @property
+    def grid(self) -> "Grid1D[Linspace]":
+        raise NotImplementedError("This property must be implemented by subclass.")
 
     @property
     def resolution(self) -> float:
         return self.grid[0].step
+
+
+@overload
+def frequency_series(
+    frequencies: "Linspace",
+    entries: "Array",
+) -> "UniformFrequencySeries": ...
+
+
+@overload
+def frequency_series[AxisT: Axis](
+    frequencies: AxisT,
+    entries: "Array",
+) -> "FrequencySeries[AxisT]": ...
 
 
 def frequency_series[AxisT: Axis](
@@ -613,6 +633,20 @@ def frequency_series[AxisT: Axis](
         return FrequencySeries[AxisT]((frequencies,), entries)
     else:
         return UniformFrequencySeries((_frequencies,), entries)
+
+
+@overload
+def time_series(
+    times: "Linspace",
+    entries: "Array",
+) -> "UniformTimeSeries": ...
+
+
+@overload
+def time_series[AxisT: Axis](
+    times: AxisT,
+    entries: "Array",
+) -> "TimeSeries[AxisT]": ...
 
 
 def time_series[AxisT: Axis](
@@ -677,7 +711,7 @@ class FrequencySeries[AxisT: Axis](
         return super().angle(**kwargs).unwrap(period=2 * self.xp.pi)
 
     @property
-    def frequencies(self) -> Axis | Linspace:
+    def frequencies(self):
         """The frequencies of the series."""
         return self.grid[0]
 
@@ -696,6 +730,21 @@ class FrequencySeries[AxisT: Axis](
         return self * self.xp.exp(
             -2j * self.xp.pi * self.xp.array(self.frequencies) * shift
         )
+
+    def get_embedded[AT: "Axis"](
+        self,
+        embedding_grid: "Grid1D[AT]",
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ):
+        """Return the series embedded in a new 1D grid."""
+        grid, entries = _embed_entries_to_grid(
+            self.grid,
+            self.entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+        return frequency_series(grid[0], entries)
 
     def get_plotter(self):
         """Return the plotter for the series."""
@@ -861,6 +910,21 @@ class TimeSeries[AxisT: Axis](
 
         return plotters.TSPlotter(self)
 
+    def get_embedded[AT: "Axis"](
+        self,
+        embedding_grid: "Grid1D[AT]",
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ):
+        """Return the series embedded in a new 1D grid."""
+        grid, entries = _embed_entries_to_grid(
+            self.grid,
+            self.entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+        return time_series(grid[0], entries)
+
 
 class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
     """A time series on a uniform time grid."""
@@ -973,7 +1037,6 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
 class Phasor[AxisT: Axis](
     _InitMixin["Grid1D[AxisT]"],
     _Subset1DMixin["Grid1D[AxisT]"],
-    _EmbedMixin["Grid1D[AxisT]"],
 ):
     """Phasor representation.
 
@@ -1028,7 +1091,7 @@ class Phasor[AxisT: Axis](
     @classmethod
     def make(
         cls,
-        frequencies: "AxisT",
+        frequencies: "Axis",
         amplitudes: "Array",
         phases: "Array",
     ):
@@ -1047,6 +1110,21 @@ class Phasor[AxisT: Axis](
     def create_like(self, entries: "Array"):
         """Create a new series with the same grid as the current one."""
         return type(self)(grid=self.grid, entries=entries)
+
+    def get_embedded[AT: "Axis"](
+        self,
+        embedding_grid: "Grid1D[AT]",
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ) -> Self:
+        """Return the phasor embedded in a new 1D grid."""
+        grid, entries = _embed_entries_to_grid(
+            self.grid,
+            self.entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+        return type(self)(grid=cast("Grid1D[AxisT]", grid), entries=entries)
 
     def get_interpolated[AT: Axis](
         self,
@@ -1070,11 +1148,19 @@ class Phasor[AxisT: Axis](
         phases = interpolator(self_freq, self.phases.squeeze())(_frequencies)
         return Phasor[AT].make(frequencies, amplitudes, phases)
 
-    def to_frequency_series(self) -> FrequencySeries[AxisT]:
+    @overload
+    def to_frequency_series(self: "Phasor[Linspace]") -> "UniformFrequencySeries": ...
+
+    @overload
+    def to_frequency_series[AT: "Axis"](
+        self: "Phasor[AT]",
+    ) -> "FrequencySeries[AT]": ...
+
+    def to_frequency_series(self):
         """Get the :class:`.FrequencySeries` representation of the waveform."""
         xp = xpc.get_namespace(self.amplitudes, self.phases)
-        return FrequencySeries[AxisT](
-            (self.frequencies,),
+        return frequency_series(
+            self.frequencies,
             self.amplitudes * xp.exp(1j * self.phases),
         )
 
@@ -1123,6 +1209,21 @@ class STFT[
     ) -> Self:
         """Create a time-frequency representation from time and frequency grids and entries."""
         return cls(grid=(times, frequencies), entries=entries)
+
+    def get_embedded[AT0: "Axis", AT1: "Axis"](
+        self,
+        embedding_grid: "Grid2D[AT0, AT1]",
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ):
+        """Return the representation embedded in a new 2D grid."""
+        grid, entries = _embed_entries_to_grid(
+            self.grid,
+            self.entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+        return stft(grid[0], grid[1], entries)
 
     # TODO for consistency: receive slices, receive copy bool arg
     def get_subset(
@@ -1385,6 +1486,21 @@ class WDM(_InitMixin["UniformGrid2D"], _ArithmeticReprOnGrid["UniformGrid2D"]):
         from ..viz import plotters
 
         return plotters.WDMPlotter(self)
+
+    def get_embedded[AT0: "Axis", AT1: "Axis"](
+        self,
+        embedding_grid: "Grid2D[AT0, AT1]",
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ):
+        """Return the representation embedded in a new 2D grid."""
+        grid, entries = _embed_entries_to_grid(
+            self.grid,
+            self.entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+        return wdm(grid[0], grid[1], entries)
 
     # TODO for consistency: receive slices, receive copy bool arg
     def get_subset(

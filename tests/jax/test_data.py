@@ -149,7 +149,7 @@ class TestDataContainersJAX(unittest.TestCase):
         case = build_fd_pair(jnp)
         embedding = jnp.asarray([0.5, 1.0, 2.0, 4.0, 5.0], dtype=jnp.float64)
 
-        embedded = case["left"].get_embedded(embedding)
+        embedded = case["left"].get_embedded((embedding,))
         got = np.asarray(embedded.get_kernel())
         source = np.asarray(case["left"].get_kernel())
 
@@ -354,8 +354,16 @@ class TestDataContainersJAX(unittest.TestCase):
 
     def test_tsdata_get_zero_padded(self):
         _, tsdata = _build_tsdata_jax()
-        with self.assertRaises(TypeError):
-            tsdata.get_zero_padded((tsdata.dt, 2 * tsdata.dt))
+        padded = tsdata.get_zero_padded((tsdata.dt, 2 * tsdata.dt))
+
+        self.assertIsInstance(padded, TSData)
+        self.assertEqual(np.asarray(padded.entries).shape[-1], np.asarray(tsdata.entries).shape[-1] + 3)
+        npt.assert_allclose(
+            np.asarray(padded.entries)[..., 1:-2],
+            np.asarray(tsdata.entries),
+        )
+        npt.assert_allclose(np.asarray(padded.entries)[..., :1], 0.0)
+        npt.assert_allclose(np.asarray(padded.entries)[..., -2:], 0.0)
 
     def test_load_data_unknown_type_raises(self):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
