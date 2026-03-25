@@ -2846,6 +2846,14 @@ dependencies = [
     { name = "scipy" },
 ]
 
+[package.optional-dependencies]
+jax = [
+    { name = "jax" },
+]
+quadax = [
+    { name = "quadax" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "fastgb" },
@@ -2882,7 +2890,7 @@ doc = [
 jax = [
     { name = "jax" },
 ]
-jax-dev = [
+quadax = [
     { name = "jax" },
     { name = "quadax" },
 ]
@@ -2891,11 +2899,14 @@ jax-dev = [
 requires-dist = [
     { name = "array-api-compat", specifier = ">=1.13.0" },
     { name = "h5py" },
+    { name = "jax", marker = "extra == 'jax'" },
     { name = "l2d-interface", git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=a5e33e1477374f946ed3295c77fbac3abae0a6e5" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "pywavelet", specifier = "==0.2.8" },
+    { name = "quadax", marker = "extra == 'quadax'" },
     { name = "scipy", specifier = ">=1.12.0" },
 ]
+provides-extras = ["jax", "quadax"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2931,7 +2942,7 @@ doc = [
     { name = "sphinxcontrib-mermaid", specifier = ">=1.2.3" },
 ]
 jax = [{ name = "jax" }]
-jax-dev = [
+quadax = [
     { name = "jax" },
     { name = "quadax" },
 ]
