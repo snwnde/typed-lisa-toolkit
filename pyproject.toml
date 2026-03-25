@@ -18,9 +18,13 @@ dependencies = [
     "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@a5e33e1477374f946ed3295c77fbac3abae0a6e5",
 ]
 
+[project.optional-dependencies]
+jax = ["jax"]
+quadax = ["quadax"]
+
 [dependency-groups]
 jax = ["jax"]
-jax-dev = [{ include-group = "jax" }, "quadax"]
+quadax = [{ include-group = "jax" }, "quadax"]
 doc = [
     "sphinx>=8.2.3",
     "sphinx-autodoc-typehints>=3.5.2",
@@ -31,7 +35,6 @@ doc = [
     "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git"
 ]
 dev = [
-    { include-group = "jax-dev" },
     { include-group = "doc" },
     "ruff",
     "h5py-stubs>=0.1.2",
@@ -45,6 +48,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "pytest-mock>=3.15.1",
     "uv-dynamic-versioning>=0.12.0",
+    { include-group = "quadax" },
 ]
 
 [tool.hatch.metadata]
