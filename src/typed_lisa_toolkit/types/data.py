@@ -17,9 +17,11 @@ import numpy.typing as npt
 
 from . import _mixins, tapering
 from . import representations as reps
-from .misc import AnyGrid, Axis, Linspace
+from .misc import AnyGrid, Array, Axis, Linspace
 
 if TYPE_CHECKING:
+    from MojitoProcessor import SignalProcessor
+
     from . import waveforms as wf
     from .representations import Representation
 
@@ -537,14 +539,14 @@ def load_data(file_path: str | pathlib.Path, legacy: bool = False):
     raise ValueError(f"Unknown data type: {data_type}")
 
 
-def load_ldc_data(
+def load_sangria(
     file_path: str | pathlib.Path,
     name: Literal[
         "obs/tdi", "sky/mbhb/tdi", "sky/igb/tdi", "sky/vgb/tdi", "sky/dgb/tdi"
     ] = "obs/tdi",
     channels: Literal["AE", "AET", "XYZ"] = "AE",
 ) -> TSData:
-    """Load the data from LDC dataset."""
+    """Load Sangria dataset or Sangria HM dataset."""
 
     def XYZ2AET(
         X: reps.UniformTimeSeries,
@@ -603,3 +605,21 @@ def load_ldc_data(
             )
             return transform_channels(tsdata)
     raise ValueError("The dataset does not have the expected structure.")
+
+
+def load_ldc_data(file_path: str | pathlib.Path, **kwargs: Any) -> TSData:
+    """Load the LDC dataset."""
+    # Currently among LDC datasets only Sangria and Sangria HM are supported
+    return load_sangria(file_path, **kwargs)
+
+def load_mojito(processed_data: SignalProcessor):
+    """Load the data from a preprocessed Mojito data object."""
+    channel_names = tuple(processed_data.channels)
+    _data = cast(dict[str, "Array"], processed_data.data)
+    _mapping = {
+        chnname: reps.time_series(
+            processed_data.t, _data[chnname][None, None, None, None, :]
+        )
+        for chnname in channel_names
+    }
+    return TSData.from_dict(_mapping)
