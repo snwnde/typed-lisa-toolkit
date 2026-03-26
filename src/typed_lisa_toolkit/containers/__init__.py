@@ -6,10 +6,10 @@ from .waveforms import (
     harmonic_projected_waveform,
     harmonic_waveform,
     hhpw,
+    hhw,
     homogeneous_harmonic_projected_waveform,
     hpw,
     hw,
-    hhw,
     projected_waveform,
     pw,
 )

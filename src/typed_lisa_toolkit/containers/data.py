@@ -33,6 +33,7 @@ Functions
 
 from __future__ import annotations
 
+import abc
 import logging
 import pathlib
 import warnings
@@ -71,22 +72,21 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-# Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
-
-
-class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
+class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
     """Mixin class to provide get_subset method for data containers."""
 
-    channel_names: tuple[str, ...]
+    @property
+    @abc.abstractmethod
+    def channel_names(self) -> tuple[str, ...]:
+        """Return the channel names."""
 
     @property
+    @abc.abstractmethod
     def representation(self) -> RepT:
         """Return the underlying representation."""
-        raise NotImplementedError("This property must be implemented by subclass.")
 
-    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self:
-        del representation, channels
-        raise NotImplementedError("This method must be implemented by subclass.")
+    @abc.abstractmethod
+    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self: ...
 
     def get_subset(
         self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
@@ -94,7 +94,7 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
         """Return the subset as a new instance."""
         subset = self.representation.get_subset(interval=interval, slice=slice)
         return self.create_new(
-            subset,  # type: ignore[arg-type] # mypy's inference is confused
+            subset,
             self.channel_names,
         )
 
@@ -122,13 +122,18 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT]):
 
 
 class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMixin):
+    @property
+    def channel_names(self) -> tuple[str, ...]:
+        """Return the channel names."""
+        return self._channel_names
+
     def __init__(
         self,
         representation: "AnyReps",
         channels: tuple[str, ...],
         name: str | None = None,
     ):
-        self.channel_names = tuple(channels)
+        self._channel_names: tuple[str, ...] = tuple(channels)
         self._init_repr(representation)
         entries = self.representation.entries
         if entries.shape[1] != len(self.channel_names):
@@ -139,8 +144,10 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
             raise ValueError(
                 "Data containers require n_harmonics=1 in the representation entries."
             )
-        self._channel_to_idx = {chn: i for i, chn in enumerate(channels)}
-        self.name = name
+        self._channel_to_idx: dict[str, int] = {
+            chn: i for i, chn in enumerate(channels)
+        }
+        self.name: str | None = name
 
     @property
     def representation(self) -> RepT:
@@ -148,7 +155,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         return cast(RepT, self._representation)
 
     def _init_repr(self, representation: "AnyReps"):
-        self._representation = representation
+        self._representation: AnyReps = representation
 
     def create_new(self, representation: "AnyReps", channels: tuple[str, ...]) -> Self:
         """Create a new instance with a representation and channels."""
@@ -175,7 +182,6 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
         del kwargs  # Unused
 
         if isinstance(other, _ChannelMapping):
-            other = cast("_ChannelMapping[AnyReps]", other)
             if self.channel_names != other.channel_names:
                 raise ValueError("Cannot operate on data with different channel sets.")
             if reflected:
@@ -269,7 +275,7 @@ class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMix
             return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
         return f"{self.__class__.__name__}({items!r})"
 
-    @overload  # type: ignore[misc]
+    @overload
     def grid[GridT: AnyGrid](  # pyright: ignore[reportInconsistentOverload]
         self: _ChannelMapping["Representation[GridT]"],
     ) -> GridT: ...
@@ -312,6 +318,11 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
 
     _reps_type: type[RepT]
 
+    def _init_repr(self, representation: "AnyReps"):
+        self._representation: "AnyReps" = self._reps_type(
+            representation.grid, representation.entries
+        )
+
     def _get_plotter(self) -> type[Any]:
         """Return the plotter class."""
         raise NotImplementedError("The method must be implemented in the subclass.")
@@ -341,9 +352,8 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
             f.attrs["channels"] = self.channel_names
             self._additional_save(f)
             grp = f.create_group("data")
-            representation = cast(Any, self.representation)
-            grp.create_dataset("grid", data=representation.grid)
-            grp.create_dataset("entries", data=representation.entries)
+            grp.create_dataset("grid", data=self.representation.grid)
+            grp.create_dataset("entries", data=cast(Any, self.representation.entries))
 
     @classmethod
     def _additional_load(cls, f: h5py.File) -> dict[str, Any]:
@@ -378,7 +388,7 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
             grid_data = cast(h5py.Dataset, data_group["grid"])[()]
             entries_data = cast(h5py.Dataset, data_group["entries"])[()]
             repr_obj = cls._reps_type(grid_data, entries_data)
-        return cls(repr_obj, channels, **additions)  # type: ignore[arg-type] # mypy's inference is confused
+        return cls(repr_obj, channels, **additions)
 
     @classmethod
     def from_waveform(cls, waveform: "wf.ProjectedWaveform[RepT]"):
@@ -394,12 +404,7 @@ class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
 class TSData(_SeriesData[reps.UniformTimeSeries]):
     """Multi-channel time series data container."""
 
-    _reps_type = reps.UniformTimeSeries
-
-    def _init_repr(self, representation: "AnyReps"):
-        self._representation = reps.UniformTimeSeries(
-            representation.grid, representation.entries
-        )
+    _reps_type: type[reps.UniformTimeSeries] = reps.UniformTimeSeries
 
     @property
     def times(self) -> npt.NDArray[np.floating[Any]]:
@@ -476,7 +481,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     ) -> STFTData:
         """Return the time-frequency data."""
         tfrepr = self.representation.stfft(win, hop)
-        tf_entries = cast(Any, tfrepr.entries)
+        tf_entries = tfrepr.entries
         tfdict = {
             chn: reps.STFT["Linspace", "Linspace"](
                 tfrepr.grid,
@@ -525,12 +530,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
 class FSData(_SeriesData[reps.UniformFrequencySeries]):
     """Multi-channel frequency series data container."""
 
-    _reps_type = reps.UniformFrequencySeries
-
-    def _init_repr(self, representation: "AnyReps"):
-        self._representation = reps.UniformFrequencySeries(
-            representation.grid, representation.entries
-        )
+    _reps_type: type[reps.UniformFrequencySeries] = reps.UniformFrequencySeries
 
     @property
     def frequencies(self):
@@ -601,7 +601,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
                 )
             warnings.warn(
                 "Passing `Nf`, `Nt`, or `nx` positionally to `to_wdm_data` is deprecated and "
-                "will be removed in 0.7.0; pass them as keyword arguments instead.",
+                + "will be removed in 0.7.0; pass them as keyword arguments instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -629,7 +629,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         """  # noqa: D401
         warnings.warn(
             "`to_WDMdata` is deprecated and will be removed in 0.7.0; "
-            "use `to_wdm_data` instead.",
+            + "use `to_wdm_data` instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -649,8 +649,8 @@ class TimedFSData(FSData):
         super().__init__(representation, channels, name)
         if times is None:
             raise ValueError("TimedFSData requires times parameter")
-        self.times = reps.Linspace.make(times)
-        self.dt = self.times.step
+        self.times: reps.Linspace = reps.Linspace.make(times)
+        self.dt: float = self.times.step
 
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=np.asarray(self.times))
@@ -693,6 +693,10 @@ class TimedFSData(FSData):
 class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
     """Dictionary data container of short-time Fourier transform data."""
 
+    _reps_type: type[reps.STFT["Linspace", "Linspace"]] = reps.STFT[
+        "Linspace", "Linspace"
+    ]
+
     def get_subset(
         self,
         *,
@@ -730,7 +734,7 @@ class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
 class WDMData(Data[reps.WDM]):
     """Dictionary data container of WDM time-frequency data."""
 
-    _reps_type = reps.WDM
+    _reps_type: type[reps.WDM] = reps.WDM
 
     def get_subset(
         self,

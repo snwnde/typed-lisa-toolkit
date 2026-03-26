@@ -48,9 +48,9 @@ from typing import (
     Any,
     Callable,
     Iterator,
+    Protocol,
     Self,
     cast,
-    Protocol,
     overload,
 )
 
@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     Axis = reps.Axis
     AnyGrid = reps.AnyGrid
     from .representations import Representation
+
     AnyReps = Representation[AnyGrid]
 
 log = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
     """Mixin for picking a single mode from a waveform."""
 
     def __init__(self, mapping: Mapping[ModeT, Any]):
-        self._mapping = mapping
+        self._mapping: Mapping[ModeT, Any] = mapping
 
     # Implement Mapping protocol
     def __getitem__(self, key: ModeT) -> VT:
@@ -154,7 +155,9 @@ class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: AnyReps](
         The shape is ``(n_batches, n_channels, n_harmonics, n_features, *grid_like)``
         """
         xp = self.__xp__()
-        return xp.concat([self[harmonic].entries for harmonic in self.harmonics], axis=2)
+        return xp.concat(
+            [self[harmonic].entries for harmonic in self.harmonics], axis=2
+        )
 
 
 class ProjectedWaveform[RepT: AnyReps](data._ChannelMapping[RepT]):  # pyright: ignore[reportPrivateUsage]
@@ -205,7 +208,9 @@ class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
         The returned array is suitable for downstream processing (e.g., by noise models to compute inner products).
         """
         xp = xpc.get_namespace(self._first.entries)
-        return xp.concat([self[harmonic].entries for harmonic in self.harmonics], axis=2)
+        return xp.concat(
+            [self[harmonic].entries for harmonic in self.harmonics], axis=2
+        )
 
 
 def harmonic_waveform[ModeT: Mode, RepT: AnyReps](
@@ -382,7 +387,8 @@ class _HHWLike[ModeT: "Mode", RepT: "AnyReps"](_HWLike[ModeT, RepT], Protocol):
 
 
 class _PWLike[RepT: "AnyReps"](Protocol):
-    channel_names: tuple[str, ...]
+    @property
+    def channel_names(self) -> tuple[str, ...]: ...
 
     def __getitem__(self, key: str) -> RepT: ...
 

@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 
 
 ChnName = str
-# Reps = reps.TimeSeries | reps.FrequencySeries | reps.STFT | reps.Phasor | reps.WDM
 Modes = modes.Harmonic | modes.QNM
 FDUniformHomogeneous = (
     dm.Data[reps.FrequencySeries["Linspace"]]
@@ -77,9 +76,9 @@ class FDWhittleLikelihood(Likelihood[FDUniformHomogeneous]):
     """
 
     def __init__(self, data: dm.FSData, noisemodel: nm.FDNoiseModelLike):
-        self.data = data
-        self.noisemodel = noisemodel  # .reset()
-        self.data_square = self.noisemodel.get_scalar_product(data, data)
+        self.data: dm.FSData = data
+        self.noisemodel: nm.FDNoiseModelLike = noisemodel  # .reset()
+        self.data_square: "Array" = self.noisemodel.get_scalar_product(data, data)
 
     @classmethod
     def log_likelihood_ratio(cls, cross_product: "Array", template_square: "Array"):

@@ -14,7 +14,7 @@ pytest:
     - pip install -q --root-user-action=ignore uv
     - uv sync --all-extras
     - source .venv/bin/activate
-    - mypy src
+    - basedpyright --gitlabcodequality report.json
     - pytest --cov=typed_lisa_toolkit --cov-branch --cov-report=term-missing
         --cov-report=xml:coverage.xml --junitxml=report.xml 
         --cov-fail-under=90 tests
@@ -23,11 +23,13 @@ pytest:
     paths:
       - coverage.xml
       - report.xml
+      - report.json
     reports:
       junit: report.xml
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+      codequality: report.json
 
     expire_in: 1 week
 
