@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from .. import utils
+    from ..viz import plotters
 
     Array = utils.Array
     Axis = Union[Array, "Linspace"]

@@ -59,15 +59,8 @@ from ..containers import data, representations
 
 if TYPE_CHECKING:
     Axis = representations.Axis
-    AnyReps = representations.Representation
+    AnyReps = representations.Representation[representations.AnyGrid]
 
-_1DRep = (
-    representations.TimeSeries["Axis"]
-    | representations.FrequencySeries["Axis"]
-    | representations.Phasor["Axis"]
-    | representations.UniformTimeSeries
-    | representations.UniformFrequencySeries
-)
 logger = logging.getLogger(__name__)
 
 figure_kwargs = [
@@ -313,7 +306,7 @@ class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
         return fig
 
 
-class PhasorPlotter[AxisT: "Axis"](_1DPlotter["representations.Phasor[AxisT]"]):
+class PhasorPlotter[AxisT: "Axis"](_1DPlotter[representations.Phasor[AxisT]]):
     """Plotter for :class:`.containers.representations.Phasor`."""
 
     def plot(
@@ -428,8 +421,6 @@ class WDMPlotter:
 
 class _1DDataPlotter[
     RepT: representations.TimeSeries["Axis"] | representations.FrequencySeries["Axis"]
-    # | representations.UniformTimeSeries
-    # | representations.UniformFrequencySeries
 ](abc.ABC):
     def __init__(self, data: data.Data[RepT]) -> None:  # pyright: ignore[reportPrivateUsage]
         self.data = copy.deepcopy(data)
