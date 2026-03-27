@@ -45,20 +45,32 @@ including NumPy and JAX.
 
 from __future__ import annotations
 
+import abc
 import logging
 import warnings
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, Union, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    Protocol,
+    Self,
+    Union,
+    cast,
+    final,
+    overload,
+)
 
 import array_api_compat as xpc
 import numpy as np
-import scipy.signal  # type: ignore[import-untyped]
+import scipy.signal
 from l2d_interface.contract import LinspaceLike
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
     from .. import utils
+    from ..viz import plotters
 
     Array = utils.Array
     Axis = Union[Array, "Linspace"]
@@ -93,11 +105,11 @@ if TYPE_CHECKING:
             ...
 
 
-from pywavelet import set_backend as _pyw_set_backend  # type: ignore[import-untyped]
-from pywavelet.transforms import from_freq_to_wavelet as _pyw_f2w  # type: ignore[import-untyped]
-from pywavelet.transforms import from_wavelet_to_freq as _pyw_w2f  # type: ignore[import-untyped]
-from pywavelet.types import FrequencySeries as pywFS  # type: ignore[import-untyped]
-from pywavelet.types import Wavelet as pywWDM  # type: ignore[import-untyped]
+from pywavelet import set_backend as _pyw_set_backend
+from pywavelet.transforms import from_freq_to_wavelet as _pyw_f2w
+from pywavelet.transforms import from_wavelet_to_freq as _pyw_w2f
+from pywavelet.types import FrequencySeries as pywFS
+from pywavelet.types import Wavelet as pywWDM
 
 # NOTE We could also import the individual transformation routines from
 # pywavelet (written in numpy, cupy, jax) for finer control
@@ -120,6 +132,7 @@ if TYPE_CHECKING:
 _slice = slice  # Alias for slice
 
 
+@final
 class Linspace:
     """Class for a uniform grid.
 
@@ -327,17 +340,98 @@ def _get_axis_end(axis: Axis) -> float:
         return float(axis[-1])  # type: ignore[union-index, arg-type]
 
 
-class _Subset1DMixin[GridT: "Grid1D[Axis]"]:
+class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin, abc.ABC):
     entries: "Array"
 
+    @abc.abstractmethod
+    def create_like(self, entries: Any) -> Self: ...
+
+    @abc.abstractmethod
+    def _unwrap(self, other: object) -> object: ...
+
+    def _binary_op(
+        self,
+        other: object,
+        op: Callable[[Any, Any], Any],
+        /,
+        reflected: bool = False,
+        inplace: bool = False,
+        **kwargs: Any,
+    ):
+        del kwargs  # Unused
+
+        if not reflected:
+            entries = op(self.entries, self._unwrap(other))
+        else:
+            entries = op(self._unwrap(other), self.entries)
+
+        if inplace:
+            del entries
+            return self
+
+        return self.create_like(entries)
+
+    def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
+        out_arg = kwargs.get("out", None)
+        if out_arg is not None:
+            kwargs["out"] = self._unwrap(out_arg)
+        entries = op(self.entries, **kwargs)
+        return self.create_like(entries)
+
+
+class _InitMixin[GridT: AnyGrid](abc.ABC):
     @property
     def grid(self) -> GridT:
-        raise NotImplementedError("This property must be implemented by subclass.")
+        return cast(GridT, self._grid)
 
-    def __init__(self, grid: "Grid1D[Axis]", entries: "Array") -> None:
-        del grid, entries
-        raise NotImplementedError("This mixin should not be instantiated directly.")
+    def __init__(
+        self,
+        grid: AnyGrid,  # on purpose not GridT to allow more flexible input types
+        entries: "Array",
+    ):
+        self._grid = tuple(_to_linspace_if_possible(g) for g in grid)  # pyright: ignore[reportUnannotatedClassAttribute]
+        self.entries: "Array" = entries
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(grid={self.grid!r}, entries={self.entries!r}, {self.entries.dtype!r})"
+
+    @property
+    @abc.abstractmethod
+    def domain(self) -> Domain:
+        """Physical domain of the representation."""
+
+    @property
+    @abc.abstractmethod
+    def kind(self) -> str | None:
+        """Optional semantic kind of representation."""
+
+    @property
+    def n_batches(self) -> int:
+        """Return the number of batches."""
+        return self.entries.shape[0]
+
+    @property
+    def n_channels(self) -> int:
+        """Return the number of channels."""
+        return self.entries.shape[1]
+
+    @property
+    def n_harmonics(self) -> int:
+        """Return the number of harmonics."""
+        return self.entries.shape[2]
+
+    @property
+    def n_features(self) -> int:
+        """Return the number of features."""
+        return self.entries.shape[3]
+
+    @property
+    def grid_shape(self) -> tuple[int, ...]:
+        """Return the shape of the grid dimensions."""
+        return _get_entry_grid_shape(self.entries)
+
+
+class _Subset1DMixin[GridT: "Grid1D[Axis]"](_InitMixin[GridT], abc.ABC):
     def get_subset(
         self,
         *,
@@ -378,114 +472,10 @@ def _embed_entries_to_grid[GT: "AnyGrid"](
     return embedding_grid, entries
 
 
-class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin):
-    entries: "Array"
-
-    def create_like(self, entries: Any) -> Self:
-        del entries
-        raise NotImplementedError("This method must be implemented by subclass.")
-
-    def _unwrap(self, other: object) -> object:
-        del other
-        raise NotImplementedError("This method must be implemented by subclass.")
-
-    def _binary_op(
-        self,
-        other: object,
-        op: Callable[[Any, Any], Any],
-        /,
-        reflected: bool = False,
-        inplace: bool = False,
-        **kwargs: Any,
-    ):
-        del kwargs  # Unused
-
-        if not reflected:
-            entries = op(self.entries, self._unwrap(other))
-        else:
-            entries = op(self._unwrap(other), self.entries)
-
-        if inplace:
-            del entries
-            return self
-
-        return self.create_like(entries)
-
-    def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
-        out_arg = kwargs.get("out", None)
-        if out_arg is not None:
-            kwargs["out"] = self._unwrap(out_arg)
-        entries = op(self.entries, **kwargs)
-        return self.create_like(entries)
-
-
-class _InitMixin[GridT: AnyGrid]:
-    _domain: Domain
-    _kind: str | None = None
-    entries: "Array"
-
-    @property
-    def grid(self) -> GridT:
-        return cast(GridT, self._grid)
-
-    def __init__(
-        self,
-        grid: AnyGrid,  # on purpose not GridT to allow more flexible input types
-        entries: "Array",
-    ):
-        self._grid = tuple(_to_linspace_if_possible(g) for g in grid)
-        self.entries = entries
-
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}(grid={self.grid!r}, entries={self.entries!r}, {self.entries.dtype!r})"
-
-    @property
-    def domain(self) -> Domain:
-        """Physical domain of the representation."""
-        return self._domain
-
-    @property
-    def kind(self) -> str | None:
-        """Optional semantic kind of representation."""
-        return self._kind
-
-    @property
-    def n_batches(self) -> int:
-        """Return the number of batches."""
-        return self.entries.shape[0]
-
-    @property
-    def n_channels(self) -> int:
-        """Return the number of channels."""
-        return self.entries.shape[1]
-
-    @property
-    def n_harmonics(self) -> int:
-        """Return the number of harmonics."""
-        return self.entries.shape[2]
-
-    @property
-    def n_features(self) -> int:
-        """Return the number of features."""
-        return self.entries.shape[3]
-
-    @property
-    def grid_shape(self) -> tuple[int, ...]:
-        """Return the shape of the grid dimensions."""
-        return _get_entry_grid_shape(self.entries)
-
-
-class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin):
+class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
+    _BinaryUnaryOpMixin, _InitMixin[GridT], abc.ABC
+):
     # Provides implementations for arithmetic operations
-    entries: "Array"
-
-    @property
-    def grid(self) -> GridT:
-        raise NotImplementedError("This property must be implemented by subclass.")
-
-    def __init__(self, grid: "AnyGrid", entries: "Array") -> None:
-        del grid, entries
-        raise NotImplementedError("This mixin should not be instantiated directly.")
 
     def create_like(self, entries: "Array"):
         """Create a new instance with the same grid as the current one."""
@@ -559,7 +549,7 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin):
         except ValueError as e:
             raise ValueError(
                 "You may want to first embed the series instances to super-grids before "
-                "adding them, if their grids are not compatible."
+                + "adding them, if their grids are not compatible."
             ) from e
         return self
 
@@ -590,18 +580,18 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](_BinaryUnaryOpMixin):
             if len(self.grid) < len(other.grid):
                 raise ValueError(
                     "In-place addition requires the series to add to "
-                    "be a sub-grid of the current one. Expect `other.grid` "
-                    "to be shorter than `self.grid`."
+                    + "be a sub-grid of the current one. Expect `other.grid` "
+                    + "to be shorter than `self.grid`."
                 )
             _slice = utils.get_subset_slice(to_array(self.grid[0]), start, stop)
             return self.iadd(other, slice=_slice)
         return super().__iadd__(other)
 
 
-class _Uniform1DMixin:
+class _Uniform1DMixin(abc.ABC):
     @property
-    def grid(self) -> "Grid1D[Linspace]":
-        raise NotImplementedError("This property must be implemented by subclass.")
+    @abc.abstractmethod
+    def grid(self) -> "Grid1D[Linspace]": ...
 
     @property
     def resolution(self) -> float:
@@ -689,11 +679,14 @@ def wdm(
     return WDM((frequencies, times), entries)
 
 
-class FrequencySeries[AxisT: Axis](
-    _InitMixin["Grid1D[AxisT]"],
+class _1DSeries[AxisT: Axis](  # pyright: ignore[reportUnsafeMultipleInheritance]
     _ArithmeticReprOnGrid["Grid1D[AxisT]"],
     _Subset1DMixin["Grid1D[AxisT]"],
-):
+    abc.ABC,
+): ...
+
+
+class FrequencySeries[AxisT: Axis](_1DSeries[AxisT]):
     """A series of numbers on a frequency grid."""
 
     @property
@@ -777,7 +770,7 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
                 )
             warnings.warn(
                 "Passing `tapering` positionally to `irfft` is deprecated and will be removed "
-                "in 0.7.0; pass it as a keyword argument instead.",
+                + "in 0.7.0; pass it as a keyword argument instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -865,18 +858,14 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
         """
         warnings.warn(
             "`to_WDM` is deprecated and will be removed in 0.7.0; "
-            "use `to_wdm` instead.",
+            + "use `to_wdm` instead.",
             DeprecationWarning,
             stacklevel=2,
         )
         return self.to_wdm(Nf=Nf, Nt=Nt, nx=nx)
 
 
-class TimeSeries[AxisT: Axis](
-    _InitMixin["Grid1D[AxisT]"],
-    _ArithmeticReprOnGrid["Grid1D[AxisT]"],
-    _Subset1DMixin["Grid1D[AxisT]"],
-):
+class TimeSeries[AxisT: Axis](_1DSeries[AxisT]):
     """A series of numbers on a time grid."""
 
     @property
@@ -956,7 +945,7 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
                 )
             warnings.warn(
                 "Passing `tapering` positionally to `rfft` is deprecated and will be removed "
-                "in 0.7.0; pass it as a keyword argument instead.",
+                + "in 0.7.0; pass it as a keyword argument instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -1035,7 +1024,6 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
 
 
 class Phasor[AxisT: Axis](
-    _InitMixin["Grid1D[AxisT]"],
     _Subset1DMixin["Grid1D[AxisT]"],
 ):
     """Phasor representation.
@@ -1138,7 +1126,7 @@ class Phasor[AxisT: Axis](
         if self.entries.shape != (1, 1, 1, 2, len(self_freq)):
             raise ValueError(
                 f"Only 1D phasors with shape (1, 1, 1, 2, {len(self_freq)}) are supported"
-                f"for interpolation, but got shape {self.entries.shape}."
+                + f"for interpolation, but got shape {self.entries.shape}."
             )
         amp_real = self.amplitudes.real.squeeze()
         amp_imag = self.amplitudes.imag.squeeze()
@@ -1175,7 +1163,6 @@ class STFT[
     FreqAxisT: Axis,
     TimeAxisT: Axis,
 ](
-    _InitMixin["Grid2D[FreqAxisT, TimeAxisT]"],
     _ArithmeticReprOnGrid["Grid2D[FreqAxisT, TimeAxisT]"],
 ):
     """Time-frequency representation."""
@@ -1255,7 +1242,7 @@ class STFT[
         )
 
 
-class WDM(_InitMixin["UniformGrid2D"], _ArithmeticReprOnGrid["UniformGrid2D"]):
+class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
     """
     Wilson-Daubechies-Meyer (WDM) time-frequency representation.
 
@@ -1380,7 +1367,7 @@ class WDM(_InitMixin["UniformGrid2D"], _ArithmeticReprOnGrid["UniformGrid2D"]):
         """
         return self.duration / self.ND
 
-    dt = sample_interval
+    dt: property = sample_interval
     """Alias for :attr:`.sample_interval`."""
 
     @property
@@ -1405,7 +1392,7 @@ class WDM(_InitMixin["UniformGrid2D"], _ArithmeticReprOnGrid["UniformGrid2D"]):
         # the special convention in this class that a grid of N points has N bins.
         return 1 / self.sample_interval
 
-    fs = sample_rate
+    fs: property = sample_rate
     """Alias for :attr:`.sample_rate`."""
 
     def to_frequency_series(
@@ -1443,7 +1430,7 @@ class WDM(_InitMixin["UniformGrid2D"], _ArithmeticReprOnGrid["UniformGrid2D"]):
         """
         warnings.warn(
             "`to_freqseries` is deprecated and will be removed in 0.7.0; "
-            "use `to_frequency_series` instead.",
+            + "use `to_frequency_series` instead.",
             DeprecationWarning,
             stacklevel=2,
         )

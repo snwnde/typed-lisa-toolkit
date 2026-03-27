@@ -80,4 +80,4 @@ def cast_mode(mode: tuple[PosInt, PosInt] | tuple[PosInt, PosInt, PosInt]):
         return Harmonic.cast(mode)
     elif len(mode) == 3:
         return QNM.cast(mode)
-    raise ValueError(f"Invalid mode: {mode}")
+    raise ValueError(f"Invalid mode: {mode}")  # pyright: ignore[reportUnreachable]

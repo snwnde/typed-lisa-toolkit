@@ -28,11 +28,11 @@ Tapering Functions
 """
 
 import logging
-from typing import TYPE_CHECKING, Generic, ParamSpec, Protocol
+from typing import TYPE_CHECKING, Generic, ParamSpec, Protocol, final
 
 import numpy as np
 import numpy.typing as npt
-import scipy.special  # type: ignore[import]
+import scipy.special
 from scipy.signal.windows import _windows  # type: ignore[import]
 
 if TYPE_CHECKING:
@@ -88,6 +88,7 @@ class LenWindow(Protocol, Generic[P]):
 #     return scipy_window
 
 
+@final
 class ldc_window(Tapering):
     """A window function that tapers a margin at both ends.
 
@@ -114,6 +115,7 @@ class ldc_window(Tapering):
         return winl * winr
 
 
+@final
 class planck_window(Tapering):
     """A Planck taper window [1]_.
 

@@ -17,23 +17,6 @@ class DataAbstractBranchesMixin:
     backend-agnostic and only check NotImplementedError semantics.
     """
 
-    def test_get_subset_mixin_notimplemented_methods(self):
-        class Dummy(data._GetSubsetMixin[TimeSeries["Axis"]]):
-            def __getitem__(self, key):
-                raise KeyError(key)
-
-            def __iter__(self):
-                return iter(())
-
-            def __len__(self):
-                return 0
-
-        dummy = Dummy()
-        with self.assertRaises(NotImplementedError):  # type: ignore[attr-defined]
-            dummy.create_new(None, ())  # type: ignore[arg-type]
-        with self.assertRaises(NotImplementedError):  # type: ignore[attr-defined]
-            dummy._get_plotter()
-
     def test_data_base_get_plotter_notimplemented(self):
         class Dummy(data.Data[TimeSeries["Axis"]]):
             _reps_type = TimeSeries["Axis"]

@@ -59,15 +59,8 @@ from ..containers import data, representations
 
 if TYPE_CHECKING:
     Axis = representations.Axis
-    AnyReps = representations.Representation
+    AnyReps = representations.Representation[representations.AnyGrid]
 
-_1DRep = (
-    representations.TimeSeries["Axis"]
-    | representations.FrequencySeries["Axis"]
-    | representations.Phasor["Axis"]
-    | representations.UniformTimeSeries
-    | representations.UniformFrequencySeries
-)
 logger = logging.getLogger(__name__)
 
 figure_kwargs = [
@@ -169,7 +162,7 @@ def sieve_kwargs(keys_to_accept: list[str], **kwargs: Any) -> dict[str, Any]:
 
 class _1DPlotter[RepT: AnyReps](abc.ABC):
     def __init__(self, series: RepT) -> None:
-        self.series = copy.deepcopy(series)
+        self.series: RepT = copy.deepcopy(series)
 
     def _get_fig_ax(
         self, **kwargs: Any
@@ -225,7 +218,7 @@ class TSPlotter(_1DPlotter[representations.TimeSeries["Axis"]]):
             elif time_unit == "days":
                 times /= 3600 * 24
             else:
-                raise ValueError(
+                raise ValueError(  # pyright: ignore[reportUnreachable]
                     f"The time unit {time_unit} is not supported. Please use 'hrs' or 'days'."
                 )
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
@@ -266,7 +259,7 @@ class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
             frequencies *= 1e3
             grid_label = "Frequency [mHz]"
         else:
-            raise ValueError(
+            raise ValueError(  # pyright: ignore[reportUnreachable]
                 f"The frequency unit {freq_unit} is not supported. Please use 'Hz' or 'mHz'."
             )
         if method == "loglog":
@@ -313,7 +306,7 @@ class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
         return fig
 
 
-class PhasorPlotter[AxisT: "Axis"](_1DPlotter["representations.Phasor[AxisT]"]):
+class PhasorPlotter[AxisT: "Axis"](_1DPlotter[representations.Phasor[AxisT]]):
     """Plotter for :class:`.containers.representations.Phasor`."""
 
     def plot(
@@ -336,7 +329,7 @@ class PhasorPlotter[AxisT: "Axis"](_1DPlotter["representations.Phasor[AxisT]"]):
             frequencies *= 1e3
             grid_label = "Frequency [mHz]"
         else:
-            raise ValueError(
+            raise ValueError(  # pyright: ignore[reportUnreachable]
                 f"The frequency unit {freq_unit} is not supported. Please use 'Hz' or 'mHz'."
             )
         if method == "loglog":
@@ -386,7 +379,7 @@ class WDMPlotter:
     """Plotter for :class:`.containers.representations.WDM`."""
 
     def __init__(self, representation: representations.WDM) -> None:
-        self.representation = representation
+        self.representation: representations.WDM = representation
 
     def plot(
         self,
@@ -428,11 +421,9 @@ class WDMPlotter:
 
 class _1DDataPlotter[
     RepT: representations.TimeSeries["Axis"] | representations.FrequencySeries["Axis"]
-    # | representations.UniformTimeSeries
-    # | representations.UniformFrequencySeries
 ](abc.ABC):
-    def __init__(self, data: data.Data[RepT]) -> None:  # pyright: ignore[reportPrivateUsage]
-        self.data = copy.deepcopy(data)
+    def __init__(self, data: data.Data[RepT]) -> None:
+        self.data: data.Data[RepT] = copy.deepcopy(data)
 
     def _draw(
         self, plotter: type[_1DPlotter[RepT]], set_legend: bool = False, **kwargs: Any
@@ -500,7 +491,7 @@ class _1DDataPlotter[
                 **kwargs,
             )
             if plot_residual:
-                plotter(self.data[chnname] - other.data[chnname]).plot(  # type: ignore[arg-type]
+                plotter(self.data[chnname] - other.data[chnname]).plot(
                     axs[diff_idx],  # pyright: ignore[reportPossiblyUnboundVariable]
                     set_xlabel=xlabel_bool,
                     set_ylabel=ylabel_bool,
@@ -643,7 +634,7 @@ class TFDataPlotter:
     """Plotter for :class:`.containers.data.TFData`."""
 
     def __init__(self, data: data.WDMData) -> None:
-        self.data = copy.deepcopy(data)
+        self.data: data.WDMData = copy.deepcopy(data)
 
     def draw(self, set_legend: bool = False, **kwargs: Any) -> matplotlib.figure.Figure:
         """Draw the time-frequency data."""

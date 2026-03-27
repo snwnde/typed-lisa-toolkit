@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 __all__ = ["NDArrayMixin"]
 
 
-class NDArrayMixin:
+class NDArrayMixin(abc.ABC):
     """Mixin class to enable array ufuncs on subclasses.
 
     The class exposes small abstract hooks that concrete subclasses must

@@ -47,7 +47,16 @@ Noise Models
 
 import logging
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, Sequence, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Literal,
+    Protocol,
+    Self,
+    Sequence,
+    Union,
+)
 
 from .. import utils
 from ..containers import data as dm
@@ -68,7 +77,7 @@ def _import_quadax() -> ModuleType:
 
 def _import_scipy_integrate() -> ModuleType:
     try:
-        import scipy.integrate  # type: ignore[import]
+        import scipy.integrate
 
         return scipy.integrate
     except ImportError:
@@ -92,11 +101,11 @@ IntegrationMethod = Literal["trapezoid", "simpson"]
 
 
 def _first_frequencies(__x: FDEntry):
-    return next(iter(__x.values())).frequencies  # type: ignore[attr-defined] # mypy complains mistakenly
+    return next(iter(__x.values())).frequencies
 
 
 def _first_entries(__x: FDEntry):
-    return next(iter(__x.values())).entries  # type: ignore[attr-defined] # mypy complains mistakenly
+    return next(iter(__x.values())).entries
 
 
 class IntegrationPolicy(Protocol):
@@ -130,7 +139,7 @@ class _NumpyIntegrationPolicy(IntegrationPolicy):
         self,
         method: IntegrationMethod = "trapezoid",
     ) -> None:
-        self.method = method
+        self.method: IntegrationMethod = method
 
     def integrate(
         self, __y: "Array", *, x: Union["Array", None] = None, **kwargs: Any
@@ -152,7 +161,7 @@ class _JaxIntegrationPolicy(IntegrationPolicy):
         self,
         method: IntegrationMethod = "trapezoid",
     ) -> None:
-        self.method = method
+        self.method: IntegrationMethod = method
 
     def integrate(
         self, __y: "Array", *, x: Union["Array", None] = None, **kwargs: Any
@@ -207,9 +216,9 @@ class SpectralDensity:
         channel_order: Sequence[ChnName],
     ):
         # kernel shape: (n_freqs, n_channels, n_channels)
-        self._frequencies = frequencies
-        self._inverse_sdm = inverse_sdm
-        self.channel_order = channel_order
+        self._frequencies: Array = frequencies
+        self._inverse_sdm: Array = inverse_sdm
+        self.channel_order: Sequence[ChnName] = channel_order
 
     def to_subband(self, f_interval: tuple[float, float]) -> Self:
         """Return a new SpectralDensity instance with the frequency grid restricted to the given subband."""
@@ -332,10 +341,10 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         psd: DensityT,
         integration_method: IntegrationMethod = "trapezoid",
     ):
-        self._psd = psd  # Keep the original PSD object for potential future use (e.g., subband restriction)
-        self.psd = psd
+        self._psd: DensityT = psd  # Keep the original PSD object for potential future use (e.g., subband restriction)
+        self.psd: DensityT = psd
         xp = psd.get_kernel().__array_namespace__()
-        self._ip = _make_integration_policy(xp, integration_method)
+        self._ip: IntegrationPolicy = _make_integration_policy(xp, integration_method)
 
     def reset(self) -> Self:
         """Reset the noise model to its original state."""
@@ -443,7 +452,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         """
         return self.get_complex_scalar_product(left, right).real
 
-    inner = get_scalar_product
+    inner: Callable[..., "Array"] = get_scalar_product
     """Alias for :meth:`get_scalar_product`."""
 
     def get_cumulative_scalar_product(
@@ -562,10 +571,10 @@ class EvolutionarySpectralDensity:
             channel_order=channel_order,
         )
         # kernel shape: (n_freqs, n_times, n_channels, n_channels)
-        self._frequencies = frequencies
-        self._times = times
-        self._inverse_esdm = inverse_esdm
-        self.channel_order = channel_order
+        self._frequencies: "Array" = frequencies
+        self._times: "Array" = times
+        self._inverse_esdm: "Array" = inverse_esdm
+        self.channel_order: Sequence[ChnName] = channel_order
 
     def get_kernel(self, backend: str | None = None) -> "Array":
         """Return the inverse of the evolutionary spectral density matrix.
@@ -626,7 +635,7 @@ class EvolutionarySpectralDensity:
         kind: the kind of whitening matrix. Defaults to "cholesky".
         """
         if kind != "cholesky":
-            raise NotImplementedError(f"Unsupported whitening matrix kind {kind}.")
+            raise NotImplementedError(f"Unsupported whitening matrix kind {kind}.")  # pyright: ignore[reportUnreachable]
         xp = self._inverse_esdm.__array_namespace__()
         return xp.linalg.cholesky(self._inverse_esdm, upper=True)
 
@@ -644,7 +653,7 @@ class TFNoiseModel:
         self,
         esd: EvolutionarySpectralDensity,
     ):
-        self.esd = esd
+        self.esd: EvolutionarySpectralDensity = esd
 
     def _get_whitened_entries(self, _data: TFEntry) -> "Array":
         """Return the whitened kernel entries of the given dm."""
@@ -674,7 +683,7 @@ class TFNoiseModel:
             .real
         )
 
-    inner = get_scalar_product
+    inner: Callable[..., "Array"] = get_scalar_product
     """Alias for :meth:`get_scalar_product`."""
 
     def whiten(self, _data: TFEntry) -> TFEntry:

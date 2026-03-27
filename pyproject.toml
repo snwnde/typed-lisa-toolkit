@@ -32,14 +32,14 @@ doc = [
     "sphinxcontrib-bibtex>=2.6.5",
     "sphinxcontrib-mermaid>=1.2.3",
     "furo",
-    "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git"
+    "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git",
 ]
 dev = [
     { include-group = "doc" },
     "ruff",
     "h5py-stubs>=0.1.2",
-    "isort>=7.0.0",
-    "mypy>=1.19.1",
+    # "isort>=7.0.0", # `ruff check --select I --fix .` does the trick
+    # "mypy>=1.19.1", # `basedpyright` is used instead of `mypy` for type checking
     "myst-nb>=1.3.0",
     "nb-clean>=4.0.1",
     "pre-commit>=4.5.1",
@@ -49,6 +49,7 @@ dev = [
     "pytest-mock>=3.15.1",
     "uv-dynamic-versioning>=0.12.0",
     { include-group = "quadax" },
+    "basedpyright",
 ]
 
 [tool.hatch.metadata]
@@ -92,3 +93,23 @@ addopts = "--import-mode=importlib"
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/typed_lisa_toolkit/py.typed" = "typed_lisa_toolkit/py.typed"
+
+[tool.basedpyright]
+include = ["src"]
+exclude = ["**/__pycache__"]
+ignore = ["tests"]
+defineConstant = { DEBUG = true }
+enableTypeIgnoreComments = true
+reportIgnoreCommentWithoutRule = "none"
+reportMissingImports = "error"
+reportMissingTypeStubs = false
+reportImplicitOverride = "none"
+reportAny = "none"
+reportExplicitAny = "none"
+reportUnusedCallResult = "none"
+reportDeprecated = false
+reportImportCycles = false
+executionEnvironments = [
+    { root = "tests", reportPrivateUsage = false },
+    { root = "src" },
+]

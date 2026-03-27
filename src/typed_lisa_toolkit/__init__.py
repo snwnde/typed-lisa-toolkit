@@ -1,6 +1,6 @@
 """Public API for typed_lisa_toolkit."""
 
-from . import consumers, containers, utils, viz
+from . import utils, viz
 from .consumers.likelihood import FDWhittleLikelihood, Likelihood
 from .consumers.noisemodel import (
     DiagonalSpectralDensity,
@@ -54,8 +54,6 @@ from .containers.waveforms import (
 )
 
 __all__ = [
-    "containers",
-    "consumers",
     "utils",
     "viz",
     "data",
