@@ -658,7 +658,9 @@ def phasor[AxisT: Axis](
     phases: "Array",
 ) -> "Phasor[AxisT]":
     """Build a :class:`Phasor`."""
-    return Phasor[AxisT].make(frequencies, amplitudes, phases)
+    return Phasor[AxisT].make(
+        frequencies=frequencies, amplitudes=amplitudes, phases=phases
+    )
 
 
 def stft[FreqAxisT: Axis, TimeAxisT: Axis](
@@ -969,10 +971,7 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
         times = SFT.t(len(self.times)) + np.asarray(self.times)[0]
         freqs = SFT.f
         Sx = SFT.stft(np.asarray(self.entries) * self.dt)
-        return STFT[Linspace, Linspace](
-            grid=(times, freqs),
-            entries=Sx,
-        )
+        return stft(freqs, times, Sx)
 
     # def to_WDM(
     #     self,
@@ -1079,6 +1078,7 @@ class Phasor[AxisT: Axis](
     @classmethod
     def make(
         cls,
+        *,
         frequencies: "Axis",
         amplitudes: "Array",
         phases: "Array",
@@ -1134,7 +1134,9 @@ class Phasor[AxisT: Axis](
         amplitudes_imag = interpolator(self_freq, amp_imag)(_frequencies)
         amplitudes = amplitudes_real + 1j * amplitudes_imag
         phases = interpolator(self_freq, self.phases.squeeze())(_frequencies)
-        return Phasor[AT].make(frequencies, amplitudes, phases)
+        return Phasor[AT].make(
+            frequencies=_frequencies, amplitudes=amplitudes, phases=phases
+        )
 
     @overload
     def to_frequency_series(self: "Phasor[Linspace]") -> "UniformFrequencySeries": ...
@@ -1210,6 +1212,7 @@ class STFT[
     @classmethod
     def make(
         cls,
+        *,
         times: "Array",
         frequencies: "Array",
         entries: "Array",
@@ -1334,6 +1337,7 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
     @classmethod
     def make(
         cls,
+        *,
         times: Union["Array", Linspace],
         frequencies: Union["Array", Linspace],
         entries: "Array",

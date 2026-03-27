@@ -232,7 +232,7 @@ class AdvancedRepresentationMethodsMixin:
         times = np.linspace(0, 10, 100)
         freqs = np.linspace(0, 1, 50)
         entries = np.random.randn(1, 1, 1, 1, 100, 50)
-        stft = STFT.make(times, freqs, entries)
+        stft = STFT.make(times=times, frequencies=freqs, entries=entries)
         self.assertIsInstance(stft, STFT)  # type: ignore[attr-defined]
         npt.assert_allclose(np.array(stft.grid[1]), times, rtol=1e-10)
         npt.assert_allclose(np.array(stft.grid[0]), freqs, rtol=1e-10)
