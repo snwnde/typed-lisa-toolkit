@@ -49,11 +49,10 @@ import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..types import data, representations
+from ..types import AnyGrid, Axis, Grid2D, Linspace, data, representations
 
 if TYPE_CHECKING:
-    Axis = representations.Axis
-    AnyReps = representations.Representation[representations.AnyGrid]
+    AnyReps = representations.Representation[AnyGrid]
 
 logger = logging.getLogger(__name__)
 
@@ -369,16 +368,11 @@ class PhasorPlotter[AxisT: "Axis"](_1DPlotter[representations.Phasor[AxisT]]):
         return fig
 
 
-class STFTPlotter[
-    FreqAxisT: Axis,
-    TimeAxisT: Axis,
-]:
+class STFTPlotter[GridT: Grid2D[Axis, Axis]]:
     """Plotter for :class:`.containers.representations.STFT`."""
 
-    def __init__(
-        self, representation: representations.STFT[FreqAxisT, TimeAxisT]
-    ) -> None:
-        self.representation: representations.STFT[FreqAxisT, TimeAxisT] = representation
+    def __init__(self, representation: representations.STFT[GridT]) -> None:
+        self.representation: representations.STFT[GridT] = representation
 
     def plot(
         self,
@@ -417,11 +411,11 @@ class STFTPlotter[
         return ax
 
 
-class WDMPlotter:
+class WDMPlotter[GridT: Grid2D[Linspace, Linspace]]:
     """Plotter for :class:`.containers.representations.WDM`."""
 
-    def __init__(self, representation: representations.WDM) -> None:
-        self.representation: representations.WDM = representation
+    def __init__(self, representation: representations.WDM[GridT]) -> None:
+        self.representation: representations.WDM[GridT] = representation
 
     def plot(
         self,
@@ -672,7 +666,10 @@ class FSDataPlotter(_1DDataPlotter["representations.FrequencySeries[Axis]"]):
         return self._compare_angle(other=other, **kwargs)
 
 
-class TFDataPlotter[DataT: data.WDMData | data.STFTData]:
+class TFDataPlotter[
+    DataT: data.WDMData[Grid2D[Linspace, Linspace]]
+    | data.STFTData[Grid2D[Linspace, Linspace]]
+]:
     """Plotter for :class:`.containers.data.TFData`."""
 
     def __init__(self, data: DataT) -> None:

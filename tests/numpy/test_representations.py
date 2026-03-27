@@ -18,16 +18,19 @@ from tests._helpers import (
     build_canonical_representations,
 )
 from typed_lisa_toolkit import (
+    build_grid2d,
     frequency_series,
     linspace,
     phasor,
     stft,
     time_series,
     utils,
+    wdm,
 )
 from typed_lisa_toolkit.types import (
     STFT,
     FrequencySeries,
+    Grid2DSparse,
     Linspace,
     Phasor,
     TSData,
@@ -35,8 +38,10 @@ from typed_lisa_toolkit.types import (
     UniformTimeSeries,
 )
 from typed_lisa_toolkit.types.representations import (  # extra symbols for coverage tests
+    _embed_entries_to_grid_2d_sparse,
     _get_full_slice,
     _get_subset_slice,
+    _subset_grid_2d_sparse,
     _take_subset,
 )
 
@@ -1623,3 +1628,109 @@ class TestWDMPropertiesAndMethods(WDMPropertiesAndMethodsMixin, unittest.TestCas
         from tests._helpers import build_wdm_pair
 
         self.wdm = build_wdm_pair(np)["left"]["X"]
+
+
+class TestSparse2DGridRepresentations(unittest.TestCase):
+    """Coverage tests for sparse-grid code paths in representations."""
+
+    def test_embed_entries_to_grid_2d_sparse_with_known_slices(self):
+        """Test sparse embedding helper with correct 5D entries shape."""
+        source_freqs = np.array([20.0, 30.0, 40.0])
+        source_times = np.array([5.0, 6.0, 7.0])
+        source_indices = np.array([[0, 0], [1, 2], [2, 1]], dtype=int)
+        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        # For sparse grids, entries is 5D: (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
+        source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
+
+        embedding_grid = (
+            np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
+            np.array([3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+        )
+        known_slices = (slice(1, 4), slice(2, 5))
+
+        new_grid, new_entries = _embed_entries_to_grid_2d_sparse(
+            source_grid,
+            source_entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+
+        # New indices are source indices shifted by known slice starts.
+        expected_indices = np.array([[1, 2], [2, 4], [3, 3]], dtype=int)
+        self.assertIsInstance(new_grid, Grid2DSparse)
+        npt.assert_array_equal(np.asarray(new_grid.indices), expected_indices)
+        npt.assert_array_equal(np.asarray(new_entries), np.array([[[[1.0, 2.0, 3.0]]]]))
+
+    def test_sparse_stft_factory_with_sparse_indices(self):
+        """Test that stft factory returns sparse-grid representation when indices are provided."""
+        freqs = np.array([2.0, 3.0, 4.0])
+        times = np.array([10.0, 20.0, 30.0])
+        sparse_indices = np.array([[0, 0], [1, 2], [2, 1]], dtype=int)
+        # For sparse grids, entries is 5D: (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
+        entries = np.array([[[[[7.0, 8.0, 9.0]]]]])
+
+        tf = stft(freqs, times, entries=entries, sparse_indices=sparse_indices)
+
+        # Verify it's a sparse grid
+        self.assertIsInstance(tf.grid, Grid2DSparse)
+        npt.assert_array_equal(np.asarray(tf.grid.indices), sparse_indices)
+        npt.assert_array_equal(np.asarray(tf.entries), entries)
+
+    def test_subset_grid_2d_sparse_filters_and_reindexes(self):
+        source_freqs = np.array([10.0, 20.0, 30.0, 40.0])
+        source_times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        source_indices = np.array([[0, 0], [1, 2], [2, 3], [3, 4]], dtype=int)
+        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_entries = np.array([[[[[11.0, 22.0, 33.0, 44.0]]]]])
+
+        subset_slices = (slice(1, 4), slice(2, 5))
+        new_grid, new_entries = _subset_grid_2d_sparse(
+            source_grid,
+            source_entries,
+            subset_slices,
+        )
+
+        expected_indices = np.array([[0, 0], [1, 1], [2, 2]], dtype=int)
+        expected_entries = np.array([[[[[22.0, 33.0, 44.0]]]]])
+
+        self.assertIsInstance(new_grid, Grid2DSparse)
+        npt.assert_array_equal(np.asarray(new_grid.indices), expected_indices)
+        npt.assert_array_equal(np.asarray(new_grid[0]), np.array([20.0, 30.0, 40.0]))
+        npt.assert_array_equal(np.asarray(new_grid[1]), np.array([3.0, 4.0, 5.0]))
+        npt.assert_array_equal(np.asarray(new_entries), expected_entries)
+
+    def test_embed_entries_to_grid_2d_sparse_computes_slices_when_missing(self):
+        source_freqs = np.array([20.0, 30.0, 40.0])
+        source_times = np.array([5.0, 6.0, 7.0])
+        source_indices = np.array([[0, 0], [1, 1], [2, 2]], dtype=int)
+        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
+
+        embedding_grid = (
+            np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
+            np.array([4.0, 5.0, 6.0, 7.0, 8.0]),
+        )
+
+        new_grid, new_entries = _embed_entries_to_grid_2d_sparse(
+            source_grid,
+            source_entries,
+            embedding_grid,
+        )
+
+        expected_indices = np.array([[1, 1], [2, 2], [3, 3]], dtype=int)
+        npt.assert_array_equal(np.asarray(new_grid.indices), expected_indices)
+        npt.assert_array_equal(np.asarray(new_entries), source_entries)
+
+
+class TestRepresentationErrorBranches(unittest.TestCase):
+    def test_get_subset_slice_rejects_interval_and_slice_together(self):
+        grid = np.linspace(0.0, 1.0, 11)
+        with self.assertRaises(ValueError):
+            _get_subset_slice(grid, interval=(0.2, 0.6), slice=slice(2, 7))
+
+    def test_take_subset_rejects_wrong_number_of_slices(self):
+        grid = (np.linspace(0.0, 1.0, 11), np.linspace(0.0, 2.0, 21))
+        entries = np.zeros((1, 1, 1, 1, 11, 21))
+
+        with self.assertRaises(ValueError):
+            _take_subset(grid, entries, (slice(2, 6),))

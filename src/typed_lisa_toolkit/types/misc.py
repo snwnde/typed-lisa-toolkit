@@ -6,7 +6,9 @@ from typing import (
     Callable,
     Literal,
     Self,
+    cast,
     final,
+    overload,
 )
 
 import array_api_compat as xpc
@@ -51,9 +53,10 @@ class Linspace:
     """A lazy representation of a uniformly spaced array.
 
     .. note::
-        To construct a Linspace, use the :func:`~typed_lisa_toolkit.linspace` function.
+        To construct a Linspace, use :func:`~typed_lisa_toolkit.linspace`
+        or :func:`~typed_lisa_toolkit.linspace_from_array`.
 
-    .. note::
+    .. attention::
 
         This class is designed to represent a uniform grid by
         three numbers. It does not try to implement the full
@@ -137,18 +140,9 @@ class Linspace:
         return type(self)(start=start, step=step, num=num)
 
     @classmethod
-    def from_array(cls, array: "ArrayLike") -> Self:
+    def from_array(cls, array: "ArrayLike"):
         """Create a Linspace from an array."""
-        xp = xpc.get_namespace(array)
-        _array = xp.asarray(array)
-        if len(_array) < 2:
-            raise ValueError(
-                "Array must have at least two elements to create Linspace."
-            )
-        diff = xp.diff(_array)
-        if not xp.allclose(diff, diff[0], rtol=1e-8, atol=0):
-            raise ValueError("Array must have uniform spacing to create Linspace.")
-        return cls(start=float(_array[0]), step=float(diff[0]), num=len(_array))
+        return linspace_from_array(array)
 
     @classmethod
     def make(cls, array: "ArrayLike | LinspaceLike") -> "Linspace":
@@ -156,15 +150,15 @@ class Linspace:
         if isinstance(array, Linspace):
             return array
         if isinstance(array, LinspaceLike):
-            return Linspace(start=array.start, step=array.step, num=len(array))
-        return cls.from_array(array)
+            return linspace(start=array.start, step=array.step, num=len(array))
+        return linspace_from_array(array)
 
     @classmethod
     def get_step(cls, grid: "ArrayLike | LinspaceLike") -> float:
         """Return the step of the uniform grid."""
         if isinstance(grid, LinspaceLike):
             return grid.step
-        return cls.from_array(grid).step
+        return linspace_from_array(grid).step
 
     def asarray(
         self,
@@ -179,22 +173,117 @@ class Linspace:
 Axis = Array | Linspace
 """An axis of a grid, which can be either an :class:`array <.Array>` or a :class:`Linspace`."""
 
-type Grid1D[AxisT: "Axis"] = tuple[AxisT]
-"""A 1D grid, represented as a tuple containing a single axis."""
 
-type Grid2D[Axis0: "Axis", Axis1: "Axis"] = tuple[Axis0, Axis1]
-"""A 2D grid, represented as a tuple containing two axes."""
+def linspace(start: float, step: float, num: int) -> Linspace:
+    """Create a :class:`~types.Linspace` instance."""
+    return Linspace(start=start, step=step, num=num)
+
+
+def linspace_from_array(array: ArrayLike) -> Linspace:
+    """Create a :class:`~types.Linspace` instance from an array."""
+    xp = xpc.get_namespace(array)
+    _array = xp.asarray(array)
+    if len(_array) < 2:
+        raise ValueError("Array must have at least two elements to create Linspace.")
+    diff = xp.diff(_array)
+    if not xp.allclose(diff, diff[0], rtol=1e-8, atol=0):
+        raise ValueError("Array must have uniform spacing to create Linspace.")
+    return linspace(start=float(_array[0]), step=float(diff[0]), num=len(_array))
+
+
+class Grid2DSparse[Axis0: Axis, Axis1: Axis]:
+    """Class for a sparse 2D grid."""
+
+    indices: Array
+    """
+    The indices of the non-empty points in the grid, represented as an array of shape 
+    ``(n_sparse_points, 2)`` where each row is a pair of indices corresponding to the 
+    positions in ``axis0`` and ``axis1``.
+    """
+
+    @property
+    def axis0(self) -> Axis0:
+        """The first axis of the grid."""
+        return cast(Axis0, self._axis0)
+
+    @property
+    def axis1(self) -> Axis1:
+        """The second axis of the grid."""
+        return cast(Axis1, self._axis1)
+
+    def __init__(self, axis0: Axis, axis1: Axis, *, sparse_indices: Array):
+        self._axis0: Axis = axis0
+        self._axis1: Axis = axis1
+        self.indices = sparse_indices
+
+    @overload
+    def __getitem__(self, idx: Literal[0]) -> Axis0: ...
+
+    @overload
+    def __getitem__(self, idx: Literal[1]) -> Axis1: ...
+
+    @overload
+    def __getitem__(self, idx: int) -> Axis0 | Axis1: ...
+
+    def __getitem__(self, idx: int):
+        """Return the axis at the given index."""
+        if idx == 0:
+            return self.axis0
+        elif idx == 1:
+            return self.axis1
+        else:
+            raise IndexError(f"Invalid index {idx} for Grid2DSparse.")
+
+    def __len__(self):
+        """Return the number of axes."""
+        return 2
+
+    def __iter__(self):
+        """Return an iterator over the axes."""
+        yield self.axis0
+        yield self.axis1
+
+
+type Grid1D[AxisT: "Axis"] = tuple[AxisT]
+"""A tuple containing a single axis, representing a 1D grid."""
+
+type Grid2DCartesian[Axis0: Axis, Axis1: Axis] = tuple[Axis0, Axis1]
+"""A tuple containing two axes, representing a dense 2D grid."""
+
+
+type Grid2D[Axis0: Axis, Axis1: Axis] = (
+    Grid2DCartesian[Axis0, Axis1] | Grid2DSparse[Axis0, Axis1]
+)
+"""A 2D grid, which can be either :class:`.Grid2DCartesian` or :class:`.Grid2DSparse`."""
+
 
 UniformGrid2D = Grid2D["Linspace", "Linspace"]
-"""A 2D grid where both axes are uniformly spaced, represented as a tuple of two :class:`Linspace` instances."""
+"""A tuple containing two :class:`Linspace` axes, representing a uniform 2D grid."""
 
 AnyGrid = Grid1D["Axis"] | Grid2D["Axis", "Axis"]
-"""A grid that can be either 1D or 2D, represented as a tuple of one or two axes."""
+"""A grid that can be either 1D or 2D."""
 
 Domain = Literal["time", "frequency", "time-frequency"]
 """A type representing the physical domain of a representation, which can be either "time", "frequency", or "time-frequency"."""
 
 
-def linspace(start: float, step: float, num: int) -> Linspace:
-    """Create a :class:`~types.misc.Linspace` instance."""
-    return Linspace(start=start, step=step, num=num)
+@overload
+def build_grid2d[Axis0: Axis, Axis1: Axis](
+    axis0: Axis0, axis1: Axis1, /, *, sparse_indices: None = None
+) -> Grid2DCartesian[Axis0, Axis1]: ...
+
+
+@overload
+def build_grid2d[Axis0: Axis, Axis1: Axis](
+    axis0: Axis0, axis1: Axis1, /, *, sparse_indices: Array
+) -> Grid2DSparse[Axis0, Axis1]: ...
+
+
+def build_grid2d[Axis0: Axis, Axis1: Axis](
+    axis0: Axis0, axis1: Axis1, /, *, sparse_indices: Array | None = None
+) -> Grid2DCartesian[Axis0, Axis1] | Grid2DSparse[Axis0, Axis1]:
+    """Build a :class:`~typed_lisa_toolkit.types.misc.Grid2D`, either :class:`dense <typed_lisa_toolkit.types.misc.Grid2DCartesian>` or :class:`sparse <typed_lisa_toolkit.types.misc.Grid2DSparse>`."""
+    if sparse_indices is None:
+        return (axis0, axis1)
+    else:
+        return Grid2DSparse[Axis0, Axis1](axis0, axis1, sparse_indices=sparse_indices)

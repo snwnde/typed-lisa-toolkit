@@ -5,7 +5,6 @@ from __future__ import annotations
 import abc
 import logging
 import pathlib
-
 import warnings
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, cast, overload
@@ -17,7 +16,17 @@ import numpy.typing as npt
 
 from . import _mixins, tapering
 from . import representations as reps
-from .misc import AnyGrid, Array, Axis, Grid1D, Linspace
+from .misc import (
+    AnyGrid,
+    Array,
+    Axis,
+    Domain,
+    Grid1D,
+    Grid2D,
+    Grid2DCartesian,
+    Grid2DSparse,
+    Linspace,
+)
 
 if TYPE_CHECKING:
     from MojitoProcessor import SignalProcessor
@@ -37,6 +46,95 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger(__name__)
+
+
+def _save_axis(grp: h5py.Group, name: str, axis: "Axis") -> None:
+    """Serialize one grid axis, preserving Linspace compactness."""
+    axis_grp = grp.create_group(name)
+    if isinstance(axis, Linspace):
+        axis_grp.attrs["linspace"] = True
+        axis_grp.attrs["start"] = axis.start
+        axis_grp.attrs["step"] = axis.step
+        axis_grp.attrs["num"] = axis.num
+        return
+
+    axis_grp.create_dataset("values", data=np.asarray(axis))
+
+
+def _attr_float(attrs: Any, key: str) -> float:
+    return float(attrs[key])
+
+
+def _attr_int(attrs: Any, key: str) -> int:
+    return int(attrs[key])
+
+
+def _attr_bool(attrs: Any, key: str, default: bool = False) -> bool:
+    return bool(attrs.get(key, default))
+
+
+def _load_axis(node: h5py.Group | h5py.Dataset) -> "Axis":
+    """Deserialize one grid axis.
+
+    Supports both new grouped axis format and old raw-dataset axis format.
+    """
+    if isinstance(node, h5py.Dataset):
+        return cast("Axis", node[()])
+
+    linspace = _attr_bool(node.attrs, "linspace", default=False)
+    if linspace:
+        return Linspace(
+            start=_attr_float(node.attrs, "start"),
+            step=_attr_float(node.attrs, "step"),
+            num=_attr_int(node.attrs, "num"),
+        )
+    return cast("Axis", cast(h5py.Dataset, node["values"])[()])
+
+
+def _save_grid(grp: h5py.Group, grid: "AnyGrid") -> None:
+    """Serialize a representation grid into an HDF5 group."""
+    if isinstance(grid, Grid2DSparse):
+        grp.attrs["sparse"] = True
+        grp.attrs["dim"] = 2
+        _save_axis(grp, "axis0", grid[0])
+        _save_axis(grp, "axis1", grid[1])
+        grp.create_dataset("sparse_indices", data=np.asarray(grid.indices))
+        return
+
+    if len(grid) == 1:
+        grp.attrs["dim"] = 1
+        _save_axis(grp, "axis0", grid[0])
+        return
+    if len(grid) == 2:
+        grp.attrs["sparse"] = False
+        grp.attrs["dim"] = 2
+        _save_axis(grp, "axis0", grid[0])
+        _save_axis(grp, "axis1", grid[1])
+        return
+
+
+def _load_grid(node: h5py.Group | h5py.Dataset) -> "AnyGrid":
+    """Deserialize a representation grid from HDF5."""
+    # Backward compatibility: previous format stored `grid` as a single dataset.
+    if isinstance(node, h5py.Dataset):
+        return cast("AnyGrid", node[()])
+
+    sparse = _attr_bool(node.attrs, "sparse", default=False)
+    dim = _attr_int(node.attrs, "dim") if "dim" in node.attrs else -1
+    if not sparse and dim == 1:
+        axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
+        return (axis0,)
+    if not sparse and dim == 2:
+        axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
+        axis1 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis1"]))
+        return (axis0, axis1)
+    if sparse and dim == 2:
+        axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
+        axis1 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis1"]))
+        sparse_indices = cast(h5py.Dataset, node["sparse_indices"])[()]
+        return Grid2DSparse(axis0, axis1, sparse_indices=sparse_indices)
+
+    raise ValueError(f"Unknown grid serialization format with attributes: {node.attrs}")
 
 
 class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
@@ -88,6 +186,24 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
         )
 
 
+def _load_data[DataT: "Data[AnyReps]"](
+    cls: type[DataT], file_path: str | pathlib.Path, legacy: bool = False
+) -> DataT:
+    """Load data from an HDF5 file."""
+    if legacy:
+        return cls._load_legacy(file_path)  # pyright: ignore[reportPrivateUsage]
+    with h5py.File(str(file_path), "r") as f:
+        channels_attr = cast(Iterable[object], f.attrs["channels"])
+        channels = tuple(str(ch) for ch in channels_attr)
+        additions = cls._additional_load(f)  # pyright: ignore[reportPrivateUsage]
+        data_group = cast(h5py.Group, f["data"])
+        grid_node = cast(h5py.Group | h5py.Dataset, data_group["grid"])
+        grid_data = _load_grid(grid_node)
+        entries_data = cast(h5py.Dataset, data_group["entries"])[()]
+        repr_obj = cls._reps_type(grid_data, entries_data)  # pyright: ignore[reportPrivateUsage]
+    return cls.from_representation(repr_obj, channels, **additions)
+
+
 class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
     """Channel-indexed data containers.
 
@@ -125,12 +241,13 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
 
         """
         with h5py.File(str(file_path), "a") as f:
-            f.attrs["type"] = self.__class__.__name__
+            f.attrs["domain"] = self.domain
+            f.attrs["kind"] = str(self.kind)
             f.attrs["channels"] = self.channel_names
             self._additional_save(f)
             grp = f.create_group("data")
-            grp.create_dataset("grid", data=self._representation.grid)
-            grp.create_dataset("entries", data=cast(Any, self._representation.entries))
+            _save_grid(grp.create_group("grid"), self.grid)
+            grp.create_dataset("entries", data=cast(Any, self.get_kernel()))
 
     @classmethod
     def _additional_load(cls, f: h5py.File) -> dict[str, Any]:
@@ -153,24 +270,19 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
         return cls.from_dict(dict_, **additions)
 
     @classmethod
-    def load(cls, file_path: str | pathlib.Path, legacy: bool = False) -> Self:
-        """Load the data from an HDF5 file."""
-        if legacy:
-            return cls._load_legacy(file_path)
-        with h5py.File(str(file_path), "r") as f:
-            channels_attr = cast(Iterable[object], f.attrs["channels"])
-            channels = tuple(str(ch) for ch in channels_attr)
-            additions = cls._additional_load(f)
-            data_group = cast(h5py.Group, f["data"])
-            grid_data = cast(h5py.Dataset, data_group["grid"])[()]
-            entries_data = cast(h5py.Dataset, data_group["entries"])[()]
-            repr_obj = cls._reps_type(grid_data, entries_data)
-        return cls.from_representation(repr_obj, channels, **additions)
+    def load(cls, file_path: str | pathlib.Path, legacy: bool = False):
+        """Load the data from an HDF5 file (*Deprecated*).
 
-    # @classmethod
-    # def from_waveform(cls, waveform: "ProjectedWaveform[RepT]"):
-    #     """Create a new instance from a projected waveform."""
-    #     return cls(waveform._representation, waveform.channel_names)
+        Warning
+        -------
+        This method is deprecated and will be removed in 0.8.0; use :func:`~typed_lisa_toolkit.load_data` instead.
+        """
+        warnings.warn(
+            "The 'load' method is deprecated and will be removed in 0.8.0; use the function `load_data` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _load_data(cls, file_path, legacy=legacy)
 
 
 class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
@@ -270,7 +382,15 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             The frequency series data. If `keep_times` is `True`, the time grid is kept.
 
         """
-        fsrepr = self._representation.rfft(tapering=tapering)
+        from ..shop import time2freq
+
+        warnings.warn(
+            "The 'to_fsdata' method is deprecated and will be removed in 0.8.0; use the function `shop.time2freq` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _window = tapering(self.xp.asarray(self.times)) if tapering is not None else 1
+        fsrepr = time2freq(self._representation * _window)
         if keep_times:
             return TimedFSData.from_representation(
                 fsrepr,
@@ -396,7 +516,15 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
             This method is deprecated and will be removed in 0.8.0; use
             :func:`~typed_lisa_toolkit.shop.freq2time` instead.
         """
-        tsrepr = self._representation.irfft(np.asarray(times), tapering=tapering)
+        from ..shop import freq2time
+
+        warnings.warn(
+            "The 'to_tsdata' method is deprecated and will be removed in 0.8.0; use the function `shop.freq2time` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        _window = tapering(self.xp.asarray(times)) if tapering is not None else 1
+        tsrepr = freq2time(self._representation * _window, times=times)
         return TSData.from_representation(
             tsrepr,
             channels=self.channel_names,
@@ -417,6 +545,11 @@ class TimedFSData(FSData):
         functions: :func:`~typed_lisa_toolkit.timed_fsdata`
         or :func:`~typed_lisa_toolkit.construct_timed_fsdata`.
     """
+
+    @property
+    def kind(self):
+        """Semantic kind of the data."""
+        return "timed"
 
     @classmethod
     def from_representation(
@@ -488,17 +621,10 @@ class TimedFSData(FSData):
             :func:`~typed_lisa_toolkit.shop.freq2time` instead.
         """
         del times
-        tsrepr = self._representation.irfft(
-            self.xp.asarray(self.times), tapering=tapering
-        )
-        return TSData.from_representation(
-            tsrepr,
-            channels=self.channel_names,
-            name=self.name,
-        )
+        return super().to_tsdata(times=self.times, tapering=tapering)
 
 
-class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
+class STFTData[GridT: Grid2D[Linspace, Linspace]](Data[reps.STFT[GridT]]):
     """Multi-channel short-time Fourier transform data container.
 
     .. note::
@@ -507,9 +633,7 @@ class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
         or :func:`~typed_lisa_toolkit.construct_stftdata`.
     """
 
-    _reps_type: type[reps.STFT["Linspace", "Linspace"]] = reps.STFT[
-        "Linspace", "Linspace"
-    ]
+    _reps_type: type[reps.STFT[GridT]] = reps.STFT[GridT]
 
     @classmethod
     def from_entries(
@@ -519,10 +643,11 @@ class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
         times: Axis,
         entries: Array,
         channels: tuple[str, ...],
+        sparse_indices: Array | None = None,
         name: str | None = None,
     ) -> Self:
         """Construct from raw time-frequency entries and explicit channel names."""
-        rep = reps.stft(frequencies, times, entries)
+        rep = reps.stft(frequencies, times, entries, sparse_indices=sparse_indices)
         return cls.from_representation(rep, channels=channels, name=name)
 
     def get_subset(
@@ -559,7 +684,7 @@ class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
         return plotter.draw(**kwargs)
 
 
-class WDMData(Data[reps.WDM]):
+class WDMData[GridT: Grid2D[Linspace, Linspace]](Data[reps.WDM[GridT]]):
     """Multi-channel wavelet domain model data container.
 
     .. note::
@@ -568,7 +693,7 @@ class WDMData(Data[reps.WDM]):
         or :func:`~typed_lisa_toolkit.construct_wdmdata`.
     """
 
-    _reps_type: type[reps.WDM] = reps.WDM
+    _reps_type: type[reps.WDM[GridT]] = reps.WDM[GridT]
 
     @classmethod
     def from_entries(
@@ -578,10 +703,11 @@ class WDMData(Data[reps.WDM]):
         times: Axis,
         entries: Array,
         channels: tuple[str, ...],
+        sparse_indices: Array | None = None,
         name: str | None = None,
     ) -> Self:
         """Construct from raw WDM entries and explicit channel names."""
-        rep = reps.wdm(frequencies, times, entries)
+        rep = reps.wdm(frequencies, times, entries, sparse_indices=sparse_indices)
         return cls.from_representation(rep, channels=channels, name=name)
 
     def get_subset(
@@ -621,7 +747,7 @@ class WDMData(Data[reps.WDM]):
 def tsdata(
     mapping: Mapping[str, reps.TimeSeries[Linspace]], name: str | None = None
 ) -> TSData:
-    """Construct a :class:`~types.data.TSData` instance from channel mappings."""
+    """Construct :class:`~types.data.TSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.TimeSeries`."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return TSData.from_dict(mapping, name=name)
 
@@ -629,7 +755,7 @@ def tsdata(
 def fsdata(
     mapping: Mapping[str, reps.FrequencySeries[Linspace]], name: str | None = None
 ) -> FSData:
-    """Construct a :class:`~types.data.FSData` instance from channel mappings."""
+    """Construct :class:`~types.data.FSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.FrequencySeries`."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return FSData.from_dict(mapping, name=name)
 
@@ -639,27 +765,27 @@ def timed_fsdata(
     times: Linspace | npt.NDArray[np.floating[Any]],
     name: str | None = None,
 ) -> TimedFSData:
-    """Construct a :class:`~types.data.TimedFSData` instance from channel mappings."""
+    """Construct :class:`~types.data.TimedFSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.FrequencySeries` and a time grid."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return TimedFSData.from_dict(mapping, times=times, name=name)
 
 
-def stftdata(
-    mapping: Mapping[str, reps.STFT[Linspace, Linspace]],
+def stftdata[GridT: Grid2D[Linspace, Linspace]](
+    mapping: Mapping[str, reps.STFT[GridT]],
     name: str | None = None,
-) -> STFTData:
-    """Construct a :class:`~types.data.STFTData` instance from channel mappings."""
+) -> STFTData[GridT]:
+    """Construct :class:`~types.data.STFTData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.ShortTimeFourierTransform`."""
     _ = _mixins.validate_maps_to_reps(mapping)
-    return STFTData.from_dict(mapping, name=name)
+    return STFTData[GridT].from_dict(mapping, name=name)
 
 
-def wdmdata(
-    mapping: Mapping[str, reps.WDM],
+def wdmdata[GridT: Grid2D[Linspace, Linspace]](
+    mapping: Mapping[str, reps.WDM[GridT]],
     name: str | None = None,
-) -> WDMData:
-    """Construct a :class:`~types.WDMData` instance from channel mappings."""
+) -> WDMData[GridT]:
+    """Construct :class:`~types.WDMData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.WilsonDaubechiesMeyer`."""
     _ = _mixins.validate_maps_to_reps(mapping)
-    return WDMData.from_dict(mapping, name=name)
+    return WDMData[GridT].from_dict(mapping, name=name)
 
 
 def construct_tsdata(
@@ -669,15 +795,18 @@ def construct_tsdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> TSData:
-    """Construct :class:`~types.TSData` from grid, entries, and channel names.
+    """Construct a :class:`~types.TSData`.
 
     Parameters
     ----------
     times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Time grid of the data.
+        A uniform array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the time grid of the data.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)`` where ``Nt`` is the size of ``times``.
+        See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+        for more details.
 
     channels: tuple[str, ...]
         Names of the channels in the data.
@@ -702,15 +831,18 @@ def construct_fsdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> FSData:
-    """Construct :class:`~types.data.FSData` from grid, entries, and channel names.
+    """Construct an :class:`~types.data.FSData`.
 
     Parameters
     ----------
     frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Frequency grid of the data.
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the frequency grid of the data.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+        See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+        for more details.
 
     channels: tuple[str, ...]
         Names of the channels in the data.
@@ -739,30 +871,32 @@ def construct_timed_fsdata(
     times: Linspace | npt.NDArray[np.floating[Any]],
     name: str | None = None,
 ) -> TimedFSData:
-    """Construct :class:`~types.data.TimedFSData` from grid, entries, and channel names.
+    """Construct a :class:`~types.data.TimedFSData`.
 
     Parameters
     ----------
     frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Frequency grid of the data.
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the frequency grid of the data.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+        See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+        for more details.
 
     channels: tuple[str, ...]
         Names of the channels in the data.
 
     times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Associated time grid of the data.
+        An array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the associated time grid of the data.
 
     name: str | None
         Name of the data. Default is ``None``.
 
     Note
     ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
-    Note that the associated time grid does not count as a grid dimension of the data,
+    The associated time grid does not count as a grid dimension of the data,
     hence the shape of `entries` does include the time dimension.
 
     """
@@ -772,46 +906,109 @@ def construct_timed_fsdata(
     )
 
 
+@overload
 def construct_stftdata(
     *,
     frequencies: Axis,
     times: Axis,
     entries: Array,
     channels: tuple[str, ...],
+    sparse_indices: None = None,
     name: str | None = None,
-) -> STFTData:
-    """Construct :class:`~types.data.STFTData` from grid, entries, and channel names.
+) -> STFTData[Grid2DCartesian[Linspace, Linspace]]: ...
+
+
+@overload
+def construct_stftdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: Array,
+    name: str | None = None,
+) -> STFTData[Grid2DSparse[Linspace, Linspace]]: ...
+
+
+def construct_stftdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: Array | None = None,
+    name: str | None = None,
+):
+    """Construct an :class:`~types.data.STFTData`.
 
     Parameters
     ----------
     frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Frequency grid of the data.
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the frequency grid of the data.
 
     times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Time grid of the data.
+        A uniform array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the time grid of the data.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf, Nt)`` where ``Nf`` and ``Nt`` are the sizes
-        of ``frequencies`` and ``times``, respectively.
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
+        ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
+        :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+        for more details.
 
     channels: tuple[str, ...]
         Names of the channels in the data.
 
+    sparse_indices: :class:`~typed_lisa_toolkit.types.misc.Array` | None
+        An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+        See :attr:`~typed_lisa_toolkit.types.misc.Grid2DSparse.indices` for more details.
+        If ``None``, the data is treated as dense.
+
     name: str | None
         Name of the data. Default is ``None``.
-
-    Note
-    ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
-    return STFTData.from_entries(
+    if sparse_indices is None:
+        return STFTData[Grid2DCartesian[Linspace, Linspace]].from_entries(
+            frequencies=frequencies,
+            times=times,
+            entries=entries,
+            channels=channels,
+            sparse_indices=sparse_indices,
+            name=name,
+        )
+    return STFTData[Grid2DSparse[Linspace, Linspace]].from_entries(
         frequencies=frequencies,
         times=times,
         entries=entries,
         channels=channels,
+        sparse_indices=sparse_indices,
         name=name,
     )
+
+
+@overload
+def construct_wdmdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: None = None,
+    name: str | None = None,
+) -> WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+
+
+@overload
+def construct_wdmdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: Array,
+    name: str | None = None,
+) -> WDMData[Grid2DSparse[Linspace, Linspace]]: ...
 
 
 def construct_wdmdata(
@@ -820,24 +1017,34 @@ def construct_wdmdata(
     times: Axis,
     entries: Array,
     channels: tuple[str, ...],
+    sparse_indices: Array | None = None,
     name: str | None = None,
-) -> WDMData:
-    """Construct :class:`~types.data.WDMData` from grid, entries, and channel names.
+):
+    """Construct a :class:`~types.data.WDMData`.
 
     Parameters
     ----------
     frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Frequency grid of the data.
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the frequency grid of the data.
 
     times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        Time grid of the data.
+        A uniform array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+        object representing the time grid of the data.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf+1, Nt)`` where ``Nf+1`` and ``Nt`` are the sizes
-        of ``frequencies`` and ``times``, respectively.
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
+        ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
+        :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+        for more details.
 
     channels: tuple[str, ...]
         Names of the channels in the data.
+
+    sparse_indices: :class:`~typed_lisa_toolkit.types.misc.Array` | None
+        An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+        See :attr:`~typed_lisa_toolkit.types.misc.Grid2DSparse.indices` for more details.
+        If ``None``, the data is treated as dense.
 
     name: str | None
         Name of the data. Default is ``None``.
@@ -847,7 +1054,16 @@ def construct_wdmdata(
     See the general description of the shape convention for
     :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
-    return WDMData.from_entries(
+    if sparse_indices is None:
+        return WDMData[Grid2DCartesian[Linspace, Linspace]].from_entries(
+            frequencies=frequencies,
+            times=times,
+            entries=entries,
+            channels=channels,
+            sparse_indices=sparse_indices,
+            name=name,
+        )
+    return WDMData[Grid2DSparse[Linspace, Linspace]].from_entries(
         frequencies=frequencies,
         times=times,
         entries=entries,
@@ -856,33 +1072,151 @@ def construct_wdmdata(
     )
 
 
-def load_data(file_path: str | pathlib.Path, legacy: bool = False):
-    """Load the data from a saved HDF5 file (*Deprecated*).
-    
-    Warning
-    -------
-    This function is deprecated and will be removed in 0.8.0; use the
-    class method ``load`` of the specific data type instead, namely :meth:`TSData.load <typed_lisa_toolkit.types.TSData.load>`, 
-    :meth:`FSData.load <typed_lisa_toolkit.types.FSData.load>`, :meth:`TimedFSData.load <typed_lisa_toolkit.types.TimedFSData.load>`,
-    :meth:`STFTData.load <typed_lisa_toolkit.types.STFTData.load>`, or :meth:`WDMData.load <typed_lisa_toolkit.types.WDMData.load>`.
+@overload
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Literal["time"],
+    kind: str | None = None,
+    sparse: bool = False,
+    legacy: bool = False,
+) -> TSData: ...
 
-    """
-    warnings.warn(
-        "The function `load_data` is deprecated and will be removed in 0.8.0;"
-        + "Use the class method `load` of the specific data type instead,"
-        + "e.g., `TSData.load`, `FSData.load`, or `TimedFSData.load`.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
+
+@overload
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Literal["frequency"],
+    kind: None = None,
+    sparse: bool = False,
+    legacy: bool = False,
+) -> FSData: ...
+
+
+@overload
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Literal["frequency"],
+    kind: Literal["timed"],
+    sparse: bool = False,
+    legacy: bool = False,
+) -> TimedFSData: ...
+
+
+@overload
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Literal["time-frequency"],
+    kind: Literal["stft"],
+    sparse: Literal[False] = False,
+    legacy: bool = False,
+) -> STFTData[Grid2DCartesian[Linspace, Linspace]]: ...
+
+
+@overload
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Literal["time-frequency"],
+    kind: Literal["stft"],
+    sparse: Literal[True],
+    legacy: bool = False,
+) -> STFTData[Grid2DSparse[Linspace, Linspace]]: ...
+
+
+@overload
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Literal["time-frequency"],
+    kind: Literal["wdm"],
+    sparse: Literal[False] = False,
+    legacy: bool = False,
+) -> WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+
+
+@overload
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Literal["time-frequency"],
+    kind: Literal["wdm"],
+    sparse: Literal[True],
+    legacy: bool = False,
+) -> WDMData[Grid2DSparse[Linspace, Linspace]]: ...
+
+
+def load_data(
+    file_path: str | pathlib.Path,
+    *,
+    domain: Domain | None = None,
+    kind: str | None = None,
+    sparse: bool = False,
+    legacy: bool = False,
+):
+    """Load the data from a saved HDF5 file."""
+    if legacy:
+        warnings.warn(
+            "The `legacy` mode of `load_data` is deprecated and will be removed in 0.9.0; ",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        with h5py.File(str(file_path), "r") as f:
+            data_type = str(f.attrs["type"])
+        if data_type == "TSData":
+            return _load_data(TSData, file_path, legacy=legacy)
+        if data_type == "FSData":
+            return _load_data(FSData, file_path, legacy=legacy)
+        if data_type == "TimedFSData":
+            return _load_data(TimedFSData, file_path, legacy=legacy)
+        raise ValueError(f"Unsupported data type: {data_type}")
     with h5py.File(str(file_path), "r") as f:
-        data_type = str(f.attrs["type"])
-    if data_type == "TSData":
-        return TSData.load(file_path, legacy=legacy)
-    if data_type == "FSData":
-        return FSData.load(file_path, legacy=legacy)
-    if data_type == "TimedFSData":
-        return TimedFSData.load(file_path, legacy=legacy)
-    raise ValueError(f"Unknown data type: {data_type}")
+        domain_attr = str(f.attrs["domain"])
+        kind_attr = str(f.attrs["kind"])
+        expected_kind = str(kind)
+        if domain is None:
+            warnings.warn(
+                "The `domain` argument of `load_data` is not provided. From 0.8.0,"
+                + " the `domain` argument will be required.",
+                FutureWarning,
+                stacklevel=2,
+            )
+        elif domain_attr != domain:
+            raise ValueError(
+                f"The domain of the data does not match the provided `domain` argument. "
+                + f"The data has domain {domain_attr}, but `domain` is {domain}."
+            )
+        if kind_attr != expected_kind:
+            raise ValueError(
+                f"The kind of the data does not match the provided `kind` argument. "
+                + f"The data has kind {kind_attr}, but `kind` is {kind}."
+            )
+        if domain_attr == "time" or domain_attr == "frequency":
+            if sparse:
+                raise ValueError(
+                    f"Sparse grid is not supported for domain {domain_attr}."
+                )
+    if domain_attr == "time":
+        return _load_data(TSData, file_path)
+    if domain_attr == "frequency":
+        if kind_attr == "timed":
+            return _load_data(TimedFSData, file_path)
+        return _load_data(FSData, file_path)
+    if domain_attr == "time-frequency":
+        if kind_attr == "stft":
+            if sparse:
+                return _load_data(STFTData[Grid2DSparse[Linspace, Linspace]], file_path)
+            return _load_data(STFTData[Grid2DCartesian[Linspace, Linspace]], file_path)
+        if kind_attr == "wdm":
+            if sparse:
+                return _load_data(WDMData[Grid2DSparse[Linspace, Linspace]], file_path)
+            return _load_data(WDMData[Grid2DCartesian[Linspace, Linspace]], file_path)
+    raise ValueError(
+        f"Unsupported combination of domain and kind: domain={domain_attr}, kind={kind_attr}."
+    )
 
 
 def load_sangria(

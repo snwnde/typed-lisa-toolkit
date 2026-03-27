@@ -3,9 +3,9 @@ from types import ModuleType
 from typing import Literal, overload
 
 from .. import _constructors  # pyright: ignore[reportPrivateUsage]
-from ..types import Array, data
+from ..types import Array, Grid2DCartesian, Linspace, data
 from ..types import representations as reps
-from ..types.misc import Axis, Linspace
+from ..types.misc import Axis
 
 
 def _import_wdm_transform() -> ModuleType:
@@ -143,13 +143,15 @@ def freq2time(
 
 
 @overload
-def time2wdm(tdata: data.TSData, /, *, Nt: int, Nf: int) -> data.WDMData: ...
+def time2wdm(
+    tdata: data.TSData, /, *, Nt: int, Nf: int
+) -> data.WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
 @overload
 def time2wdm(
     tseries: reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int
-) -> reps.WDM: ...
+) -> reps.WDM[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
 def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int):
@@ -221,14 +223,22 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
 
 
 @overload
-def wdm2time(wdmdata: data.WDMData, /) -> data.TSData: ...
+def wdm2time(
+    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]], /
+) -> data.TSData: ...
 
 
 @overload
-def wdm2time(wdm: reps.WDM, /) -> reps.UniformTimeSeries: ...
+def wdm2time(
+    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]], /
+) -> reps.UniformTimeSeries: ...
 
 
-def wdm2time(wdmthing: reps.WDM | data.WDMData, /):
+def wdm2time(
+    wdmthing: reps.WDM[Grid2DCartesian[Linspace, Linspace]]
+    | data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    /,
+):
     """Transform WDM expansion to equivalent time series.
 
     Parameters
@@ -267,13 +277,13 @@ def wdm2time(wdmthing: reps.WDM | data.WDMData, /):
 @overload
 def freq2wdm(
     fseries: reps.FrequencySeries[Linspace], /, *, Nt: int, Nf: int, t0: float = 0.0
-) -> reps.WDM: ...
+) -> reps.WDM[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
 @overload
 def freq2wdm(
     fdata: data.FSData, /, *, Nt: int, Nf: int, t0: float = 0.0
-) -> data.WDMData: ...
+) -> data.WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
 def freq2wdm(
@@ -321,14 +331,22 @@ def freq2wdm(
 
 
 @overload
-def wdm2freq(wdmdata: data.WDMData, /) -> data.FSData: ...
+def wdm2freq(
+    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]], /
+) -> data.FSData: ...
 
 
 @overload
-def wdm2freq(wdm: reps.WDM, /) -> reps.UniformFrequencySeries: ...
+def wdm2freq(
+    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]], /
+) -> reps.UniformFrequencySeries: ...
 
 
-def wdm2freq(wdmthing: reps.WDM | data.WDMData, /):
+def wdm2freq(
+    wdmthing: reps.WDM[Grid2DCartesian[Linspace, Linspace]]
+    | data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    /,
+):
     """Transform WDM expansion to a frequency series.
 
     .. note::
