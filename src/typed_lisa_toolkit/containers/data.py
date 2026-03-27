@@ -712,23 +712,23 @@ class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
         }
         return type(self).from_dict(tfdict).set_name(self.name)
 
-    # def draw(
-    #     self,
-    #     *,
-    #     time_interval: tuple[float, float] | None = None,
-    #     freq_interval: tuple[float, float] | None = None,
-    #     **kwargs: Any,
-    # ):
-    #     """Plot the data."""
-    #     from ..viz import plotters
+    def draw(
+        self,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+        **kwargs: Any,
+    ):
+        """Plot the data."""
+        from ..viz import plotters
 
-    # plotter = plotters.TFDataPlotter(
-    #     self.get_subset(
-    #         time_interval=time_interval,
-    #         freq_interval=freq_interval,
-    #     )
-    # )
-    #     return plotter.draw(**kwargs)
+        plotter = plotters.TFDataPlotter(
+            self.get_subset(
+                time_interval=time_interval,
+                freq_interval=freq_interval,
+            )
+        )
+        return plotter.draw(**kwargs)
 
 
 class WDMData(Data[reps.WDM]):

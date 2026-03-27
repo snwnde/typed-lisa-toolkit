@@ -8,7 +8,7 @@ to customize the plots.
 
 .. currentmodule:: typed_lisa_toolkit.viz.plotters
 
-Entities
+Plotters
 --------
 
 .. autoclass:: TSPlotter
@@ -375,6 +375,54 @@ class PhasorPlotter[AxisT: "Axis"](_1DPlotter[representations.Phasor[AxisT]]):
         return fig
 
 
+class STFTPlotter[
+    FreqAxisT: Axis,
+    TimeAxisT: Axis,
+]:
+    """Plotter for :class:`.containers.representations.STFT`."""
+
+    def __init__(
+        self, representation: representations.STFT[FreqAxisT, TimeAxisT]
+    ) -> None:
+        self.representation: representations.STFT[FreqAxisT, TimeAxisT] = representation
+
+    def plot(
+        self,
+        ax: matplotlib.axes.Axes,
+        set_xlabel: bool = False,
+        set_ylabel: bool = False,
+        set_legend: bool = False,
+        **kwargs: Any,
+    ) -> matplotlib.axes.Axes:
+        """Plot the time-frequency representation on the provided Axes."""
+        _kwargs = sieve_kwargs(imshow_kwargs, **kwargs)
+
+        times_extent = (
+            self.representation.t_start / 3600,
+            (self.representation.t_end) / 3600,
+        )
+        freqs_extent = (
+            self.representation.f_min,
+            self.representation.f_max,
+        )
+        extent = times_extent + freqs_extent
+        ax.imshow(  # pyright: ignore[reportUnknownMemberType]
+            self.representation.abs().entries,
+            origin="lower",
+            aspect="auto",
+            extent=extent,
+            **_kwargs,
+        )
+        if set_xlabel:
+            ax.set_xlabel("Time [hrs]")  # pyright: ignore[reportUnknownMemberType]
+        if set_ylabel:
+            ax.set_ylabel("Frequency [Hz]")  # pyright: ignore[reportUnknownMemberType]
+        if set_legend:
+            _legend_kwargs = sieve_kwargs(legend_kwargs, **kwargs)
+            ax.legend(**_legend_kwargs)  # pyright: ignore[reportUnknownMemberType]
+        return ax
+
+
 class WDMPlotter:
     """Plotter for :class:`.containers.representations.WDM`."""
 
@@ -630,11 +678,11 @@ class FSDataPlotter(_1DDataPlotter["representations.FrequencySeries[Axis]"]):
         return self._compare_angle(other=other, **kwargs)
 
 
-class TFDataPlotter:
+class TFDataPlotter[DataT: data.WDMData | data.STFTData]:
     """Plotter for :class:`.containers.data.TFData`."""
 
-    def __init__(self, data: data.WDMData) -> None:
-        self.data: data.WDMData = copy.deepcopy(data)
+    def __init__(self, data: DataT) -> None:
+        self.data: DataT = copy.deepcopy(data)
 
     def draw(self, set_legend: bool = False, **kwargs: Any) -> matplotlib.figure.Figure:
         """Draw the time-frequency data."""
@@ -646,7 +694,7 @@ class TFDataPlotter:
             axs = [axs]
         for idx, chnname in enumerate(self.data.channel_names):
             xlabel_bool = True if idx == len(self.data.channel_names) - 1 else False
-            WDMPlotter(self.data[chnname]).plot(
+            self.data[chnname].get_plotter().plot(
                 axs[idx],
                 set_xlabel=xlabel_bool,
                 set_ylabel=True,
