@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.5 - 2026-03-27
+#### Features
+- STFT viz - (3d03d69) - Senwen Deng
+#### Bug Fixes
+- viz static typing - (20bac6e) - Senwen Deng
+- dependency management - (12960f1) - Senwen Deng
+#### Continuous Integration
+- trigger on ver tags - (772a315) - Senwen Deng
+#### Refactoring
+- basedpyright - (fd3519d) - Senwen Deng
+
+- - -
+
 ## 0.5.4 - 2026-03-23
 #### Features
 - add waveform helpers - (35696e7) - Senwen Deng
