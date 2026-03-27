@@ -1183,9 +1183,29 @@ class STFT[
         return self.grid[1]
 
     @property
+    def t_start(self) -> float:
+        """The onset time of the series."""
+        return _get_axis_onset(self.times)
+
+    @property
+    def t_end(self) -> float:
+        """The end time of the series."""
+        return _get_axis_end(self.times)
+
+    @property
     def frequencies(self) -> FreqAxisT:
         """The frequency grid of the time-frequency representation."""
         return self.grid[0]
+
+    @property
+    def f_min(self) -> float:
+        """The minimum frequency of the series."""
+        return _get_axis_onset(self.frequencies)
+
+    @property
+    def f_max(self) -> float:
+        """The maximum frequency of the series."""
+        return _get_axis_end(self.frequencies)
 
     @classmethod
     def make(
@@ -1240,6 +1260,12 @@ class STFT[
             grid=(freq_grid_sliced, time_grid_sliced),
             entries=self.entries[_get_full_slice((freq_slice, time_slice))],
         )
+
+    def get_plotter(self):
+        """Return the plotter for the representation."""
+        from ..viz import plotters
+
+        return plotters.STFTPlotter(self)
 
 
 class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
