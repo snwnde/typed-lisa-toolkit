@@ -1215,7 +1215,7 @@ class STFT[
         entries: "Array",
     ) -> Self:
         """Create a time-frequency representation from time and frequency grids and entries."""
-        return cls(grid=(times, frequencies), entries=entries)
+        return cls(grid=(frequencies, times), entries=entries)
 
     def get_embedded[AT0: "Axis", AT1: "Axis"](
         self,
