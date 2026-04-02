@@ -1,4 +1,4 @@
-"""Module for modes."""
+"""Mode types."""
 
 import logging
 from typing import NamedTuple, Self, overload
@@ -33,7 +33,7 @@ class Harmonic(NamedTuple):
         return cls(*mode)
 
 
-class QNM(NamedTuple):
+class QuasiNormalMode(NamedTuple):
     """A quasinormal mode."""
 
     l: PosInt  # noqa: E741
@@ -66,6 +66,10 @@ class QNM(NamedTuple):
         return cls(*mode)
 
 
+QNM = QuasiNormalMode
+"""Alias for :class:`.QuasiNormalMode`."""
+
+
 @overload
 def cast_mode(mode: tuple[PosInt, PosInt]) -> Harmonic: ...
 
@@ -74,10 +78,10 @@ def cast_mode(mode: tuple[PosInt, PosInt]) -> Harmonic: ...
 def cast_mode(mode: tuple[PosInt, PosInt, PosInt]) -> QNM: ...
 
 
-def cast_mode(mode: tuple[PosInt, PosInt] | tuple[PosInt, PosInt, PosInt]):
+def cast_mode(mode: tuple[PosInt, ...]):
     """Cast a tuple of positive integers to :class:`.Harmonic` or :class:`.QNM`."""
     if len(mode) == 2:
         return Harmonic.cast(mode)
     elif len(mode) == 3:
         return QNM.cast(mode)
-    raise ValueError(f"Invalid mode: {mode}")  # pyright: ignore[reportUnreachable]
+    raise ValueError(f"Invalid mode: {mode}")

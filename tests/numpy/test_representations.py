@@ -5,25 +5,36 @@ import unittest
 
 import numpy as np
 import numpy.testing as npt
-from l2d_interface.validators import validate_representation  # type: ignore[import-untyped]
+from l2d_interface.validators import (
+    validate_representation,  # type: ignore[import-untyped]
+)
+from scipy.signal import freqs
 
-from tests._shared.representations_helpers import (
+from tests._helpers import (
     AdvancedRepresentationMethodsMixin,
     HelperFunctionsMixin,
     LinspaceExtraPropertiesMixin,
     WDMPropertiesAndMethodsMixin,
     build_canonical_representations,
 )
-from typed_lisa_toolkit import utils
-from typed_lisa_toolkit.containers.data import TSData
-from typed_lisa_toolkit.containers.representations import (  # extra symbols for coverage tests
+from typed_lisa_toolkit import (
+    utils,
+    frequency_series,
+    phasor,
+    linspace,
+    time_series,
+    stft,
+)
+from typed_lisa_toolkit.types import (
     STFT,
     FrequencySeries,
-    UniformFrequencySeries,
     Linspace,
     Phasor,
-    TimeSeries,
+    TSData,
+    UniformFrequencySeries,
     UniformTimeSeries,
+)
+from typed_lisa_toolkit.types.representations import (  # extra symbols for coverage tests
     _get_full_slice,
     _get_subset_slice,
     _take_subset,
@@ -45,7 +56,6 @@ class TestCanonicalShape(unittest.TestCase):
             n_features=self.n_features,
             len_time=self.len_time,
             len_freq=self.len_freq,
-            tf_grid_order="freq_time",
         )
 
         self.freqs = case["freqs"]
@@ -65,12 +75,12 @@ class TestL2DContractNumpy(TestCanonicalShape):
         times = np.linspace(0.0, 1.0, 16)
         freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
 
-        ts = TimeSeries(
-            grid=(times,),
+        ts = time_series(
+            times,
             entries=np.random.randn(1, 1, 1, 1, len(times)),
         )
-        fs = FrequencySeries(
-            grid=(freqs,),
+        fs = frequency_series(
+            freqs,
             entries=np.random.randn(1, 1, 1, 1, len(freqs)),
         )
         stft = STFT(
@@ -90,8 +100,8 @@ class TestL2DContractNumpy(TestCanonicalShape):
 
     def test_data_contract(self):
         times = np.linspace(0.0, 1.0, 16)
-        x = TimeSeries(grid=(times,), entries=np.random.randn(1, 1, 1, 1, len(times)))
-        y = TimeSeries(grid=(times,), entries=np.random.randn(1, 1, 1, 1, len(times)))
+        x = time_series(times, entries=np.random.randn(1, 1, 1, 1, len(times)))
+        y = time_series(times, entries=np.random.randn(1, 1, 1, 1, len(times)))
 
         data = TSData.from_dict({"X": x, "Y": y})
         kernel = np.asarray(data.get_kernel())
@@ -298,9 +308,7 @@ class TestSubsetOperations(unittest.TestCase):
             self.n_features,
             self.len_grid_large,
         )
-        self.fs_large = FrequencySeries(
-            grid=(self.freqs_large,), entries=entries_fs_large
-        )
+        self.fs_large = frequency_series(self.freqs_large, entries=entries_fs_large)
 
         # Time series fixture with Linspace
         self.times_ls = Linspace(0.0, 0.01, self.len_grid_large)
@@ -311,10 +319,11 @@ class TestSubsetOperations(unittest.TestCase):
             self.n_features,
             self.len_grid_large,
         )
-        self.ts_ls = TimeSeries(grid=(self.times_ls,), entries=entries_ts_ls)
+        self.ts_ls = time_series(self.times_ls, entries=entries_ts_ls)
 
-        self.tf_large = STFT(
-            grid=(self.freqs_large, self.times_ls),
+        self.tf_large = stft(
+            self.freqs_large,
+            self.times_ls,
             entries=np.random.randn(
                 self.n_batches,
                 self.n_channels,
@@ -451,7 +460,7 @@ class TestSubsetOperations(unittest.TestCase):
         entries = np.random.randn(
             self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 100
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Use slice notation
         fs_sub = fs[20:50]
@@ -539,7 +548,7 @@ class TestEmbedOperations(unittest.TestCase):
         entries_small = np.ones((1, 1, 1, 1, 5), dtype=complex)  # Use simple values
         for i in range(5):
             entries_small[0, 0, 0, 0, i] = i + 1
-        fs_small = FrequencySeries(grid=(freqs_small,), entries=entries_small)
+        fs_small = frequency_series(freqs_small, entries=entries_small)
 
         # Create large grid that contains small grid exactly
         freqs_large = np.array(
@@ -570,7 +579,7 @@ class TestEmbedOperations(unittest.TestCase):
         # Small grid (Linspace)
         times_small = Linspace(2.0, 0.1, 30)
         entries_small = np.random.randn(2, 1, 1, 1, 30)
-        ts_small = TimeSeries(grid=(times_small,), entries=entries_small)
+        ts_small = time_series(times_small, entries=entries_small)
 
         # Large grid (Linspace)
         times_large = Linspace(0.0, 0.1, 100)
@@ -647,8 +656,8 @@ class TestArithmeticOperations(unittest.TestCase):
             self.len_freq,
         )
 
-        fs1 = FrequencySeries(grid=(self.freqs_short,), entries=entries1)
-        fs2 = FrequencySeries(grid=(self.freqs_short,), entries=entries2)
+        fs1 = frequency_series(self.freqs_short, entries=entries1)
+        fs2 = frequency_series(self.freqs_short, entries=entries2)
 
         # Add
         fs_sum = fs1 + fs2
@@ -670,7 +679,7 @@ class TestArithmeticOperations(unittest.TestCase):
             self.n_features,
             self.len_time,
         )
-        ts = TimeSeries(grid=(self.times,), entries=entries)
+        ts = time_series(times=self.times, entries=entries)
 
         # Multiply by scalar
         ts_scaled = ts * 2.5
@@ -700,8 +709,8 @@ class TestArithmeticOperations(unittest.TestCase):
             self.len_freq,
         )
 
-        fs1 = FrequencySeries(grid=(self.freqs_short,), entries=entries1)
-        fs2 = FrequencySeries(grid=(self.freqs_short,), entries=entries2)
+        fs1 = frequency_series(self.freqs_short, entries=entries1)
+        fs2 = frequency_series(self.freqs_short, entries=entries2)
 
         # Subtract
         fs_diff = fs1 - fs2
@@ -719,7 +728,7 @@ class TestArithmeticOperations(unittest.TestCase):
         entries_old = np.random.randn(
             self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 200
         )
-        fs_old = FrequencySeries(grid=(freqs,), entries=entries_old)
+        fs_old = frequency_series(freqs, entries=entries_old)
 
         # Create new entries with same shape
         entries_new = (
@@ -763,7 +772,7 @@ class TestArithmeticOperations(unittest.TestCase):
                 self.len_freq,
             )
         )
-        fs = FrequencySeries(grid=(self.freqs_complex,), entries=entries)
+        fs = frequency_series(self.freqs_complex, entries=entries)
 
         # Divide by scalar
         fs_scaled = fs / 2.5
@@ -784,7 +793,7 @@ class TestArithmeticOperations(unittest.TestCase):
             self.n_features,
             self.len_time,
         )
-        ts = TimeSeries(grid=(self.times_short,), entries=entries)
+        ts = time_series(times=self.times_short, entries=entries)
 
         # Right multiply
         ts_scaled = 3.0 * ts
@@ -816,7 +825,7 @@ class TestArithmeticOperations(unittest.TestCase):
                 self.len_freq,
             )
         )
-        fs = FrequencySeries(grid=(self.freqs_complex,), entries=entries)
+        fs = frequency_series(self.freqs_complex, entries=entries)
 
         # Right divide
         fs_scaled = 2.0 / fs
@@ -837,7 +846,7 @@ class TestArithmeticOperations(unittest.TestCase):
             self.n_features,
             self.len_freq,
         )
-        fs = FrequencySeries(grid=(self.freqs_short,), entries=entries)
+        fs = frequency_series(self.freqs_short, entries=entries)
 
         # Negate
         fs_neg = -fs
@@ -997,7 +1006,7 @@ class TestComplexProperties(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_real = fs.real
 
         npt.assert_array_almost_equal(fs_real.entries, entries_full.real)
@@ -1017,7 +1026,7 @@ class TestComplexProperties(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_imag = fs.imag
 
         npt.assert_array_almost_equal(fs_imag.entries, entries_full.imag)
@@ -1038,7 +1047,7 @@ class TestComplexProperties(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_conj = fs.conj
 
         npt.assert_array_almost_equal(fs_conj.entries, np.conj(entries_full))
@@ -1060,7 +1069,7 @@ class TestComplexProperties(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_abs = fs.abs()
 
         expected_abs = 5.0 * np.ones(
@@ -1101,7 +1110,7 @@ class TestPropertiesAndAliases(unittest.TestCase):
             self.n_features,
             self.len_freq_long,
         )
-        fs = UniformFrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Check df
         self.assertEqual(fs.df, 1e-3)
@@ -1125,7 +1134,7 @@ class TestPropertiesAndAliases(unittest.TestCase):
             self.n_features,
             self.len_time,
         )
-        ts = UniformTimeSeries(grid=(times,), entries=entries)
+        ts = time_series(times, entries=entries)
 
         # Check dt
         self.assertEqual(ts.dt, 0.01)
@@ -1149,7 +1158,7 @@ class TestPropertiesAndAliases(unittest.TestCase):
             self.n_features,
             self.len_freq_short,
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         npt.assert_array_equal(fs.frequencies, freqs)
         npt.assert_array_equal(fs.frequencies, fs.grid[0])
@@ -1168,7 +1177,7 @@ class TestPropertiesAndAliases(unittest.TestCase):
             self.n_features,
             self.len_freq_long,
         )
-        ts = TimeSeries(grid=(times,), entries=entries)
+        ts = time_series(times=times, entries=entries)
 
         npt.assert_array_equal(ts.times, times)
         npt.assert_array_equal(ts.times, ts.grid[0])
@@ -1198,7 +1207,7 @@ class TestGridTupleHandling(unittest.TestCase):
             self.n_features,
             self.len_grid_small,
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Grid must be tuple
         self.assertIsInstance(fs.grid, tuple)
@@ -1218,7 +1227,7 @@ class TestGridTupleHandling(unittest.TestCase):
             self.n_features,
             self.len_grid_large,
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Should be converted to Linspace
         self.assertIsInstance(fs.grid[0], Linspace)
@@ -1236,7 +1245,7 @@ class TestGridTupleHandling(unittest.TestCase):
         entries = np.random.randn(
             self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 5
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Should remain as array
         self.assertIsInstance(fs.grid[0], np.ndarray)
@@ -1267,7 +1276,7 @@ class TestEdgeCases(unittest.TestCase):
             self.n_features,
             self.len_grid_large,
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Get subset without copy
         fs_sub = fs.get_subset(slice=slice(20, 50), copy=False)
@@ -1296,7 +1305,7 @@ class TestEdgeCases(unittest.TestCase):
             self.n_features,
             self.len_grid_large,
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Get subset with copy
         fs_sub = fs.get_subset(slice=slice(20, 50), copy=True)
@@ -1323,7 +1332,7 @@ class TestEdgeCases(unittest.TestCase):
             self.n_features,
             self.len_grid_small,
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Get empty subset
         fs_empty = fs.get_subset(slice=slice(2, 2))
@@ -1384,7 +1393,7 @@ class TestErrorHandling(unittest.TestCase):
 
         # Should either raise error or create empty series
         try:
-            fs = FrequencySeries(grid=(freqs,), entries=entries)
+            fs = frequency_series(freqs, entries=entries)
             # If it succeeds, verify it created empty series
             self.assertEqual(len(fs.grid[0]), 0)
         except ValueError:
@@ -1416,7 +1425,7 @@ class TestErrorHandling(unittest.TestCase):
         entries = np.random.randn(
             self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 50
         )
-        fs = FrequencySeries(grid=(self.freqs_short,), entries=entries)
+        fs = frequency_series(self.freqs_short, entries=entries)
 
         # Try interval outside grid range - may return empty or clamp to bounds
         try:
@@ -1461,8 +1470,8 @@ class TestArithmeticAddMethods(unittest.TestCase):
         small_freqs = Linspace(0.30, 0.01, 30)
         entries_large = np.ones((1, 1, 1, 1, 100))
         entries_small = np.ones((1, 1, 1, 1, 30)) * 2.0
-        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large.copy())
-        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        fs_large = frequency_series(large_freqs, entries=entries_large.copy())
+        fs_small = frequency_series(small_freqs, entries=entries_small)
         full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
         result = fs_large.iadd(fs_small, full_slice)
         npt.assert_allclose(result.entries[0, 0, 0, 0, 30:60], 3.0)
@@ -1473,8 +1482,8 @@ class TestArithmeticAddMethods(unittest.TestCase):
         small_freqs = Linspace(0.30, 0.01, 30)
         entries_large = np.ones((1, 1, 1, 1, 100))
         entries_small = np.ones((1, 1, 1, 1, 30)) * 2.0
-        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large.copy())
-        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        fs_large = frequency_series(large_freqs, entries=entries_large.copy())
+        fs_small = frequency_series(small_freqs, entries=entries_small)
         full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
         result = fs_large.add(fs_small, full_slice, inplace=False)
         npt.assert_allclose(result.entries[0, 0, 0, 0, 30:60], 3.0)
@@ -1487,8 +1496,8 @@ class TestArithmeticAddMethods(unittest.TestCase):
         small_freqs = Linspace(0.30, 0.01, 30)
         entries_large = np.ones((1, 1, 1, 1, 100))
         entries_small = np.ones((1, 1, 1, 1, 30)) * 2.0
-        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large.copy())
-        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        fs_large = frequency_series(large_freqs, entries=entries_large.copy())
+        fs_small = frequency_series(small_freqs, entries=entries_small)
         full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
         result = fs_large.add(fs_small, full_slice, inplace=True)
         npt.assert_allclose(result.entries[0, 0, 0, 0, 30:60], 3.0)
@@ -1498,7 +1507,7 @@ class TestArithmeticAddMethods(unittest.TestCase):
         # Test __iadd__ fallback to super().__iadd__ for non-matching types (scalar)
         freqs = Linspace(0.0, 0.01, 10)
         entries = np.ones((1, 1, 1, 1, 10))
-        fs = FrequencySeries(grid=(freqs,), entries=entries.copy())
+        fs = frequency_series(freqs, entries=entries.copy())
         fs += 1.0
         npt.assert_allclose(np.asarray(fs.entries), 2.0)  # 1.0 + 1.0
 
@@ -1508,20 +1517,41 @@ class TestArithmeticAddMethods(unittest.TestCase):
         small_freqs_arr = np.linspace(0.30, 0.59, 3)
         entries_large = np.ones((1, 1, 1, 1, 10))
         entries_small = np.ones((1, 1, 1, 1, 3)) * 2.0
-        fs_large = FrequencySeries(
-            grid=(large_freqs_arr,), entries=entries_large.copy()
-        )
-        fs_small = FrequencySeries(grid=(small_freqs_arr,), entries=entries_small)
+        fs_large = frequency_series(large_freqs_arr, entries=entries_large.copy())
+        fs_small = frequency_series(small_freqs_arr, entries=entries_small)
         # This covers the 'else: start, stop = float(...)' branch in __iadd__
         try:
             fs_large += fs_small
         except (ValueError, IndexError):
             pass  # iadd may fail for canonical shape; we just want the branch covered
 
+    def test_addition_with_equal_nonuniform_array_grids(self):
+        # Non-uniform grids avoid Linspace coercion and force array_equal path.
+        freqs = np.array([0.0, 0.11, 0.37, 0.9])
+        entries1 = np.ones((1, 1, 1, 1, len(freqs)))
+        entries2 = np.ones((1, 1, 1, 1, len(freqs))) * 2.0
+        fs1 = frequency_series(freqs, entries1)
+        fs2 = frequency_series(freqs, entries2)
+
+        out = fs1 + fs2
+        npt.assert_allclose(np.asarray(out.entries), 3.0)
+
+    def test_addition_with_mismatched_nonuniform_array_grids_raises(self):
+        # Covers _check_grid_compatibility branch where array_equal is False.
+        freqs1 = np.array([0.0, 0.11, 0.37, 0.9])
+        freqs2 = np.array([0.0, 0.11, 0.4, 0.9])
+        entries1 = np.ones((1, 1, 1, 1, len(freqs1)))
+        entries2 = np.ones((1, 1, 1, 1, len(freqs2)))
+        fs1 = frequency_series(freqs1, entries1)
+        fs2 = frequency_series(freqs2, entries2)
+
+        with self.assertRaises(ValueError):
+            _ = fs1 + fs2
+
     def test_setitem_on_series(self):
         freqs = Linspace(0.0, 0.1, 50)
         entries = np.ones((1, 1, 1, 1, 50))
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
         with self.assertRaises(ValueError):
             fs[10:20] = np.zeros((1, 1, 1, 1, 10))
 
@@ -1535,10 +1565,9 @@ class TestPhasor(unittest.TestCase):
         self.phases = np.linspace(0, np.pi, 20, dtype=np.float64)[
             None, None, None, None, :
         ]
-        entries = np.zeros((1, 1, 1, 2, 20), dtype=np.complex128)
-        entries[:, :, :, slice(0, 1), :] = self.amps
-        entries[:, :, :, slice(1, 2), :] = self.phases
-        self.phasor = Phasor(grid=(self.freqs,), entries=entries)
+        self.phasor = phasor(
+            frequencies=self.freqs, amplitudes=self.amps, phases=self.phases
+        )
 
     def test_domain_and_kind(self):
         self.assertEqual(self.phasor.domain, "frequency")
@@ -1591,6 +1620,6 @@ class TestWDMPropertiesAndMethods(WDMPropertiesAndMethodsMixin, unittest.TestCas
     """WDM property/method tests (shared via mixin)."""
 
     def setUp(self):
-        from tests._shared.noisemodel_helpers import build_wdm_pair
+        from tests._helpers import build_wdm_pair
 
         self.wdm = build_wdm_pair(np)["left"]["X"]

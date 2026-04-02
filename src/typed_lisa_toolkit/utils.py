@@ -20,22 +20,10 @@ from __future__ import annotations
 
 import functools
 import logging
-from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 import array_api_compat as xpc
 
-if TYPE_CHECKING:
-    import jax
-    import jax.typing as jpt
-    import numpy as np
-    import numpy.typing as npt
-
-    ArrayLike = jpt.ArrayLike | npt.ArrayLike
-    Array = jax.Array | npt.NDArray[np.number]
-    ArrayFunc = Callable[[Array], Array]
-    Interpolator = Callable[[Array, Array], ArrayFunc]
-
+from .types.misc import Array, ArrayFunc, Interpolator
 
 log = logging.getLogger(__name__)
 
@@ -71,8 +59,8 @@ def get_support_slice(array: Array):
     return slice(non_zero_indices[0], non_zero_indices[-1] + 1)
 
 
-def extend_to[ArrayT: Array](
-    target_grid: tuple[ArrayT, ...] | ArrayT,
+def extend_to(
+    target_grid: tuple[Array, ...] | Array,
     *,
     known_slices: tuple[slice, ...] | None = None,
 ):
@@ -120,9 +108,9 @@ def extend_to[ArrayT: Array](
     _target_grid = target_grid if isinstance(target_grid, tuple) else (target_grid,)
 
     def get_extension(
-        grid: tuple[ArrayT, ...] | ArrayT,
-        entries: ArrayT,
-    ) -> ArrayT:
+        grid: tuple[Array, ...] | Array,
+        entries: Array,
+    ) -> Array:
         _grid = grid if isinstance(grid, tuple) else (grid,)
         xp = xpc.get_namespace(entries)
         # Handle canonical shape: (n_batches, n_channels, n_harmonics, n_features, *grid_dims)

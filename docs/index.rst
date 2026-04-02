@@ -17,7 +17,8 @@ contracts defined in `l2d-interface`.
    :caption: Documentation:
    :titlesonly:
 
-   api/containers/index
-   api/consumers/index
+   api/toplevel
+   api/types
+   api/shop
    api/viz/index
    api/utils

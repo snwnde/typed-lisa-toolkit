@@ -9,7 +9,7 @@ from the :mod:`scipy.signal.windows` module. For this purpose, use the
 The module also provides custom tapering functions, ready to use upon
 choosing the parameters. Refer to the section "Tapering Functions" for a list.
 
-.. currentmodule:: typed_lisa_toolkit.containers.tapering
+.. currentmodule:: typed_lisa_toolkit.types.tapering
 
 Protocols
 ---------

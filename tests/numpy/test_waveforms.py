@@ -8,17 +8,13 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import numpy.testing as npt
 
-from tests._shared.waveforms_helpers import (
+from tests._helpers import (
     build_fake_harmonic_projected_waveform,
     build_harmonic_projected_frequency_waveform,
     build_harmonic_waveform_frequency_series,
     make_mock_phasor,
 )
-from typed_lisa_toolkit.containers import modes
-from typed_lisa_toolkit.containers.waveforms import (
-    phasor_to_fs_hpw,
-    phasor_to_fs_hw,
-    phasor_to_fs_pw,
+from typed_lisa_toolkit import (
     densify_phasor,
     densify_phasor_hpw,
     densify_phasor_hw,
@@ -27,13 +23,17 @@ from typed_lisa_toolkit.containers.waveforms import (
     harmonic_projected_waveform,
     harmonic_waveform,
     hhpw,
+    homogeneous_harmonic_projected_waveform,
     hpw,
     hw,
-    homogeneous_harmonic_projected_waveform,
-    pw,
+    phasor_to_fs_hpw,
+    phasor_to_fs_hw,
+    phasor_to_fs_pw,
     projected_waveform,
+    pw,
     sum_harmonics,
 )
+from typed_lisa_toolkit.types import modes
 
 
 class TestHarmonicWaveformNumpy(unittest.TestCase):
@@ -161,7 +161,7 @@ class TestDenseMakerNumpy(unittest.TestCase):
         # Patch ProjectedWaveform.from_dict to an identity so structural assertions
         # can be made without constructing real ProjectedWaveform objects.
         with patch(
-            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
             side_effect=self._identity_mapping,
         ) as from_dict_mock:
             out = fn(wf)
@@ -197,7 +197,7 @@ class TestDenseMakerNumpy(unittest.TestCase):
         fn = maker(frequencies, embed=True)
 
         with patch(
-            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
             side_effect=self._identity_mapping,
         ) as from_dict_mock:
             out = fn(wf)
@@ -271,7 +271,7 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
             phasor.entries = frequencies
 
         with patch(
-            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
             side_effect=lambda d: d,  # type: ignore
         ):
             out = densify_phasor_pw(wf, interpolator, frequencies, embed=False)
@@ -308,7 +308,7 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
                 phasor.entries = frequencies
 
         with patch(
-            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
             side_effect=lambda d: d,  # type: ignore
         ):
             out = densify_phasor_hpw(wf, interpolator, frequencies, embed=False)
@@ -353,7 +353,7 @@ class TestCombineHelpersNumpy(unittest.TestCase):
         wf["Y"] = p_y
 
         with patch(
-            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
             side_effect=lambda d: d,  # type: ignore
         ):
             out = phasor_to_fs_pw(wf)
@@ -374,7 +374,7 @@ class TestCombineHelpersNumpy(unittest.TestCase):
                 expected[mode][channel] = fs
 
         with patch(
-            "typed_lisa_toolkit.containers.waveforms.ProjectedWaveform.from_dict",
+            "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
             side_effect=lambda d: d,  # type: ignore
         ):
             out = phasor_to_fs_hpw(wf)

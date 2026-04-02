@@ -1,9 +1,9 @@
-"""Module for the noise model.
+"""Noise model types.
 
 A noise model carries the knowledge of noise properties in the dm.
 It defines the inner product and determines how to whiten the dm.
 
-.. currentmodule:: typed_lisa_toolkit.consumers.noisemodel
+.. currentmodule:: typed_lisa_toolkit.types.noisemodel
 
 Protocols
 ---------
@@ -48,7 +48,6 @@ Noise Models
 import logging
 from types import ModuleType
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Literal,
@@ -59,9 +58,10 @@ from typing import (
 )
 
 from .. import utils
-from ..containers import data as dm
-from ..containers import representations as reps
-from ..containers import waveforms
+from . import data as dm
+from . import representations as reps
+from . import waveforms
+from .misc import Array, Axis
 
 
 def _import_quadax() -> ModuleType:
@@ -87,11 +87,6 @@ def _import_scipy_integrate() -> ModuleType:
 
 
 log = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    Array = reps.Array
-    Axis = reps.Axis
-    Linspace = reps.Linspace
 
 
 ChnName = str

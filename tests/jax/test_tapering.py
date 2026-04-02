@@ -9,7 +9,7 @@ jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 
-from typed_lisa_toolkit.containers import tapering
+from typed_lisa_toolkit.types import tapering
 
 
 class TestTaperingJax(unittest.TestCase):

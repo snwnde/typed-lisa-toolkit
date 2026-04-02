@@ -55,7 +55,7 @@ import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..containers import data, representations
+from ..types import data, representations
 
 if TYPE_CHECKING:
     Axis = representations.Axis

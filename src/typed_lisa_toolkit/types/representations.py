@@ -1,46 +1,10 @@
-"""Module for representations.
+"""Representation types.
 
 **Multi-Backend Support:**
 
 The underlying arrays can be from any array library that supports the Python "Array" API standard,
 including NumPy and JAX.
 
-.. currentmodule:: typed_lisa_toolkit.containers.representations
-
-.. autoclass:: Linspace
-   :members:
-   :special-members: __eq__, __len__, __array__, __getitem__
-
-.. autofunction:: frequency_series
-.. autofunction:: time_series
-.. autofunction:: phasor
-.. autofunction:: stft
-.. autofunction:: wdm
-
-
-.. autoclass:: TimeSeries
-   :members:
-   :member-order: bysource
-
-.. autoclass:: FrequencySeries
-   :members:
-   :member-order: bysource
-   :inherited-members:
-
-.. autoclass:: Phasor
-   :members:
-   :member-order: bysource
-   :inherited-members:
-
-.. autoclass:: STFT
-    :members:
-    :member-order: bysource
-    :inherited-members:
-
-.. autoclass:: WDM
-    :members:
-    :member-order: bysource
-    :inherited-members:
 """
 
 from __future__ import annotations
@@ -57,23 +21,23 @@ from typing import (
     Self,
     Union,
     cast,
-    final,
     overload,
 )
 
 import array_api_compat as xpc
+from jax import P
 import numpy as np
 import scipy.signal
 from l2d_interface.contract import LinspaceLike
 
+from .misc import Array, Interpolator, Linspace
+
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-    from .. import utils
     from ..viz import plotters
 
-    Array = utils.Array
-    Axis = Union[Array, "Linspace"]
+    Axis = Array | Linspace
     type Grid1D[AxisT: Axis] = tuple[AxisT]
     type Grid2D[Axis0: Axis, Axis1: Axis] = tuple[Axis0, Axis1]
     UniformGrid2D = Grid2D["Linspace", "Linspace"]
@@ -105,23 +69,23 @@ if TYPE_CHECKING:
             ...
 
 
-from pywavelet import set_backend as _pyw_set_backend
-from pywavelet.transforms import from_freq_to_wavelet as _pyw_f2w
-from pywavelet.transforms import from_wavelet_to_freq as _pyw_w2f
-from pywavelet.types import FrequencySeries as pywFS
-from pywavelet.types import Wavelet as pywWDM
+# from pywavelet import set_backend as _pyw_set_backend
+# from pywavelet.transforms import from_freq_to_wavelet as _pyw_f2w
+# from pywavelet.transforms import from_wavelet_to_freq as _pyw_w2f
+# from pywavelet.types import FrequencySeries as pywFS
+# from pywavelet.types import Wavelet as pywWDM
 
 # NOTE We could also import the individual transformation routines from
 # pywavelet (written in numpy, cupy, jax) for finer control
 
 # temporary: force backend to be numpy. This should be removed when
 # tlt is updated to use multiple array backends.
-_pyw_set_backend("numpy", "float64")
+# _pyw_set_backend("numpy", "float64")
 # pyw_set_precision("float64")  # by default pywavelet uses float32.
 
 
-from .. import lib, utils
-from . import tapering
+from .. import utils
+from . import _mixins, tapering
 
 log = logging.getLogger(__name__)
 
@@ -130,123 +94,6 @@ if TYPE_CHECKING:
 
 
 _slice = slice  # Alias for slice
-
-
-@final
-class Linspace:
-    """Class for a uniform grid.
-
-    .. note::
-
-        This class is designed to represent a uniform grid by
-        three numbers. It does not try to implement the full
-        interface of an array, but only a subset of it that is
-        relevant for our use cases.
-    """
-
-    def __init__(self, start: float, step: float, num: int):
-        if num <= 0:
-            raise ValueError("num must be at least 1")
-        num = int(num)
-        # The float conversion is necessary to avoid issues with JAX scalars
-        self._start = float(start)
-        self._step = float(step)
-        self._num = num
-        self._shape = (num,)
-        self._stop = self.start + self.step * (num - 1)
-
-    @property
-    def start(self) -> float:
-        """The start of the grid."""
-        return self._start
-
-    @property
-    def step(self) -> float:
-        """The step of the grid."""
-        return self._step
-
-    @property
-    def num(self) -> int:
-        """The number of points in the grid."""
-        return self._num
-
-    @property
-    def shape(self) -> tuple[int]:
-        """The shape of the grid."""
-        return self._shape
-
-    @property
-    def stop(self) -> float:
-        """The stop of the grid."""
-        return self._stop
-
-    def __eq__(self, other: object) -> bool:
-        """Check if two Linspace instances are equal."""
-        if not isinstance(other, LinspaceLike):
-            raise TypeError(f"Cannot compare Linspace with {type(other)}.")
-        if not self.start == other.start:
-            return False
-        if not self.step == other.step:
-            return False
-        if not len(self) == len(other):
-            return False
-        return True
-
-    def __len__(self) -> int:
-        """Return the length of the grid."""
-        return self.num
-
-    def __repr__(self):
-        """Return the string representation of the grid."""
-        return f"Linspace(start={self.start}, step={self.step}, num={self.num})"
-
-    def __array__(
-        self, dtype: npt.DTypeLike | None = None, copy: bool | None = None
-    ) -> npt.NDArray[np.floating]:
-        """Return the grid as a numpy array."""
-        grid = self.start + self.step * np.arange(self.num, dtype=dtype)
-        if copy is False:
-            return grid
-        return np.array(grid, copy=True)
-
-    def __getitem__(self, slice: object) -> Self:
-        """Return a subset of the grid."""
-        if not isinstance(slice, _slice):
-            raise TypeError(f"Invalid index type: expected slice, got {type(slice)}.")
-        slice_idx = slice.indices(self.num)
-        start = self.start + self.step * slice_idx[0]
-        step = self.step * slice_idx[2]
-        num = len(range(*slice_idx))
-        return type(self)(start=start, step=step, num=num)
-
-    @classmethod
-    def from_array(cls, array: "Array") -> Self:
-        """Create a Linspace from an array."""
-        xp = xpc.get_namespace(array)
-        if len(array) < 2:
-            raise ValueError(
-                "Array must have at least two elements to create Linspace."
-            )
-        diff = xp.diff(array)
-        if not xp.allclose(diff, diff[0], rtol=1e-8, atol=0):
-            raise ValueError("Array must have uniform spacing to create Linspace.")
-        return cls(start=float(array[0]), step=float(diff[0]), num=len(array))
-
-    @classmethod
-    def make(cls, array: "Array | LinspaceLike") -> "Linspace":
-        """Create a Linspace from a numpy array or return the input if already Linspace."""
-        if isinstance(array, Linspace):
-            return array
-        if isinstance(array, LinspaceLike):
-            return Linspace(start=array.start, step=array.step, num=len(array))
-        return cls.from_array(array)
-
-    @classmethod
-    def get_step(cls, grid: "Array | LinspaceLike") -> float:
-        """Return the step of the uniform grid."""
-        if isinstance(grid, LinspaceLike):
-            return grid.step
-        return cls.from_array(grid).step
 
 
 def _get_entry_grid_shape(entries: "Array") -> tuple[int, ...]:
@@ -312,10 +159,10 @@ def _set_value(entries: "Array", slice: _slice, value: Any) -> None:
         entries = cast("Array", entries.at[slice].set(value))  # type: ignore[assignment, union-attr]
 
 
-def to_array(ary: Axis, xp: ModuleType = np) -> "Array":
+def to_array(ary: "Axis", xp: ModuleType = np) -> "Array":
     """Convert an axis to an array if it is a Linspace, otherwise return it as is."""
     if isinstance(ary, LinspaceLike):
-        return xp.array(Linspace.make(ary))
+        return Linspace.make(ary).asarray(xp)
     return ary
 
 
@@ -326,21 +173,21 @@ def _to_linspace_if_possible(ary: Union["Array", LinspaceLike]):
         return ary
 
 
-def _get_axis_onset(axis: Axis) -> float:
+def _get_axis_onset(axis: "Axis") -> float:
     try:
         return axis.start  # type: ignore[union-attr]
     except AttributeError:
         return float(axis[0])  # type: ignore[union-index, arg-type]
 
 
-def _get_axis_end(axis: Axis) -> float:
+def _get_axis_end(axis: "Axis") -> float:
     try:
         return axis.stop  # type: ignore[union-attr]
     except AttributeError:
         return float(axis[-1])  # type: ignore[union-index, arg-type]
 
 
-class _BinaryUnaryOpMixin(lib.mixins.NDArrayMixin, abc.ABC):
+class _BinaryUnaryOpMixin(_mixins.NDArrayMixin, abc.ABC):
     entries: "Array"
 
     @abc.abstractmethod
@@ -426,7 +273,7 @@ class _InitMixin[GridT: AnyGrid](abc.ABC):
         return self.entries.shape[3]
 
     @property
-    def grid_shape(self) -> tuple[int, ...]:
+    def _grid_shape(self) -> tuple[int, ...]:
         """Return the shape of the grid dimensions."""
         return _get_entry_grid_shape(self.entries)
 
@@ -469,7 +316,7 @@ def _embed_entries_to_grid[GT: "AnyGrid"](
     entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
         _source_grid, source_entries
     )
-    return embedding_grid, entries
+    return embedding_grid, cast(Any, entries)
 
 
 class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
@@ -606,17 +453,17 @@ def frequency_series(
 
 
 @overload
-def frequency_series[AxisT: Axis](
+def frequency_series[AxisT: "Axis"](
     frequencies: AxisT,
     entries: "Array",
 ) -> "FrequencySeries[AxisT]": ...
 
 
-def frequency_series[AxisT: Axis](
+def frequency_series[AxisT: "Axis"](
     frequencies: AxisT,
     entries: "Array",
-) -> Union["FrequencySeries[AxisT]", "UniformFrequencySeries"]:
-    """Build a :class:`FrequencySeries` or :class:`UniformFrequencySeries`."""
+) -> "FrequencySeries[AxisT] | UniformFrequencySeries":
+    """Build a :class:`~types.representations.FrequencySeries` or :class:`~types.representations.UniformFrequencySeries`."""
     try:
         _frequencies = Linspace.make(frequencies)
     except ValueError:
@@ -633,17 +480,17 @@ def time_series(
 
 
 @overload
-def time_series[AxisT: Axis](
+def time_series[AxisT: "Axis"](
     times: AxisT,
     entries: "Array",
 ) -> "TimeSeries[AxisT]": ...
 
 
-def time_series[AxisT: Axis](
+def time_series[AxisT: "Axis"](
     times: AxisT,
     entries: "Array",
-) -> Union["TimeSeries[AxisT]", "UniformTimeSeries"]:
-    """Build a :class:`TimeSeries` or :class:`UniformTimeSeries`."""
+) -> "TimeSeries[AxisT] | UniformTimeSeries":
+    """Build a :class:`~types.representations.TimeSeries` or :class:`~types.representations.UniformTimeSeries`."""
     try:
         _times = Linspace.make(times)
     except ValueError:
@@ -652,43 +499,43 @@ def time_series[AxisT: Axis](
         return UniformTimeSeries((_times,), entries)
 
 
-def phasor[AxisT: Axis](
+def phasor[AxisT: "Axis"](
     frequencies: AxisT,
     amplitudes: "Array",
     phases: "Array",
 ) -> "Phasor[AxisT]":
-    """Build a :class:`Phasor`."""
+    """Build a :class:`~types.representations.Phasor`."""
     return Phasor[AxisT].make(
         frequencies=frequencies, amplitudes=amplitudes, phases=phases
     )
 
 
-def stft[FreqAxisT: Axis, TimeAxisT: Axis](
+def stft[FreqAxisT: "Axis", TimeAxisT: "Axis"](
     frequencies: FreqAxisT,
     times: TimeAxisT,
     entries: "Array",
 ) -> "STFT[FreqAxisT, TimeAxisT]":
-    """Build an :class:`STFT`."""
+    """Build an :class:`~types.representations.STFT`."""
     return STFT[FreqAxisT, TimeAxisT]((frequencies, times), entries)
 
 
 def wdm(
-    frequencies: Axis,
-    times: Axis,
+    frequencies: "Axis",
+    times: "Axis",
     entries: "Array",
 ) -> "WDM":
-    """Build a :class:`WDM`."""
+    """Build a :class:`~types.representations.WDM`."""
     return WDM((frequencies, times), entries)
 
 
-class _1DSeries[AxisT: Axis](  # pyright: ignore[reportUnsafeMultipleInheritance]
+class _1DSeries[AxisT: "Axis"](  # pyright: ignore[reportUnsafeMultipleInheritance]
     _ArithmeticReprOnGrid["Grid1D[AxisT]"],
     _Subset1DMixin["Grid1D[AxisT]"],
     abc.ABC,
 ): ...
 
 
-class FrequencySeries[AxisT: Axis](_1DSeries[AxisT]):
+class FrequencySeries[AxisT: "Axis"](_1DSeries[AxisT]):
     """A series of numbers on a frequency grid."""
 
     @property
@@ -762,7 +609,14 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
         *args: tapering.Tapering | None,
         tapering: tapering.Tapering | None = None,
     ):
-        """Inverse real FFT of the series."""
+        """Inverse real FFT of the series (*Deprecated*).
+
+        .. warning::
+            This method is deprecated and will be removed in 0.8.0; use
+            `shop.freq2time` instead.
+        """
+        from ..shop import conversions
+
         if len(args) > 1:
             raise TypeError("irfft() accepts at most one positional optional argument.")
         if len(args) == 1:
@@ -777,97 +631,92 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
                 stacklevel=2,
             )
             tapering = args[0]
-        self_frequencies = to_array(self.frequencies)
-        tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
-        dt = float(time_grid[1] - time_grid[0])
-        nyquist_dt = 1 / (2 * self_frequencies[-1])
-        if dt < nyquist_dt and not self.xp.isclose(dt, nyquist_dt):
-            # FIXME spurious warning for odd, small n
-            # probably related to the (n-1)/2 in the last frequency in rfftfreq
-            warnings.warn("The time grid is denser than the Nyquist limit.")
-
-        return UniformTimeSeries(
-            grid=(time_grid,),
-            entries=self.xp.fft.irfft(
-                self.entries * tapering_window / dt, n=len(time_grid)
-            ),
-        )
-
-    def to_wdm(
-        self,
-        /,
-        *,
-        Nf: int | None = None,
-        Nt: int | None = None,
-        nx: float = 4.0,
-    ) -> WDM:
-        """Transform the frequency series to a WDM representation.
-
-        This method performs a forward wavelet transform, converting a
-        frequency series into a wavelet representation.
-
-        At least one of `Nf` and `Nt` must be provided.
-
-        .. warning::
-
-            The WDM transform on discrete-time or discrete-frequency data
-            is inherently lossy, since WDM is a Wilson basis conceived for
-            continuous-time functions. The smaller ``(Nf, Nt)`` are,
-            the more lossy the transform is. You must make sure
-            they are large enough for your needs. Use the inverse transform
-            :meth:`.WDM.to_frequency_series` to quantify the loss.
-            Even numbers for ``Nf`` and ``Nt`` are recommended.
-
-        .. note::
-
-            This method first transforms the frequency series to :class:`pywavelet.types.FrequencySeries` object,
-            then leverages the forward wavelet transform implemented in pywavelet to get the WDM representation.
-            Note that in pywavelet, the degree of freedom of a frequency series of length ``K`` is ``2 * (K - 1)``,
-            even though the length of the original time series could be ``2*K - 1`` as well.
-
-        Parameters
-        ----------
-        Nf : int | None
-            The number of frequency bins in the WDM representation. Note that this
-            is smaller than the number of frequency bins in the original frequency series.
-
-        Nt : int | None
-            The number of time bins in the WDM representation.
-
-        nx : float
-            Shape parameter controling the width of the wavelets.
-        """
-        ndof = 2 * (len(self.frequencies) - 1)  # pywavelet's convention
-        dt = 1 / (ndof * self.df)
-        fs = pywFS(
-            data=self.entries.squeeze() / dt,
-            freq=self.xp.array(self.frequencies),
-            t0=0.0,
-        )
-        return WDM.from_pywWDM(_pyw_f2w(fs, Nf=Nf, Nt=Nt, nx=nx))
-
-    def to_WDM(
-        self,
-        /,
-        *,
-        Nf: int | None = None,
-        Nt: int | None = None,
-        nx: float = 4.0,
-    ) -> WDM:
-        """Return :meth:`to_wdm` while warning about deprecation.
-
-        This alias will be removed in 0.7.0.
-        """
         warnings.warn(
-            "`to_WDM` is deprecated and will be removed in 0.7.0; "
-            + "use `to_wdm` instead.",
+            "The method `UniformFrequencySeries.irfft` is deprecated and will be removed in 0.8.0; "
+            + "use `shop.freq2time` instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        return self.to_wdm(Nf=Nf, Nt=Nt, nx=nx)
+        self_frequencies = to_array(self.frequencies)
+        tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
+        _times = Linspace.make(time_grid)
+        return conversions.freq2time(self * tapering_window, times=_times)
+
+    # def to_wdm(
+    #     self,
+    #     /,
+    #     *,
+    #     Nf: int | None = None,
+    #     Nt: int | None = None,
+    #     nx: float = 4.0,
+    # ) -> WDM:
+    #     """Transform the frequency series to a WDM representation.
+
+    #     This method performs a forward wavelet transform, converting a
+    #     frequency series into a wavelet representation.
+
+    #     At least one of `Nf` and `Nt` must be provided.
+
+    #     .. warning::
+
+    #         The WDM transform on discrete-time or discrete-frequency data
+    #         is inherently lossy, since WDM is a Wilson basis conceived for
+    #         continuous-time functions. The smaller ``(Nf, Nt)`` are,
+    #         the more lossy the transform is. You must make sure
+    #         they are large enough for your needs. Use the inverse transform
+    #         :meth:`.WDM.to_frequency_series` to quantify the loss.
+    #         Even numbers for ``Nf`` and ``Nt`` are recommended.
+
+    #     .. note::
+
+    #         This method first transforms the frequency series to :class:`pywavelet.types.FrequencySeries` object,
+    #         then leverages the forward wavelet transform implemented in pywavelet to get the WDM representation.
+    #         Note that in pywavelet, the degree of freedom of a frequency series of length ``K`` is ``2 * (K - 1)``,
+    #         even though the length of the original time series could be ``2*K - 1`` as well.
+
+    #     Parameters
+    #     ----------
+    #     Nf : int | None
+    #         The number of frequency bins in the WDM representation. Note that this
+    #         is smaller than the number of frequency bins in the original frequency series.
+
+    #     Nt : int | None
+    #         The number of time bins in the WDM representation.
+
+    #     nx : float
+    #         Shape parameter controling the width of the wavelets.
+    #     """
+    #     ndof = 2 * (len(self.frequencies) - 1)  # pywavelet's convention
+    #     dt = 1 / (ndof * self.df)
+    #     fs = pywFS(
+    #         data=self.entries.squeeze() / dt,
+    #         freq=self.xp.array(self.frequencies),
+    #         t0=0.0,
+    #     )
+    #     return WDM.from_pywWDM(_pyw_f2w(fs, Nf=Nf, Nt=Nt, nx=nx))
+
+    # def to_WDM(
+    #     self,
+    #     /,
+    #     *,
+    #     Nf: int | None = None,
+    #     Nt: int | None = None,
+    #     nx: float = 4.0,
+    # ) -> WDM:
+    #     """Return :meth:`to_wdm` while warning about deprecation.
+
+    #     This alias will be removed in 0.7.0.
+    #     """
+    #     warnings.warn(
+    #         "`to_WDM` is deprecated and will be removed in 0.7.0; "
+    #         + "use `to_wdm` instead.",
+    #         DeprecationWarning,
+    #         stacklevel=2,
+    #     )
+    #     return self.to_wdm(Nf=Nf, Nt=Nt, nx=nx)
 
 
-class TimeSeries[AxisT: Axis](_1DSeries[AxisT]):
+class TimeSeries[AxisT: "Axis"](_1DSeries[AxisT]):
     """A series of numbers on a time grid."""
 
     @property
@@ -881,8 +730,8 @@ class TimeSeries[AxisT: Axis](_1DSeries[AxisT]):
         return None
 
     @property
-    def times(self) -> Axis | Linspace:
-        """The times of the series. Alias for :attr:`.grid`."""
+    def times(self) -> "AxisT":
+        """The times of the series."""
         return self.grid[0]
 
     @property
@@ -930,14 +779,20 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
         *args: tapering.Tapering | None,
         tapering: tapering.Tapering | None = None,
     ):
-        """Fast Fourier transform of the series.
+        """Fast Fourier transform of the series (*Deprecated*).
 
         .. note::
             Unlike the inverse transform :meth:`.FrequencySeries.irfft`, this method does
             not allow taking a frequency grid as input. Time series are considered as
             primary representations for DATA, in the sense that they are the most directly
             related to what we measure.
+
+        .. warning::
+            This method is deprecated and will be removed in 0.8.0; use
+            `shop.time2freq` instead.
         """
+        from ..shop import conversions
+
         if len(args) > 1:
             raise TypeError("rfft() accepts at most one positional optional argument.")
         if len(args) == 1:
@@ -952,16 +807,20 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
                 stacklevel=2,
             )
             tapering = args[0]
+        warnings.warn(
+            "The method `UniformTimeSeries.rfft` is deprecated and will be removed in 0.8.0; "
+            + "use `shop.time2freq` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self_times = self.xp.array(self.times)
         tapering_window = (
             tapering(self_times)
             if tapering is not None
             else self.xp.ones_like(self_times)
         )
-        return UniformFrequencySeries(
-            grid=(self.xp.fft.rfftfreq(len(self.times), d=self.dt),),
-            entries=self.xp.fft.rfft(self.entries * tapering_window * self.dt),
-        )
+        return conversions.time2freq(self * tapering_window)
 
     # NOTE win cannot be a Tapering object. It's probably worth designing this
     # interface to be consistent with the rest of tlt and close to scipy's stft
@@ -1022,7 +881,7 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
     #     return WDM.from_pywWDM(_pyw_t2w(fs, Nf=Nf, Nt=Nt, nx=nx, mult=mult))
 
 
-class Phasor[AxisT: Axis](
+class Phasor[AxisT: "Axis"](
     _Subset1DMixin["Grid1D[AxisT]"],
 ):
     """Phasor representation.
@@ -1046,7 +905,7 @@ class Phasor[AxisT: Axis](
         return "frequency"
 
     @property
-    def kind(self):
+    def kind(self) -> Literal["phasor"]:
         """The semantic kind of the representation."""
         return "phasor"
 
@@ -1061,8 +920,8 @@ class Phasor[AxisT: Axis](
         return self.entries[..., slice(0, 1), :]
 
     @property
-    def frequencies(self) -> Axis | Linspace:
-        """The frequencies of the phasors. Alias for :attr:`.grid`."""
+    def frequencies(self) -> "Axis | Linspace":
+        """The frequencies of the phasors."""
         return self.grid[0]
 
     @property
@@ -1085,10 +944,26 @@ class Phasor[AxisT: Axis](
     ):
         """Create a phasor from amplitudes and phases."""
         xp = xpc.get_namespace(amplitudes, phases)
-        # We assume input amplitudes and phases are 1D arrays
-        return cls(
-            grid=(frequencies,),
-            entries=xp.stack((amplitudes, phases), axis=0)[None, None, None, ...],
+        # If amplitudes and phases are 1D
+        if amplitudes.ndim == 1 and phases.ndim == 1:
+            return cls(
+                grid=(frequencies,),
+                entries=xp.stack((amplitudes, phases), axis=0)[None, None, None, ...],
+            )
+        # If amplitudes and phases are already in the shape of entries
+        if (
+            amplitudes.shape == phases.shape
+            and len(amplitudes.shape) == 5
+            and amplitudes.shape[4] == len(frequencies)
+            and amplitudes.shape[3] == 1
+        ):
+            return cls(
+                grid=(frequencies,),
+                entries=xp.stack((amplitudes[:, :, 0], phases[:, :, 0]), axis=3),
+            )
+        raise ValueError(
+            "Amplitudes and phases must be either 1D arrays of shape (n_freqs,) or 5D arrays of shape "
+            + f"(n_batches, n_channels, n_harmonics, 1, n_freqs), but got shapes {amplitudes.shape} and {phases.shape}."
         )
 
     def __setitem__(self, slice: _slice, value: Any) -> None:
@@ -1104,7 +979,7 @@ class Phasor[AxisT: Axis](
         embedding_grid: "Grid1D[AT]",
         *,
         known_slices: tuple[slice, ...] | None = None,
-    ) -> Self:
+    ) -> Phasor[AT]:
         """Return the phasor embedded in a new 1D grid."""
         grid, entries = _embed_entries_to_grid(
             self.grid,
@@ -1112,12 +987,16 @@ class Phasor[AxisT: Axis](
             embedding_grid,
             known_slices=known_slices,
         )
-        return type(self)(grid=cast("Grid1D[AxisT]", grid), entries=entries)
+        return Phasor[AT].make(
+            frequencies=grid[0],
+            amplitudes=entries,
+            phases=entries,
+        )
 
-    def get_interpolated[AT: Axis](
+    def get_interpolated[AT: "Axis"](
         self,
         frequencies: AT,
-        interpolator: Callable[[Any, Any], Callable[[Any], Any]],
+        interpolator: Interpolator,
     ) -> "Phasor[AT]":
         """Get the phasors interpolated to the given frequencies."""
         xp = xpc.get_namespace(self.amplitudes, self.phases)
@@ -1147,7 +1026,13 @@ class Phasor[AxisT: Axis](
     ) -> "FrequencySeries[AT]": ...
 
     def to_frequency_series(self):
-        """Get the :class:`.FrequencySeries` representation of the waveform."""
+        """Convert to a :class:`.FrequencySeries` or :class:`.UniformFrequencySeries`.
+
+        This method converts the phasor representation to a frequency series by applying the formula:
+        ``X(f) = A(f) * exp(1j * phi(f))`` where ``A(f)`` is the amplitude and ``phi(f)`` is the phase.
+        If the grid of the phasor is uniform, a :class:`.UniformFrequencySeries` is returned;
+        otherwise, a :class:`.FrequencySeries` is returned.
+        """
         xp = xpc.get_namespace(self.amplitudes, self.phases)
         return frequency_series(
             self.frequencies,
@@ -1161,9 +1046,41 @@ class Phasor[AxisT: Axis](
         return plotters.PhasorPlotter(self)
 
 
+def densify_phasor[AT: "Axis"](
+    wf: "Phasor[Axis]",
+    interpolator: Interpolator,
+    frequencies: AT,
+    embed: bool = False,
+) -> Phasor[AT]:
+    """Densify a sparse :class:`~types.representations.Phasor` representation by interpolation.
+
+    Parameters
+    ----------
+    wf :
+        The phasor representation to densify.
+    interpolator :
+        The interpolator to use for densification.
+    frequencies :
+        The frequencies at which to evaluate the densified phasor.
+    embed :
+        Whether to embed the densified phasor on the original frequency grid.
+    """
+    _frequencies = to_array(frequencies, xpc.get_namespace(wf.entries))
+
+    _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
+    freqs = cast(
+        AT,
+        frequencies[utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)],
+    )
+    nwf = wf.get_interpolated(freqs, interpolator)
+    if not embed:
+        return nwf
+    return nwf.get_embedded((frequencies,), known_slices=(_slice,))
+
+
 class STFT[
-    FreqAxisT: Axis,
-    TimeAxisT: Axis,
+    FreqAxisT: "Axis",
+    TimeAxisT: "Axis",
 ](
     _ArithmeticReprOnGrid["Grid2D[FreqAxisT, TimeAxisT]"],
 ):
@@ -1344,7 +1261,11 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
     ):
         """Create a WDM representation from time and frequency grids and entries."""
         return cls(
-            grid=(Linspace.make(frequencies), Linspace.make(times)), entries=entries
+            grid=(
+                Linspace.make(frequencies),
+                Linspace.make(times),
+            ),
+            entries=entries,
         )
 
     def is_critically_sampled(self):
@@ -1425,46 +1346,46 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
     fs: property = sample_rate
     """Alias for :attr:`.sample_rate`."""
 
-    def to_frequency_series(
-        self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
-    ) -> UniformFrequencySeries:
-        """Perform an inverse wavelet transform to the frequency domain.
+    # def to_frequency_series(
+    #     self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
+    # ) -> UniformFrequencySeries:
+    #     """Perform an inverse wavelet transform to the frequency domain.
 
-        Parameters
-        ----------
-        nx : float
-            Shape parameter controling the width of the wavelets, defaults to 4.0.
-        mask : npt.NDArray[np.bool] | None
-            Mask to apply on the frequencies and entries of the result, useful
-            to avoid singularities. Defaults to None.
-        """
-        pywwv = self._to_pywWDM()
-        # Is there a reason why pywavelet accepts the time step
-        # instead of computing it from the WDM representation itself?
-        pywfs = cast(Any, _pyw_w2f(pywwv, self.dt, nx))
-        freqs = pywfs.freq
-        entries = pywfs.data * pywfs.dt
-        # To see if we keep or not
-        # https://gitlab.in2p3.fr/lisa-apc/typed-lisa-toolkit/-/merge_requests/4#note_576666
-        if mask is not None:
-            freqs = np.ma.masked_where(mask, freqs)  # type: ignore
-            entries = np.ma.masked_where(mask, entries)  # type: ignore
-        return UniformFrequencySeries((freqs,), entries[None, None, None, None, ...])  # type: ignore
+    #     Parameters
+    #     ----------
+    #     nx : float
+    #         Shape parameter controling the width of the wavelets, defaults to 4.0.
+    #     mask : npt.NDArray[np.bool] | None
+    #         Mask to apply on the frequencies and entries of the result, useful
+    #         to avoid singularities. Defaults to None.
+    #     """
+    #     pywwv = self._to_pywWDM()
+    #     # Is there a reason why pywavelet accepts the time step
+    #     # instead of computing it from the WDM representation itself?
+    #     pywfs = cast(Any, _pyw_w2f(pywwv, self.dt, nx))
+    #     freqs = pywfs.freq
+    #     entries = pywfs.data * pywfs.dt
+    #     # To see if we keep or not
+    #     # https://gitlab.in2p3.fr/lisa-apc/typed-lisa-toolkit/-/merge_requests/4#note_576666
+    #     if mask is not None:
+    #         freqs = np.ma.masked_where(mask, freqs)
+    #         entries = np.ma.masked_where(mask, entries)
+    #     return UniformFrequencySeries((freqs,), entries[None, None, None, None, ...])
 
-    def to_freqseries(
-        self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
-    ) -> UniformFrequencySeries:
-        """Return :meth:`to_frequency_series` while warning about deprecation.
+    # def to_freqseries(
+    #     self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
+    # ) -> UniformFrequencySeries:
+    #     """Return :meth:`to_frequency_series` while warning about deprecation.
 
-        This alias will be removed in 0.7.0.
-        """
-        warnings.warn(
-            "`to_freqseries` is deprecated and will be removed in 0.7.0; "
-            + "use `to_frequency_series` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.to_frequency_series(nx=nx, mask=mask)
+    #     This alias will be removed in 0.7.0.
+    #     """
+    #     warnings.warn(
+    #         "`to_freqseries` is deprecated and will be removed in 0.7.0; "
+    #         + "use `to_frequency_series` instead.",
+    #         DeprecationWarning,
+    #         stacklevel=2,
+    #     )
+    #     return self.to_frequency_series(nx=nx, mask=mask)
 
     @property
     def nyquist(self) -> float:
@@ -1472,31 +1393,31 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
         # I don't like this property name
         return self.sample_rate / 2
 
-    @classmethod
-    def from_pywWDM(cls, pywwv: pywWDM, /) -> Self:
-        """Convert a pywWDM object to a WDM."""
-        pywwv_any = cast(Any, pywwv)
-        entries = pywwv_any.data[None, None, None, None, ...]
-        times = Linspace(
-            pywwv_any.time[0],
-            pywwv_any.time[1] - pywwv_any.time[0],
-            len(pywwv_any.time),
-        )
-        frequencies = Linspace(
-            pywwv_any.freq[0],
-            pywwv_any.freq[1] - pywwv_any.freq[0],
-            len(pywwv_any.freq),
-        )
-        return cls.make(times=times, frequencies=frequencies, entries=entries)
+    # @classmethod
+    # def from_pywWDM(cls, pywwv: pywWDM, /) -> Self:
+    #     """Convert a pywWDM object to a WDM."""
+    #     pywwv_any = cast(Any, pywwv)
+    #     entries = pywwv_any.data[None, None, None, None, ...]
+    #     times = Linspace(
+    #         pywwv_any.time[0],
+    #         pywwv_any.time[1] - pywwv_any.time[0],
+    #         len(pywwv_any.time),
+    #     )
+    #     frequencies = Linspace(
+    #         pywwv_any.freq[0],
+    #         pywwv_any.freq[1] - pywwv_any.freq[0],
+    #         len(pywwv_any.freq),
+    #     )
+    #     return cls.make(times=times, frequencies=frequencies, entries=entries)
 
-    def _to_pywWDM(self) -> pywWDM:
-        """Convert self to a pywWDM object."""
-        xp = xpc.get_namespace(self.entries)
-        return pywWDM(
-            data=self.entries.squeeze(),
-            time=xp.array(self.times),
-            freq=xp.array(self.frequencies),
-        )
+    # def _to_pywWDM(self) -> pywWDM:
+    #     """Convert self to a pywWDM object."""
+    #     xp = xpc.get_namespace(self.entries)
+    #     return pywWDM(
+    #         data=self.entries.squeeze(),
+    #         time=xp.array(self.times),
+    #         freq=xp.array(self.frequencies),
+    #     )
 
     def get_plotter(self) -> plotters.WDMPlotter:
         """Return the plotter for the WDM representation."""
@@ -1542,10 +1463,10 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
         else:
             freq_slice = _slice(None)
         time_grid_sliced = Linspace.from_array(
-            to_array(self.times, xp=self.xp)[time_slice]
+            cast(Any, to_array(self.times, xp=self.xp)[time_slice])
         )
         freq_grid_sliced = Linspace.from_array(
-            to_array(self.frequencies, xp=self.xp)[freq_slice]
+            cast(Any, to_array(self.frequencies, xp=self.xp)[freq_slice])
         )
         return type(self)(
             grid=(freq_grid_sliced, time_grid_sliced),

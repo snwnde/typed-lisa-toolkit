@@ -1,43 +1,13 @@
-"""Module for data containers.
-
-.. currentmodule:: typed_lisa_toolkit.containers.data
-
-.. autoclass:: TSData
-   :members:
-   :member-order: groupwise
-
-.. autoclass:: FSData
-   :members:
-   :member-order: groupwise
-
-.. autoclass:: TimedFSData
-   :members:
-   :member-order: groupwise
-   :show-inheritance:
-
-.. autoclass:: STFTData
-   :members:
-   :member-order: groupwise
-
-.. autoclass:: WDMData
-   :members:
-   :member-order: groupwise
-
-Functions
----------
-
-.. autofunction:: load_data
-.. autofunction:: load_ldc_data
-
-"""
+"""Data container types."""
 
 from __future__ import annotations
 
 import abc
 import logging
 import pathlib
-import warnings
-from collections.abc import Callable, Iterable, Iterator, Mapping
+
+# import warnings
+from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, cast, overload
 
 import array_api_compat as xpc
@@ -45,20 +15,15 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
-from .. import lib
+from . import _mixins, tapering
 from . import representations as reps
-from . import tapering
+from .misc import AnyGrid, Axis, Linspace
 
 if TYPE_CHECKING:
     from . import waveforms as wf
-    from .representations import Linspace
-
-    AnyGrid = reps.AnyGrid
     from .representations import Representation
 
     AnyReps = Representation[AnyGrid]
-
-    Axis = reps.Axis
 
     class _SubsettableRep(AnyReps, Protocol):
         def get_subset(
@@ -121,195 +86,7 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
         )
 
 
-class _ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], lib.mixins.NDArrayMixin):
-    @property
-    def channel_names(self) -> tuple[str, ...]:
-        """Return the channel names."""
-        return self._channel_names
-
-    def __init__(
-        self,
-        representation: "AnyReps",
-        channels: tuple[str, ...],
-        name: str | None = None,
-    ):
-        self._channel_names: tuple[str, ...] = tuple(channels)
-        self._init_repr(representation)
-        entries = self.representation.entries
-        if entries.shape[1] != len(self.channel_names):
-            raise ValueError(
-                "Channel count mismatch between representation entries and channel names."
-            )
-        if entries.shape[2] != 1:
-            raise ValueError(
-                "Data containers require n_harmonics=1 in the representation entries."
-            )
-        self._channel_to_idx: dict[str, int] = {
-            chn: i for i, chn in enumerate(channels)
-        }
-        self.name: str | None = name
-
-    @property
-    def representation(self) -> RepT:
-        """Return the underlying representation."""
-        return cast(RepT, self._representation)
-
-    def _init_repr(self, representation: "AnyReps"):
-        self._representation: AnyReps = representation
-
-    def create_new(self, representation: "AnyReps", channels: tuple[str, ...]) -> Self:
-        """Create a new instance with a representation and channels."""
-        return type(self)(representation, channels, self.name)
-
-    def create_like(self, entries: "reps.Array", channels: tuple[str, ...]) -> Self:
-        """Create a new instance with different entries but the same grid and type."""
-        return type(self)(self.representation.create_like(entries), channels, self.name)
-
-    def __xp__(self, api_version: str | None = None) -> Any:
-        """Get the array namespace from the representation entries."""
-        return xpc.get_namespace(self.representation.entries, api_version=api_version)
-
-    def _binary_op(
-        self,
-        other: object,
-        op: Callable[[object, object], object],
-        /,
-        reflected: bool = False,
-        inplace: bool = False,
-        **kwargs: Any,
-    ) -> Any:
-        """Apply binary operation using native array ops on representations."""
-        del kwargs  # Unused
-
-        if isinstance(other, _ChannelMapping):
-            if self.channel_names != other.channel_names:
-                raise ValueError("Cannot operate on data with different channel sets.")
-            if reflected:
-                new_repr = op(other.representation, self.representation)
-            else:
-                new_repr = op(self.representation, other.representation)
-        else:
-            # Scalar or array-like broadcast
-            if reflected:
-                new_repr = op(other, self.representation)
-            else:
-                new_repr = op(self.representation, other)
-
-        if inplace:
-            self._representation = cast("AnyReps", new_repr)
-            return self
-
-        return self.create_new(cast(RepT, new_repr), self.channel_names)
-
-    def _unary_op(self, op: Callable[[object], object], /, **kwargs: Any) -> Self:
-        """Apply unary operation using native array ops."""
-        new_repr = op(self.representation, **kwargs)
-        return self.create_new(cast(RepT, new_repr), self.channel_names)
-
-    def pick(self, channels: str | tuple[str, ...]) -> Self:
-        """Pick specific channels.
-
-        Parameters
-        ----------
-        channels : str or tuple[str, ...]
-            Channel name(s) to pick.
-
-        Returns
-        -------
-        Self
-            New instance with only the specified channels.
-        """
-        if isinstance(channels, str):
-            channels = (channels,)
-
-        indices = tuple([self._channel_to_idx[chn] for chn in channels])
-        # Slice entries to pick only these channels (canonical shape: n_batches, n_channels, ...)
-        xp = xpc.get_namespace(self.representation.entries)
-        picked_entries = xp.asarray(self.representation.entries)[:, indices, ...]
-        picked_repr = self.representation.create_like(picked_entries)
-        return self.create_new(picked_repr, channels)
-
-    @classmethod
-    def from_dict[RT: "AnyReps"](
-        cls, data_dict: Mapping[str, RT], **additions: Any
-    ) -> Self:
-        """Create a new instance from a dictionary of channel names to representations."""
-        if len(data_dict) == 0:
-            raise ValueError("Cannot build data container from an empty mapping.")
-        channels = tuple(data_dict.keys())
-        xp = xpc.get_namespace(*(cast(Any, data_dict[chn]).entries for chn in channels))
-        # Concatenate entries along the channel dimension (canonical shape: n_batches, n_channels, ...)
-        entries = xp.concatenate([data_dict[chn].entries for chn in channels], axis=1)
-        # Assume all representations have the same grid and type
-        first = next(iter(data_dict.values()))
-        return cls(first.create_like(entries), channels, **additions)
-
-    def set_name(self, name: str | None) -> Self:
-        """Set the name of the data container.
-
-        .. note:: The name is only used for labeling the data container in plots.
-
-        .. note:: This method returns `self` to allow for fluent method chaining.
-        """
-        self.name = name
-        return self
-
-    # Implement Mapping protocol
-    def __getitem__(self, key: str) -> RepT:
-        """Get a channel by name as a view with preserved channel dimension (size 1)."""
-        idx = self._channel_to_idx[key]
-        entries_view = self.representation.entries[:, idx : idx + 1, 0:1, ...]
-        return self.representation.create_like(entries_view)
-
-    def __iter__(self) -> Iterator[str]:
-        """Iterate over channel names."""
-        return iter(self.channel_names)
-
-    def __len__(self) -> int:
-        """Return the number of channels."""
-        return len(self.channel_names)
-
-    def __repr__(self):
-        items = {key: self[key] for key in self}
-        if self.name is not None:
-            return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
-        return f"{self.__class__.__name__}({items!r})"
-
-    @overload
-    def grid[GridT: AnyGrid](  # pyright: ignore[reportInconsistentOverload]
-        self: _ChannelMapping["Representation[GridT]"],
-    ) -> GridT: ...
-
-    @property
-    def grid(self):
-        """Return the grid."""
-        return self.representation.grid
-
-    @property
-    def domain(self):
-        """Physical domain shared by all channels."""
-        return self.representation.domain
-
-    @property
-    def kind(self):
-        """Semantic kind shared by all channels."""
-        return self.representation.kind
-
-    @property
-    def entries(self) -> Any:
-        """Return the raw entries array for direct matrix operations.
-
-        Shape is (n_channels, ...) where ... depends on the representation type.
-        Use this for complicated array operations with numpy/jax.
-        """
-        return self.representation.entries
-
-    def get_kernel(self):
-        """Return kernel entries in conventional shape."""
-        return self.representation.entries
-
-
-class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
+class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
     """Channel-indexed data containers.
 
     Stores a single homogeneous representation with channels as the first dimension,
@@ -381,7 +158,7 @@ class Data[RepT: "AnyReps"](_ChannelMapping[RepT]):
         if legacy:
             return cls._load_legacy(file_path)
         with h5py.File(str(file_path), "r") as f:
-            channels_attr = cast(Iterable[Any], f.attrs["channels"])
+            channels_attr = cast(Iterable[object], f.attrs["channels"])
             channels = tuple(str(ch) for ch in channels_attr)
             additions = cls._additional_load(f)
             data_group = cast(h5py.Group, f["data"])
@@ -407,10 +184,9 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     _reps_type: type[reps.UniformTimeSeries] = reps.UniformTimeSeries
 
     @property
-    def times(self) -> npt.NDArray[np.floating[Any]]:
+    def times(self):
         """Return the times."""
-        representation = cast(Any, self.representation)
-        return np.asarray(representation.times)
+        return self.representation.times
 
     @property
     def dt(self) -> float:
@@ -461,12 +237,15 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         keep_times: bool = True,
         tapering: tapering.Tapering | None = None,
     ):
-        """Return the frequency series data.
+        """Return the frequency series data (*Deprecated*).
 
         Returns
         -------
         :class:`.FSData` | :class:`.TimedFSData`
             The frequency series data. If `keep_times` is `True`, the time grid is kept.
+
+        .. warning::
+            This method is deprecated and will be removed in 0.8.0; use `shop.time2freq` instead.
         """
         fsrepr = self.representation.rfft(tapering=tapering)
         if keep_times:
@@ -498,19 +277,20 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     ) -> Self:
         """Return the zero-padded data."""
         xp = xpc.get_namespace(self.entries)
+        _times = xp.asarray(self.times)
         pad_width = tuple(int(xp.rint(time / self.dt)) for time in pad_time)
         time_end_values = (
-            -self.dt * pad_width[0] + self.times[0],
-            self.dt * pad_width[1] + self.times[-1],
+            -self.dt * pad_width[0] + self.times.start,
+            self.dt * pad_width[1] + self.times.stop,
         )
         padded_time = xp.pad(
-            self.times,
+            _times,
             pad_width,
             mode="linear_ramp",
             end_values=time_end_values,
         )
 
-        tapering_window = tapering(self.times) if tapering is not None else 1
+        tapering_window = tapering(_times) if tapering is not None else 1
         signal = self.entries * tapering_window
         padded_signal = xp.pad(
             signal,
@@ -552,7 +332,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         """Return the maximum frequency."""
         return self.representation.f_max
 
-    def set_times(self, times: npt.NDArray[np.floating[Any]]):
+    def set_times(self, times: "Axis"):
         """Set the time grid."""
         return TimedFSData(self.representation, self.channel_names, times)
 
@@ -566,11 +346,16 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
 
     def to_tsdata(
         self,
-        times: npt.NDArray[np.floating[Any]] | reps.Linspace,
+        times: npt.NDArray[np.floating[Any]] | Linspace,
         *,
         tapering: tapering.Tapering | None = None,
     ):
-        """Return the time series data."""
+        """Return the time series data (*Deprecated*).
+
+        .. warning::
+            This method is deprecated and will be removed in 0.8.0; use
+            `shop.freq2time` instead.
+        """
         tsrepr = self.representation.irfft(np.asarray(times), tapering=tapering)
         return TSData(tsrepr, self.channel_names)
 
@@ -579,61 +364,61 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
 
         return plotters.FSDataPlotter
 
-    def to_wdm_data(
-        self,
-        *args: int | float | None,
-        Nf: int | None = None,
-        Nt: int | None = None,
-        nx: float = 4.0,
-    ) -> WDMData:
-        """Return the WDM data.
+    # def to_wdm_data(
+    #     self,
+    #     *args: int | float | None,
+    #     Nf: int | None = None,
+    #     Nt: int | None = None,
+    #     nx: float = 4.0,
+    # ) -> WDMData:
+    #     """Return the WDM data.
 
-        See :py:meth:`.representations.FrequencySeries.to_wdm`
-        """
-        if len(args) > 3:
-            raise TypeError(
-                "to_wdm_data() accepts at most 3 positional optional arguments: Nf, Nt, nx."
-            )
-        if len(args) > 0:
-            if Nf is not None or Nt is not None or nx != 4.0:
-                raise TypeError(
-                    "to_wdm_data() received optional arguments as both positional and keyword arguments."
-                )
-            warnings.warn(
-                "Passing `Nf`, `Nt`, or `nx` positionally to `to_wdm_data` is deprecated and "
-                + "will be removed in 0.7.0; pass them as keyword arguments instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if len(args) >= 1:
-                Nf = args[0] if args[0] is None else int(args[0])
-            if len(args) >= 2:
-                Nt = args[1] if args[1] is None else int(args[1])
-            if len(args) == 3:
-                nx = float(args[2])  # type: ignore[arg-type]
+    #     See :py:meth:`.representations.FrequencySeries.to_wdm`
+    #     """
+    #     if len(args) > 3:
+    #         raise TypeError(
+    #             "to_wdm_data() accepts at most 3 positional optional arguments: Nf, Nt, nx."
+    #         )
+    #     if len(args) > 0:
+    #         if Nf is not None or Nt is not None or nx != 4.0:
+    #             raise TypeError(
+    #                 "to_wdm_data() received optional arguments as both positional and keyword arguments."
+    #             )
+    #         warnings.warn(
+    #             "Passing `Nf`, `Nt`, or `nx` positionally to `to_wdm_data` is deprecated and "
+    #             + "will be removed in 0.7.0; pass them as keyword arguments instead.",
+    #             DeprecationWarning,
+    #             stacklevel=2,
+    #         )
+    #         if len(args) >= 1:
+    #             Nf = args[0] if args[0] is None else int(args[0])
+    #         if len(args) >= 2:
+    #             Nt = args[1] if args[1] is None else int(args[1])
+    #         if len(args) == 3:
+    #             nx = float(args[2])
 
-        wdmdict = {
-            chn: self[chn].to_wdm(Nf=Nf, Nt=Nt, nx=nx) for chn in self.channel_names
-        }
-        return WDMData.from_dict(wdmdict).set_name(self.name)
+    #     wdmdict = {
+    #         chn: self[chn].to_wdm(Nf=Nf, Nt=Nt, nx=nx) for chn in self.channel_names
+    #     }
+    #     return WDMData.from_dict(wdmdict).set_name(self.name)
 
-    def to_WDMdata(
-        self,
-        Nf: int | None = None,
-        Nt: int | None = None,
-        nx: float = 4.0,
-    ) -> WDMData:
-        """Deprecated alias for :meth:`to_wdm_data`.
+    # def to_WDMdata(
+    #     self,
+    #     Nf: int | None = None,
+    #     Nt: int | None = None,
+    #     nx: float = 4.0,
+    # ) -> WDMData:
+    #     """Deprecated alias for :meth:`to_wdm_data`.
 
-        This alias will be removed in 0.7.0.
-        """  # noqa: D401
-        warnings.warn(
-            "`to_WDMdata` is deprecated and will be removed in 0.7.0; "
-            + "use `to_wdm_data` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.to_wdm_data(Nf=Nf, Nt=Nt, nx=nx)
+    #     This alias will be removed in 0.7.0.
+    #     """  # noqa: D401
+    #     warnings.warn(
+    #         "`to_WDMdata` is deprecated and will be removed in 0.7.0; "
+    #         + "use `to_wdm_data` instead.",
+    #         DeprecationWarning,
+    #         stacklevel=2,
+    #     )
+    #     return self.to_wdm_data(Nf=Nf, Nt=Nt, nx=nx)
 
 
 class TimedFSData(FSData):
@@ -643,14 +428,13 @@ class TimedFSData(FSData):
         self,
         representation: "AnyReps",
         channels: tuple[str, ...],
-        times: reps.Linspace | npt.NDArray[np.floating[Any]] | None = None,
+        times: Axis | None = None,
         name: str | None = None,
     ):
         super().__init__(representation, channels, name)
         if times is None:
             raise ValueError("TimedFSData requires times parameter")
-        self.times: reps.Linspace = reps.Linspace.make(times)
-        self.dt: float = self.times.step
+        self.set_times(times)
 
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=np.asarray(self.times))
@@ -660,13 +444,13 @@ class TimedFSData(FSData):
         times_data = cast(h5py.Dataset, f["times"])[()]
         return {"times": times_data}
 
-    def set_times(self, times: npt.NDArray[np.floating[Any]] | reps.Linspace):
+    def set_times(self, times: Axis):
         """Set the time grid.
 
         This method returns `self` to allow for fluent method chaining.
         """
-        self.times = reps.Linspace.make(times)
-        self.dt = self.times.step
+        self.times: Linspace = Linspace.make(times)
+        self.dt: float = self.times.step
         return self
 
     def create_new(self, representation: "AnyReps", channels: tuple[str, ...]):
@@ -680,11 +464,16 @@ class TimedFSData(FSData):
 
     def to_tsdata(
         self,
-        times: npt.NDArray[np.floating[Any]] | reps.Linspace | None = None,
+        times: npt.NDArray[np.floating[Any]] | Linspace | None = None,
         *,
         tapering: tapering.Tapering | None = None,
     ):
-        """Return the time series data with times grid."""
+        """Return the time series data with times grid (*Deprecated*).
+
+        .. warning::
+            This method is deprecated and will be removed in 0.8.0; use
+            `to_tsdata(times=self.times, tapering=...)` instead.
+        """
         del times
         tsrepr = self.representation.irfft(np.asarray(self.times), tapering=tapering)
         return TSData(tsrepr, self.channel_names, self.name)
@@ -751,16 +540,16 @@ class WDMData(Data[reps.WDM]):
         }
         return type(self).from_dict(tfdict).set_name(self.name)
 
-    def to_fsdata(self, *, nx: float = 4.0, mask: Any | None = None):
-        """Convert to FSData.
+    # def to_fsdata(self, *, nx: float = 4.0, mask: Any | None = None):
+    #     """Convert to FSData.
 
-        See :py:meth:`.representations.WDM.to_frequency_series`.
-        """
-        fsdict = {
-            chnname: chn.to_frequency_series(nx=nx, mask=mask)
-            for chnname, chn in self.items()
-        }
-        return FSData.from_dict(fsdict)
+    #     See :py:meth:`.representations.WDM.to_frequency_series`.
+    #     """
+    #     fsdict = {
+    #         chnname: chn.to_frequency_series(nx=nx, mask=mask)
+    #         for chnname, chn in self.items()
+    #     }
+    #     return FSData.from_dict(fsdict)
 
     def draw(
         self,
@@ -779,6 +568,45 @@ class WDMData(Data[reps.WDM]):
             )
         )
         return plotter.draw(**kwargs)
+
+
+def tsdata(
+    mapping: Mapping[str, reps.TimeSeries[Linspace]], name: str | None = None
+) -> TSData:
+    """Construct a :class:`~types.data.TSData` instance."""
+    return TSData.from_dict(mapping, name=name)
+
+
+def fsdata(
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]], name: str | None = None
+) -> FSData:
+    """Construct a :class:`~types.data.FSData` instance."""
+    return FSData.from_dict(mapping, name=name)
+
+
+def timed_fsdata(
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
+    times: Linspace | npt.NDArray[np.floating[Any]],
+    name: str | None = None,
+) -> TimedFSData:
+    """Construct a :class:`~types.data.TimedFSData` instance."""
+    return TimedFSData.from_dict(mapping, times=times, name=name)
+
+
+def stftdata(
+    mapping: Mapping[str, reps.STFT[Linspace, Linspace]],
+    name: str | None = None,
+) -> STFTData:
+    """Construct a :class:`~types.data.STFTData` instance."""
+    return STFTData.from_dict(mapping, name=name)
+
+
+def wdmdata(
+    mapping: Mapping[str, reps.WDM],
+    name: str | None = None,
+) -> WDMData:
+    """Construct a :class:`~types.data.WDMData` instance."""
+    return WDMData.from_dict(mapping, name=name)
 
 
 def load_data(file_path: str | pathlib.Path, legacy: bool = False):

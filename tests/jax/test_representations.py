@@ -17,22 +17,24 @@ import numpy.testing as npt
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
-from tests._shared.representations_helpers import (
+from tests._helpers import (
     AdvancedRepresentationMethodsMixin,
     HelperFunctionsMixin,
     LinspaceExtraPropertiesMixin,
     WDMPropertiesAndMethodsMixin,
     build_canonical_representations,
 )
-from typed_lisa_toolkit import utils
-from typed_lisa_toolkit.containers.representations import (
+from typed_lisa_toolkit import utils, frequency_series, time_series, stft, phasor
+from typed_lisa_toolkit.types import (
     STFT,
     FrequencySeries,
-    UniformFrequencySeries,
     Linspace,
     Phasor,
-    TimeSeries,
+    TSData,
+    UniformFrequencySeries,
     UniformTimeSeries,
+)
+from typed_lisa_toolkit.types.representations import (  # extra symbols for coverage tests
     _get_full_slice,
     _get_subset_slice,
     _take_subset,
@@ -55,7 +57,6 @@ class TestCanonicalShapeJAX(unittest.TestCase):
             n_features=self.n_features,
             len_time=self.len_time,
             len_freq=self.len_freq,
-            tf_grid_order="time_freq",
         )
 
         self.freqs = case["freqs"]
@@ -89,8 +90,8 @@ class TestCanonicalShapeJAX(unittest.TestCase):
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                self.len_time,
                 self.len_freq,
+                self.len_time,
             ),
         )
 
@@ -116,8 +117,8 @@ class TestCanonicalShapeJAX(unittest.TestCase):
                 self.n_batches,
                 self.n_harmonics,
                 self.n_features,
-                self.len_time,
                 self.len_freq,
+                self.len_time,
             ),
         )
 
@@ -143,8 +144,8 @@ class TestCanonicalShapeJAX(unittest.TestCase):
                 self.n_batches,
                 self.n_channels,
                 self.n_features,
-                self.len_time,
                 self.len_freq,
+                self.len_time,
             ),
         )
 
@@ -202,11 +203,11 @@ class TestCanonicalShapeJAX(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features),
         )
         self.assertEqual(
-            self.entries_tf.shape[4:], (self.len_time, self.len_freq)
+            self.entries_tf.shape[4:], (self.len_freq, self.len_time)
         )  # 2D grid
 
         # Verify independent grid selection along time dimension
-        time_slice = self.entries_tf[:, :, :, :, 10:20, :]
+        time_slice = self.entries_tf[:, :, :, :, :, 10:20]
         self.assertEqual(
             time_slice.shape,
             (
@@ -214,13 +215,13 @@ class TestCanonicalShapeJAX(unittest.TestCase):
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                10,
                 self.len_freq,
+                10,
             ),
         )
 
         # Verify independent grid selection along frequency dimension
-        freq_slice = self.entries_tf[:, :, :, :, :, 5:15]
+        freq_slice = self.entries_tf[:, :, :, :, 5:15, :]
         self.assertEqual(
             freq_slice.shape,
             (
@@ -228,8 +229,8 @@ class TestCanonicalShapeJAX(unittest.TestCase):
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                self.len_time,
                 10,
+                self.len_time,
             ),
         )
 
@@ -272,9 +273,7 @@ class TestSubsetOperationsJAX(unittest.TestCase):
                 self.len_grid_large,
             )
         )
-        self.fs_large = FrequencySeries(
-            grid=(self.freqs_large,), entries=entries_fs_large
-        )
+        self.fs_large = frequency_series(self.freqs_large, entries=entries_fs_large)
 
         # Time series fixture with Linspace and JAX entries
         self.times_ls = Linspace(0.0, 0.01, 1000)
@@ -287,7 +286,7 @@ class TestSubsetOperationsJAX(unittest.TestCase):
                 1000,
             )
         )
-        self.ts_ls = TimeSeries(grid=(self.times_ls,), entries=entries_ts_ls)
+        self.ts_ls = time_series(self.times_ls, entries=entries_ts_ls)
 
     def test_get_subset_slice_helper(self):
         """Test _get_subset_slice helper function."""
@@ -421,7 +420,7 @@ class TestSubsetOperationsJAX(unittest.TestCase):
                 self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 100
             )
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Use slice notation
         fs_sub = fs[20:50]
@@ -542,7 +541,7 @@ class TestEmbedOperationsJAX(unittest.TestCase):
         entries_small = entries_small.at[0, 0, 0, 0, :].set(
             jnp.arange(1, 6, dtype=complex)
         )
-        fs_small = FrequencySeries(grid=(freqs_small,), entries=entries_small)
+        fs_small = frequency_series(freqs_small, entries=entries_small)
 
         # Create large grid with JAX
         freqs_large = jnp.array(
@@ -574,7 +573,7 @@ class TestEmbedOperationsJAX(unittest.TestCase):
         # Small grid (Linspace), JAX entries
         times_small = Linspace(2.0, 0.1, 30)
         entries_small = jnp.array(np.random.randn(2, 1, 1, 1, 30))
-        ts_small = TimeSeries(grid=(times_small,), entries=entries_small)
+        ts_small = time_series(times=times_small, entries=entries_small)
 
         # Large grid (Linspace)
         times_large = Linspace(0.0, 0.1, 100)
@@ -655,8 +654,8 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
         entries1 = jnp.array(entries1_np)
         entries2 = jnp.array(entries2_np)
 
-        fs1 = FrequencySeries(grid=(self.freqs_short,), entries=entries1)
-        fs2 = FrequencySeries(grid=(self.freqs_short,), entries=entries2)
+        fs1 = frequency_series(self.freqs_short, entries=entries1)
+        fs2 = frequency_series(self.freqs_short, entries=entries2)
 
         # Add
         fs_sum = fs1 + fs2
@@ -684,7 +683,7 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
                 self.len_time,
             )
         )
-        ts = TimeSeries(grid=(self.times,), entries=entries)
+        ts = time_series(times=self.times, entries=entries)
 
         # Multiply by scalar
         ts_scaled = ts * 2.5
@@ -720,8 +719,8 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
             )
         )
 
-        fs1 = FrequencySeries(grid=(self.freqs_short,), entries=entries1)
-        fs2 = FrequencySeries(grid=(self.freqs_short,), entries=entries2)
+        fs1 = frequency_series(self.freqs_short, entries=entries1)
+        fs2 = frequency_series(self.freqs_short, entries=entries2)
 
         # Subtract
         fs_diff = fs1 - fs2
@@ -743,7 +742,7 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
                 self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 200
             )
         )
-        fs_old = FrequencySeries(grid=(freqs,), entries=entries_old)
+        fs_old = frequency_series(freqs, entries=entries_old)
 
         # Create new entries with JAX, same shape
         entries_new = jnp.array(
@@ -788,7 +787,7 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
             )
         )
         entries = jnp.array(entries_np)
-        fs = FrequencySeries(grid=(self.freqs_complex,), entries=entries)
+        fs = frequency_series(self.freqs_complex, entries=entries)
 
         fs_scaled = fs / 2.5
 
@@ -808,7 +807,7 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
             self.len_time,
         )
         entries = jnp.array(entries_np)
-        ts = TimeSeries(grid=(self.times_short,), entries=entries)
+        ts = time_series(self.times_short, entries=entries)
 
         ts_scaled = 3.0 * ts
 
@@ -839,7 +838,7 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
             )
         )
         entries = jnp.array(entries_np)
-        fs = FrequencySeries(grid=(self.freqs_complex,), entries=entries)
+        fs = frequency_series(self.freqs_complex, entries=entries)
 
         fs_scaled = 2.0 / fs
 
@@ -859,7 +858,7 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
             self.len_freq,
         )
         entries = jnp.array(entries_np)
-        fs = FrequencySeries(grid=(self.freqs_short,), entries=entries)
+        fs = frequency_series(self.freqs_short, entries=entries)
 
         fs_neg = -fs
 
@@ -939,7 +938,7 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
                 self.len_freq_long,
             )
         )
-        fs = UniformFrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Check df
         self.assertEqual(fs.df, 1e-3)
@@ -965,7 +964,7 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
                 self.len_time,
             )
         )
-        ts = UniformTimeSeries(grid=(times,), entries=entries)
+        ts = time_series(times, entries=entries)
 
         # Check dt
         self.assertEqual(ts.dt, 0.01)
@@ -991,7 +990,7 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
                 self.len_freq_short,
             )
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         npt.assert_array_equal(np.array(fs.frequencies), np.array(freqs))
         npt.assert_array_equal(np.array(fs.frequencies), np.array(fs.grid[0]))
@@ -1012,7 +1011,7 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
                 self.len_freq_long,
             )
         )
-        ts = TimeSeries(grid=(times,), entries=entries)
+        ts = time_series(times=times, entries=entries)
 
         npt.assert_array_equal(np.array(ts.times), np.array(times))
         npt.assert_array_equal(np.array(ts.times), np.array(ts.grid[0]))
@@ -1044,7 +1043,7 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
                 self.len_grid_small,
             )
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Grid must be tuple
         self.assertIsInstance(fs.grid, tuple)
@@ -1066,7 +1065,7 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
                 self.len_grid_large,
             )
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Should be converted to Linspace
         self.assertIsInstance(fs.grid[0], Linspace)
@@ -1086,7 +1085,7 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
                 self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 5
             )
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Should remain as JAX array
         npt.assert_array_equal(np.array(fs.grid[0]), np.array(freqs))
@@ -1118,7 +1117,7 @@ class TestEdgeCasesJAX(unittest.TestCase):
                 self.len_grid_large,
             )
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Get subset
         fs_sub = fs.get_subset(slice=slice(20, 50))
@@ -1148,8 +1147,8 @@ class TestEdgeCasesJAX(unittest.TestCase):
             )
         )
 
-        fs1 = FrequencySeries(grid=(freqs,), entries=entries1)
-        fs2 = FrequencySeries(grid=(freqs,), entries=entries2)
+        fs1 = frequency_series(freqs, entries=entries1)
+        fs2 = frequency_series(freqs, entries=entries2)
 
         # Add
         fs_sum = fs1 + fs2
@@ -1176,7 +1175,7 @@ class TestEdgeCasesJAX(unittest.TestCase):
                 self.len_grid_small,
             )
         )
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
 
         # Get empty subset
         fs_empty = fs.get_subset(slice=slice(2, 2))
@@ -1281,7 +1280,7 @@ class TestComplexPropertiesJAX(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_real = fs.real
 
         npt.assert_array_almost_equal(
@@ -1304,7 +1303,7 @@ class TestComplexPropertiesJAX(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_imag = fs.imag
 
         npt.assert_array_almost_equal(
@@ -1327,7 +1326,7 @@ class TestComplexPropertiesJAX(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_conj = fs.conj
 
         npt.assert_array_almost_equal(
@@ -1349,7 +1348,7 @@ class TestComplexPropertiesJAX(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 1),
         )
 
-        fs = FrequencySeries(grid=(self.freqs,), entries=entries_full)
+        fs = frequency_series(self.freqs, entries=entries_full)
         fs_abs = fs.abs()
 
         expected_abs = 5.0 * np.ones(
@@ -1406,8 +1405,8 @@ class TestErrorHandlingJAX(unittest.TestCase):
             )
         )
 
-        fs1 = FrequencySeries(grid=(self.freqs_short,), entries=entries1)
-        fs2 = FrequencySeries(grid=(self.freqs_long,), entries=entries2)
+        fs1 = frequency_series(self.freqs_short, entries=entries1)
+        fs2 = frequency_series(self.freqs_long, entries=entries2)
 
         # Should raise error on addition
         with self.assertRaises(ValueError):
@@ -1439,7 +1438,7 @@ class TestErrorHandlingJAX(unittest.TestCase):
         )
 
         try:
-            fs = FrequencySeries(grid=(freqs,), entries=entries)
+            fs = frequency_series(freqs, entries=entries)
             self.assertEqual(len(fs.grid[0]), 0)
         except ValueError:
             pass
@@ -1478,7 +1477,7 @@ class TestErrorHandlingJAX(unittest.TestCase):
                 50,
             )
         )
-        fs = FrequencySeries(grid=(self.freqs_short,), entries=entries)
+        fs = frequency_series(self.freqs_short, entries=entries)
 
         try:
             fs_sub = fs.get_subset(interval=(10.0, 20.0))
@@ -1511,8 +1510,8 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
         small_freqs = Linspace(0.30, 0.01, 30)
         entries_large = jnp.ones((1, 1, 1, 1, 100), dtype=jnp.float64)
         entries_small = jnp.ones((1, 1, 1, 1, 30), dtype=jnp.float64) * 2.0
-        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large)
-        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        fs_large = frequency_series(large_freqs, entries=entries_large)
+        fs_small = frequency_series(small_freqs, entries=entries_small)
         full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
         result = fs_large.iadd(fs_small, full_slice)
         npt.assert_allclose(np.asarray(result.entries[0, 0, 0, 0, 30:60]), 1.0)
@@ -1522,8 +1521,8 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
         small_freqs = Linspace(0.30, 0.01, 30)
         entries_large = jnp.ones((1, 1, 1, 1, 100), dtype=jnp.float64)
         entries_small = jnp.ones((1, 1, 1, 1, 30), dtype=jnp.float64) * 2.0
-        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large)
-        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        fs_large = frequency_series(large_freqs, entries=entries_large)
+        fs_small = frequency_series(small_freqs, entries=entries_small)
         full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
         result = fs_large.add(fs_small, full_slice, inplace=False)
         npt.assert_allclose(np.asarray(result.entries[0, 0, 0, 0, 30:60]), 1.0)
@@ -1534,8 +1533,8 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
         small_freqs = Linspace(0.30, 0.01, 30)
         entries_large = jnp.ones((1, 1, 1, 1, 100), dtype=jnp.float64)
         entries_small = jnp.ones((1, 1, 1, 1, 30), dtype=jnp.float64) * 2.0
-        fs_large = FrequencySeries(grid=(large_freqs,), entries=entries_large)
-        fs_small = FrequencySeries(grid=(small_freqs,), entries=entries_small)
+        fs_large = frequency_series(large_freqs, entries=entries_large)
+        fs_small = frequency_series(small_freqs, entries=entries_small)
         full_slice = (slice(None), slice(None), slice(None), slice(None), slice(30, 60))
         result = fs_large.add(fs_small, full_slice, inplace=True)
         npt.assert_allclose(np.asarray(result.entries[0, 0, 0, 0, 30:60]), 1.0)
@@ -1544,7 +1543,7 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
     def test_iadd_operator_with_scalar(self):
         freqs = Linspace(0.0, 0.01, 10)
         entries = jnp.ones((1, 1, 1, 1, 10), dtype=jnp.float64)
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
         fs += 1.0
         npt.assert_allclose(np.asarray(fs.entries), 1.0)
 
@@ -1553,17 +1552,40 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
         small_freqs_arr = jnp.linspace(0.30, 0.59, 3, dtype=jnp.float64)
         entries_large = jnp.ones((1, 1, 1, 1, 10), dtype=jnp.float64)
         entries_small = jnp.ones((1, 1, 1, 1, 3), dtype=jnp.float64) * 2.0
-        fs_large = FrequencySeries(grid=(large_freqs_arr,), entries=entries_large)
-        fs_small = FrequencySeries(grid=(small_freqs_arr,), entries=entries_small)
+        fs_large = frequency_series(large_freqs_arr, entries=entries_large)
+        fs_small = frequency_series(small_freqs_arr, entries=entries_small)
         try:
             fs_large += fs_small
         except (ValueError, IndexError, TypeError):
             pass
 
+    def test_addition_with_equal_nonuniform_array_grids(self):
+        # Non-uniform grids avoid Linspace coercion and force array_equal path.
+        freqs = jnp.array([0.0, 0.11, 0.37, 0.9], dtype=jnp.float64)
+        entries1 = jnp.ones((1, 1, 1, 1, len(freqs)), dtype=jnp.float64)
+        entries2 = jnp.ones((1, 1, 1, 1, len(freqs)), dtype=jnp.float64) * 2.0
+        fs1 = frequency_series(freqs, entries1)
+        fs2 = frequency_series(freqs, entries2)
+
+        out = fs1 + fs2
+        npt.assert_allclose(np.asarray(out.entries), 3.0)
+
+    def test_addition_with_mismatched_nonuniform_array_grids_raises(self):
+        # Covers _check_grid_compatibility branch where array_equal is False.
+        freqs1 = jnp.array([0.0, 0.11, 0.37, 0.9], dtype=jnp.float64)
+        freqs2 = jnp.array([0.0, 0.11, 0.4, 0.9], dtype=jnp.float64)
+        entries1 = jnp.ones((1, 1, 1, 1, len(freqs1)), dtype=jnp.float64)
+        entries2 = jnp.ones((1, 1, 1, 1, len(freqs2)), dtype=jnp.float64)
+        fs1 = frequency_series(freqs1, entries1)
+        fs2 = frequency_series(freqs2, entries2)
+
+        with self.assertRaises(ValueError):
+            _ = fs1 + fs2
+
     def test_setitem_on_series(self):
         freqs = Linspace(0.0, 0.1, 50)
         entries = jnp.ones((1, 1, 1, 1, 50), dtype=jnp.float64)
-        fs = FrequencySeries(grid=(freqs,), entries=entries)
+        fs = frequency_series(freqs, entries=entries)
         before = np.asarray(fs.entries)
         fs[10:20] = jnp.zeros((1, 1, 1, 1, 10), dtype=jnp.float64)
         npt.assert_allclose(np.asarray(fs.entries), before)
@@ -1638,6 +1660,6 @@ class TestWDMPropertiesAndMethodsJAX(WDMPropertiesAndMethodsMixin, unittest.Test
 
 
 def build_canonical_wdm_jax():
-    from tests._shared.noisemodel_helpers import build_wdm_pair
+    from tests._helpers import build_wdm_pair
 
     return build_wdm_pair(jnp)["left"]["X"]

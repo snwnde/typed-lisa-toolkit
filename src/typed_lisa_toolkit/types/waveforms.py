@@ -1,43 +1,4 @@
-"""Module for waveform containers.
-
-.. currentmodule:: typed_lisa_toolkit.containers.waveforms
-
-.. autoclass:: HarmonicWaveform
-.. autoclass:: ProjectedWaveform
-.. autoclass:: HarmonicProjectedWaveform
-
-Functions
----------
-
-.. autofunction:: harmonic_waveform
-.. autofunction:: projected_waveform
-.. autofunction:: harmonic_projected_waveform
-.. autofunction:: homogeneous_harmonic_projected_waveform
-.. autofunction:: sum_harmonics
-.. autofunction:: densify_phasor
-.. autofunction:: densify_phasor_hw
-.. autofunction:: densify_phasor_pw
-.. autofunction:: densify_phasor_hpw
-.. autofunction:: phasor_to_fs_hw
-.. autofunction:: phasor_to_fs_pw
-.. autofunction:: phasor_to_fs_hpw
-.. autofunction:: combine_phasor_hw
-.. autofunction:: combine_phasor_pw
-.. autofunction:: combine_phasor_hpw
-.. autofunction:: get_dense_maker
-
-Alias Constructors
-------------------
-Use these as convenience shorthands; canonical names remain preferred in library code.
-
-.. autofunction:: hw
-.. autofunction:: hhw
-.. autofunction:: pw
-.. autofunction:: hpw
-.. autofunction:: hhpw
-
-
-"""
+"""Waveform types."""
 
 from __future__ import annotations
 
@@ -56,20 +17,16 @@ from typing import (
 
 import array_api_compat as xpc
 
-from . import data, modes
+from . import _mixins, modes
 from . import representations as reps
+from .misc import AnyGrid, Array, Axis, Interpolator
 
 Mode = modes.Harmonic | modes.QNM
 
-from .. import utils
-
 if TYPE_CHECKING:
-    Array = reps.Array
-    Axis = reps.Axis
-    AnyGrid = reps.AnyGrid
-    from .representations import Representation
+    AnyReps = reps.Representation[AnyGrid]
 
-    AnyReps = Representation[AnyGrid]
+from .. import utils
 
 log = logging.getLogger(__name__)
 
@@ -125,7 +82,7 @@ class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
         return tuple(self._mapping.keys())
 
 
-class HarmonicWaveform[ModeT: Mode, RepT: AnyReps](_ModeMapping[ModeT, RepT]):
+class HarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](_ModeMapping[ModeT, RepT]):
     """Waveform in different modes.
 
     This class is a mapping from modes to representations.
@@ -144,7 +101,7 @@ class HarmonicWaveform[ModeT: Mode, RepT: AnyReps](_ModeMapping[ModeT, RepT]):
         return self[next(iter(self))].domain
 
 
-class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: AnyReps](
+class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](
     HarmonicWaveform[ModeT, RepT]
 ):
     """Harmonic waveform where all harmonics have the same grid."""
@@ -160,7 +117,7 @@ class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: AnyReps](
         )
 
 
-class ProjectedWaveform[RepT: AnyReps](data._ChannelMapping[RepT]):  # pyright: ignore[reportPrivateUsage]
+class ProjectedWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
     """Projected waveform in a single mode or all modes summed together.
 
     This class is a mapping from channel names to representations. It is
@@ -169,7 +126,7 @@ class ProjectedWaveform[RepT: AnyReps](data._ChannelMapping[RepT]):  # pyright: 
     """
 
 
-class HarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
+class HarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
     _ModeMapping[ModeT, ProjectedWaveform[RepT]]
 ):
     """Projected waveform in different modes.
@@ -196,7 +153,7 @@ class HarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
         return tuple(self._first.keys())
 
 
-class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
+class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
     HarmonicProjectedWaveform[ModeT, RepT]
 ):
     """Harmonic projected waveform where all harmonics have the same grid."""
@@ -213,47 +170,87 @@ class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: AnyReps](
         )
 
 
-def harmonic_waveform[ModeT: Mode, RepT: AnyReps](
-    modes_to_representations: Mapping[ModeT, RepT],
+def harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
+    modes_to_reps: Mapping[ModeT, RepT],
 ) -> HarmonicWaveform[ModeT, RepT]:
-    """Build a harmonic waveform from mode-indexed representations."""
-    return HarmonicWaveform(modes_to_representations)
+    """Build a :class:`~types.HarmonicWaveform`.
+
+    Parameters
+    ----------
+    modes_to_reps :
+        A mapping from :ref:`modes <mode_types>`
+        to :ref:`representations <representation_types>`.
+    """
+    return HarmonicWaveform(modes_to_reps)
 
 
-def homogeneous_harmonic_waveform[ModeT: Mode, RepT: AnyReps](
-    modes_to_representations: Mapping[ModeT, RepT],
+def homogeneous_harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
+    modes_to_reps: Mapping[ModeT, RepT],
 ) -> HomogeneousHarmonicWaveform[ModeT, RepT]:
-    """Build a homogeneous harmonic waveform from mode-indexed representations."""
-    return HomogeneousHarmonicWaveform(modes_to_representations)
+    """Build a :class:`~types.waveforms.HomogeneousHarmonicWaveform`.
+
+    Parameters
+    ----------
+    modes_to_reps :
+        A mapping from :ref:`modes <mode_types>`
+        to :ref:`representations <representation_types>`.
+    """
+    return HomogeneousHarmonicWaveform(modes_to_reps)
 
 
-def projected_waveform[RepT: AnyReps](
-    channels: Mapping[str, RepT],
+def projected_waveform[RepT: "AnyReps"](
+    channels_to_reps: Mapping[str, RepT],
 ) -> ProjectedWaveform[RepT]:
-    """Build a projected waveform from channel-indexed representations."""
-    return ProjectedWaveform[RepT].from_dict(channels)
+    """Build a :class:`~types.ProjectedWaveform`.
+
+    Parameters
+    ----------
+    channels_to_reps :
+        A mapping from channel names (:py:class:`str`) to
+        :ref:`representations <representation_types>`.
+    """
+    return ProjectedWaveform[RepT].from_dict(channels_to_reps)
 
 
-def harmonic_projected_waveform[ModeT: Mode, RepT: AnyReps](
-    modes_to_projected_waveforms: Mapping[ModeT, ProjectedWaveform[RepT]],
+def harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
+    modes_to_pws: Mapping[ModeT, ProjectedWaveform[RepT]],
 ) -> HarmonicProjectedWaveform[ModeT, RepT]:
-    """Build a harmonic projected waveform from mode-indexed projected waveforms."""
-    return HarmonicProjectedWaveform(modes_to_projected_waveforms)
+    """Build a :class:`~types.HarmonicProjectedWaveform`.
+
+    Parameters
+    ----------
+    modes_to_pws :
+        A mapping from :ref:`modes <mode_types>`
+        to :class:`~types.ProjectedWaveform` instances.
+    """
+    return HarmonicProjectedWaveform(modes_to_pws)
 
 
-def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: AnyReps](
-    modes_to_projected_waveforms: Mapping[ModeT, ProjectedWaveform[RepT]],
+def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
+    modes_to_pws: Mapping[ModeT, ProjectedWaveform[RepT]],
 ) -> HomogeneousHarmonicProjectedWaveform[ModeT, RepT]:
-    """Build a homogeneous harmonic projected waveform from mode-indexed projected waveforms."""
-    return HomogeneousHarmonicProjectedWaveform(modes_to_projected_waveforms)
+    """Build a :class:`~types.waveforms.HomogeneousHarmonicProjectedWaveform`.
+
+    Parameters
+    ----------
+    modes_to_pws :
+        A mapping from :ref:`modes <mode_types>`
+        to :class:`~types.ProjectedWaveform` instances.
+    """
+    return HomogeneousHarmonicProjectedWaveform(modes_to_pws)
 
 
 # Convenience aliases
 hw = harmonic_waveform
+"""Alias for :func:`~harmonic_waveform`."""
 hhw = homogeneous_harmonic_waveform
+"""Alias for :func:`~homogeneous_harmonic_waveform`."""
 pw = projected_waveform
+"""Alias for :func:`~projected_waveform`."""
 hpw = harmonic_projected_waveform
+"""Alias for :func:`~harmonic_projected_waveform`."""
 hhpw = homogeneous_harmonic_projected_waveform
+"""Alias for :func:`~homogeneous_harmonic_projected_waveform`."""
 
 
 def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
@@ -264,60 +261,28 @@ def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
     return wf._first.create_like(entries, wf.channel_names)  # pyright: ignore[reportPrivateUsage]
 
 
-def densify_phasor[AT: "Axis"](
-    wf: reps.Phasor["Axis"],
-    interpolator: utils.Interpolator,
-    frequencies: AT,
-    embed: bool = False,
-) -> reps.Phasor[AT]:
-    """Densify a phasor representation by interpolation.
-
-    Parameters
-    ----------
-    wf : Phasor[Axis]
-        The phasor representation to densify.
-    interpolator : Interpolator
-        The interpolator to use for densification.
-    frequencies : Axis
-        The frequencies at which to evaluate the densified phasor.
-    embed : bool, optional
-        Whether to embed the densified phasor on the original frequency grid.
-    """
-    _frequencies = reps.to_array(frequencies, xpc.get_namespace(wf.entries))
-
-    _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
-    freqs = cast(
-        AT,
-        frequencies[utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)],
-    )
-    nwf = wf.get_interpolated(freqs, interpolator)
-    if not embed:
-        return nwf
-    return nwf.get_embedded((frequencies,), known_slices=(_slice,))
-
-
 def densify_phasor_hw[ModeT: Mode, AxisT: "Axis"](
     wf: HarmonicWaveform[ModeT, reps.Phasor["Axis"]],
-    interpolator: utils.Interpolator,
+    interpolator: Interpolator,
     frequencies: AxisT,
     embed: bool = False,
 ) -> HomogeneousHarmonicWaveform[ModeT, reps.Phasor[AxisT]]:
-    """Densify a harmonic waveform with phasor representations by interpolation.
+    """Densify :class:`~types.HarmonicWaveform` with sparse :class:`~types.Phasor` by interpolation.
 
     Parameters
     ----------
-    wf : HarmonicWaveform[Mode, Phasor[Axis]]
+    wf :
         The harmonic waveform to densify.
-    interpolator : Interpolator
+    interpolator :
         The interpolator to use for densification.
-    frequencies : Axis
+    frequencies :
         The frequencies at which to evaluate the densified phasor.
-    embed : bool, optional
+    embed :
         Whether to embed the densified phasor on the original frequency grid.
     """
     return homogeneous_harmonic_waveform(
         {
-            mode: densify_phasor(wf[mode], interpolator, frequencies, embed)
+            mode: reps.densify_phasor(wf[mode], interpolator, frequencies, embed)
             for mode in wf
         }
     )
@@ -325,26 +290,26 @@ def densify_phasor_hw[ModeT: Mode, AxisT: "Axis"](
 
 def densify_phasor_pw[RepT: reps.Phasor["Axis"], AxisT: "Axis"](
     wf: ProjectedWaveform[RepT],
-    interpolator: utils.Interpolator,
+    interpolator: Interpolator,
     frequencies: AxisT,
     embed: bool = False,
 ) -> ProjectedWaveform[reps.Phasor[AxisT]]:
-    """Densify a projected waveform with phasor representations by interpolation.
+    """Densify :class:`~types.ProjectedWaveform` with sparse :class:`~types.Phasor` representations by interpolation.
 
     Parameters
     ----------
-    wf : ProjectedWaveform[Phasor[Axis]]
+    wf :
         The projected waveform to densify.
-    interpolator : Interpolator
+    interpolator :
         The interpolator to use for densification.
-    frequencies : Axis
+    frequencies :
         The frequencies at which to evaluate the densified phasor.
-    embed : bool, optional
+    embed :
         Whether to embed the densified phasor on the original frequency grid.
     """
     return projected_waveform(
         {
-            chnname: densify_phasor(wf[chnname], interpolator, frequencies, embed)
+            chnname: reps.densify_phasor(wf[chnname], interpolator, frequencies, embed)
             for chnname in wf.channel_names
         }
     )
@@ -352,23 +317,11 @@ def densify_phasor_pw[RepT: reps.Phasor["Axis"], AxisT: "Axis"](
 
 def densify_phasor_hpw[ModeT: Mode, AxisT: "Axis"](
     wf: HarmonicProjectedWaveform[ModeT, reps.Phasor["Axis"]],
-    interpolator: utils.Interpolator,
+    interpolator: Interpolator,
     frequencies: AxisT,
     embed: bool = False,
 ) -> HomogeneousHarmonicProjectedWaveform[ModeT, reps.Phasor[AxisT]]:
-    """Densify a harmonic projected waveform with phasor representations by interpolation.
-
-    Parameters
-    ----------
-    wf : HarmonicProjectedWaveform[Mode, Phasor[Axis]]
-        The harmonic projected waveform to densify.
-    interpolator : Interpolator
-        The interpolator to use for densification.
-    frequencies : Axis
-        The frequencies at which to evaluate the densified phasor.
-    embed : bool, optional
-        Whether to embed the densified phasor on the original frequency grid.
-    """
+    """Densify :class:`~types.HarmonicProjectedWaveform` with sparse :class:`~types.Phasor` representations by interpolation."""
     return homogeneous_harmonic_projected_waveform(
         {
             mode: densify_phasor_pw(wf[mode], interpolator, frequencies, embed)
@@ -417,7 +370,7 @@ def phasor_to_fs_hw[MT: Mode, AxisT: "Axis"](
 def phasor_to_fs_hw[MT: Mode, AxisT: "Axis"](
     wf: _HWLike[MT, reps.Phasor[AxisT]],
 ):
-    """Convert phasor leaves in a harmonic waveform to frequency-series leaves."""
+    """Convert :class:`~types.Phasor`-valued :class:`~types.HarmonicWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.HarmonicWaveform`."""
     _mapping = {mode: wf[mode].to_frequency_series() for mode in wf}
     if isinstance(wf, HomogeneousHarmonicWaveform):
         return homogeneous_harmonic_waveform(_mapping)
@@ -427,7 +380,7 @@ def phasor_to_fs_hw[MT: Mode, AxisT: "Axis"](
 def phasor_to_fs_pw[AxisT: "Axis"](
     wf: _PWLike[reps.Phasor[AxisT]],
 ):
-    """Convert phasor leaves in a projected waveform to frequency-series leaves."""
+    """Convert :class:`~types.Phasor`-valued :class:`~types.ProjectedWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.ProjectedWaveform`."""
     return projected_waveform(
         {chnname: wf[chnname].to_frequency_series() for chnname in wf.channel_names}
     )
@@ -448,7 +401,7 @@ def phasor_to_fs_hpw[MT: Mode, AxisT: "Axis"](
 def phasor_to_fs_hpw[MT: Mode, AxisT: "Axis"](
     wf: _HPWLike[MT, reps.Phasor[AxisT]],
 ):
-    """Convert phasor leaves in a harmonic projected waveform to frequency-series leaves."""
+    """Convert :class:`~types.Phasor`-valued :class:`~types.HarmonicProjectedWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.HarmonicProjectedWaveform`."""
     _mapping = {mode: phasor_to_fs_pw(wf[mode]) for mode in wf}
 
     if isinstance(wf, HomogeneousHarmonicProjectedWaveform):
@@ -458,9 +411,9 @@ def phasor_to_fs_hpw[MT: Mode, AxisT: "Axis"](
 
 # To deprecate
 def get_dense_maker(
-    interpolator: utils.Interpolator,
+    interpolator: Interpolator,
 ):
-    """Return a function to convert a sparse phasor projected waveform to a dense phasor projected waveform.
+    """Return a function to convert a sparse phasor projected waveform to a dense phasor projected waveform (*Deprecated*).
 
     The returned function has the signature:
 
@@ -478,6 +431,12 @@ def get_dense_maker(
     is False, the returned function will return a waveform with the
     frequencies truncated to the lowest and highest frequencies of the
     input waveform.
+
+    .. warning::
+
+        This function is deprecated in v0.6.0 and will be removed in v0.8.0.
+        Use :func:`~densify_phasor`, :func:`~densify_phasor_hw`, :func:`~densify_phasor_pw`,
+        or :func:`~densify_phasor_hpw` instead.
     """
 
     def make[MT: Mode, AxisT: "Axis"](

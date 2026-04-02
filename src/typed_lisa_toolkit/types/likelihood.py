@@ -1,28 +1,16 @@
-"""Module for likelihood manipulation and computation.
-
-.. currentmodule:: typed_lisa_toolkit.consumers.likelihood
-
-
-.. autoclass:: FDWhittleLikelihood
-   :members:
-   :member-order: groupwise
-   :inherited-members:
-
-"""
+"""Likelihood types."""
 
 import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
-from ..containers import data as dm
-from ..containers import modes
-from ..containers import representations as reps
-from ..containers import waveforms as wf
+from . import data as dm
+from . import modes
 from . import noisemodel as nm
+from . import representations as reps
+from . import waveforms as wf
+from .misc import Array, Linspace
 
 if TYPE_CHECKING:
-    Array = reps.Array
-    Axis = reps.Axis
-    Linspace = reps.Linspace
     Reps = reps.Representation
 
 
