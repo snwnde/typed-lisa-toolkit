@@ -292,25 +292,25 @@ class TestDataContainersJAX(unittest.TestCase):
         self.assertEqual(recovered.channel_names, fsdata.channel_names)
         self.assertEqual(np.asarray(recovered.times).shape[0], len(times))
 
-    def test_tsdata_to_stftdata(self):
-        _, tsdata = _build_tsdata_jax()
-        win = np.hanning(4).astype(float)
-        stftdata = tsdata.to_stftdata(win=win, hop=2)
-        self.assertIsInstance(stftdata, STFTData)
-        self.assertEqual(stftdata.channel_names, tsdata.channel_names)
+    # def test_tsdata_to_stftdata(self):
+    #     _, tsdata = _build_tsdata_jax()
+    #     win = np.hanning(4).astype(float)
+    #     stftdata = tsdata.to_stftdata(win=win, hop=2)
+    #     self.assertIsInstance(stftdata, STFTData)
+    #     self.assertEqual(stftdata.channel_names, tsdata.channel_names)
 
-    def test_stftdata_get_subset(self):
-        _, tsdata = _build_tsdata_jax()
-        win = np.hanning(4).astype(float)
-        stftdata = tsdata.to_stftdata(win=win, hop=2)
+    # def test_stftdata_get_subset(self):
+    #     _, tsdata = _build_tsdata_jax()
+    #     win = np.hanning(4).astype(float)
+    #     stftdata = tsdata.to_stftdata(win=win, hop=2)
 
-        times_arr = np.array(list(stftdata.values())[0].times)
-        t_start, t_end = float(times_arr[0]), float(times_arr[-1])
-        sub = stftdata.get_subset(
-            time_interval=(t_start, t_start + (t_end - t_start) / 2)
-        )
-        self.assertIsInstance(sub, STFTData)
-        self.assertEqual(sub.channel_names, stftdata.channel_names)
+    #     times_arr = np.array(list(stftdata.values())[0].times)
+    #     t_start, t_end = float(times_arr[0]), float(times_arr[-1])
+    #     sub = stftdata.get_subset(
+    #         time_interval=(t_start, t_start + (t_end - t_start) / 2)
+    #     )
+    #     self.assertIsInstance(sub, STFTData)
+    #     self.assertEqual(sub.channel_names, stftdata.channel_names)
 
     def test_wdmdata_get_subset(self):
         wdmdata = build_wdm_pair(jnp)["left"]

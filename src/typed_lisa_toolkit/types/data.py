@@ -252,24 +252,6 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             return TimedFSData(fsrepr, self.channel_names, times=self.times)
         return FSData(fsrepr, self.channel_names)
 
-    def to_stftdata(
-        self,
-        *,
-        win: npt.NDArray[np.floating[Any]],
-        hop: int,
-    ) -> STFTData:
-        """Return the time-frequency data."""
-        tfrepr = self.representation.stfft(win, hop)
-        tf_entries = tfrepr.entries
-        tfdict = {
-            chn: reps.STFT["Linspace", "Linspace"](
-                tfrepr.grid,
-                tf_entries[:, idx : idx + 1, 0:1, ...],
-            )
-            for idx, chn in enumerate(self.channel_names)
-        }
-        return STFTData.from_dict(tfdict).set_name(self.name)
-
     def get_zero_padded(
         self,
         pad_time: tuple[float, float],
@@ -363,62 +345,6 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         from ..viz import plotters
 
         return plotters.FSDataPlotter
-
-    # def to_wdm_data(
-    #     self,
-    #     *args: int | float | None,
-    #     Nf: int | None = None,
-    #     Nt: int | None = None,
-    #     nx: float = 4.0,
-    # ) -> WDMData:
-    #     """Return the WDM data.
-
-    #     See :py:meth:`.representations.FrequencySeries.to_wdm`
-    #     """
-    #     if len(args) > 3:
-    #         raise TypeError(
-    #             "to_wdm_data() accepts at most 3 positional optional arguments: Nf, Nt, nx."
-    #         )
-    #     if len(args) > 0:
-    #         if Nf is not None or Nt is not None or nx != 4.0:
-    #             raise TypeError(
-    #                 "to_wdm_data() received optional arguments as both positional and keyword arguments."
-    #             )
-    #         warnings.warn(
-    #             "Passing `Nf`, `Nt`, or `nx` positionally to `to_wdm_data` is deprecated and "
-    #             + "will be removed in 0.7.0; pass them as keyword arguments instead.",
-    #             DeprecationWarning,
-    #             stacklevel=2,
-    #         )
-    #         if len(args) >= 1:
-    #             Nf = args[0] if args[0] is None else int(args[0])
-    #         if len(args) >= 2:
-    #             Nt = args[1] if args[1] is None else int(args[1])
-    #         if len(args) == 3:
-    #             nx = float(args[2])
-
-    #     wdmdict = {
-    #         chn: self[chn].to_wdm(Nf=Nf, Nt=Nt, nx=nx) for chn in self.channel_names
-    #     }
-    #     return WDMData.from_dict(wdmdict).set_name(self.name)
-
-    # def to_WDMdata(
-    #     self,
-    #     Nf: int | None = None,
-    #     Nt: int | None = None,
-    #     nx: float = 4.0,
-    # ) -> WDMData:
-    #     """Deprecated alias for :meth:`to_wdm_data`.
-
-    #     This alias will be removed in 0.7.0.
-    #     """  # noqa: D401
-    #     warnings.warn(
-    #         "`to_WDMdata` is deprecated and will be removed in 0.7.0; "
-    #         + "use `to_wdm_data` instead.",
-    #         DeprecationWarning,
-    #         stacklevel=2,
-    #     )
-    #     return self.to_wdm_data(Nf=Nf, Nt=Nt, nx=nx)
 
 
 class TimedFSData(FSData):
@@ -539,17 +465,6 @@ class WDMData(Data[reps.WDM]):
             for chnname, chn in self.items()
         }
         return type(self).from_dict(tfdict).set_name(self.name)
-
-    # def to_fsdata(self, *, nx: float = 4.0, mask: Any | None = None):
-    #     """Convert to FSData.
-
-    #     See :py:meth:`.representations.WDM.to_frequency_series`.
-    #     """
-    #     fsdict = {
-    #         chnname: chn.to_frequency_series(nx=nx, mask=mask)
-    #         for chnname, chn in self.items()
-    #     }
-    #     return FSData.from_dict(fsdict)
 
     def draw(
         self,

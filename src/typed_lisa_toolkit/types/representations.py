@@ -26,16 +26,11 @@ from typing import (
 
 import array_api_compat as xpc
 import numpy as np
-import scipy.signal
 from l2d_interface.contract import LinspaceLike
 
 from .misc import Array, Interpolator, Linspace
 
 if TYPE_CHECKING:
-    import numpy.typing as npt
-
-    from ..viz import plotters
-
     Axis = Array | Linspace
     type Grid1D[AxisT: Axis] = tuple[AxisT]
     type Grid2D[Axis0: Axis, Axis1: Axis] = tuple[Axis0, Axis1]
@@ -68,28 +63,10 @@ if TYPE_CHECKING:
             ...
 
 
-# from pywavelet import set_backend as _pyw_set_backend
-# from pywavelet.transforms import from_freq_to_wavelet as _pyw_f2w
-# from pywavelet.transforms import from_wavelet_to_freq as _pyw_w2f
-# from pywavelet.types import FrequencySeries as pywFS
-# from pywavelet.types import Wavelet as pywWDM
-
-# NOTE We could also import the individual transformation routines from
-# pywavelet (written in numpy, cupy, jax) for finer control
-
-# temporary: force backend to be numpy. This should be removed when
-# tlt is updated to use multiple array backends.
-# _pyw_set_backend("numpy", "float64")
-# pyw_set_precision("float64")  # by default pywavelet uses float32.
-
-
 from .. import utils
-from . import _mixins, tapering
+from . import tapering, _mixins
 
 log = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from ..viz import plotters
 
 
 _slice = slice  # Alias for slice
@@ -524,7 +501,7 @@ def wdm(
     entries: "Array",
 ) -> "WDM":
     """Build a :class:`~types.representations.WDM`."""
-    return WDM((frequencies, times), entries)
+    return WDM.make(frequencies=frequencies, times=times, entries=entries)
 
 
 class _1DSeries[AxisT: "Axis"](  # pyright: ignore[reportUnsafeMultipleInheritance]
@@ -641,79 +618,6 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
         _times = Linspace.make(time_grid)
         return conversions.freq2time(self * tapering_window, times=_times)
 
-    # def to_wdm(
-    #     self,
-    #     /,
-    #     *,
-    #     Nf: int | None = None,
-    #     Nt: int | None = None,
-    #     nx: float = 4.0,
-    # ) -> WDM:
-    #     """Transform the frequency series to a WDM representation.
-
-    #     This method performs a forward wavelet transform, converting a
-    #     frequency series into a wavelet representation.
-
-    #     At least one of `Nf` and `Nt` must be provided.
-
-    #     .. warning::
-
-    #         The WDM transform on discrete-time or discrete-frequency data
-    #         is inherently lossy, since WDM is a Wilson basis conceived for
-    #         continuous-time functions. The smaller ``(Nf, Nt)`` are,
-    #         the more lossy the transform is. You must make sure
-    #         they are large enough for your needs. Use the inverse transform
-    #         :meth:`.WDM.to_frequency_series` to quantify the loss.
-    #         Even numbers for ``Nf`` and ``Nt`` are recommended.
-
-    #     .. note::
-
-    #         This method first transforms the frequency series to :class:`pywavelet.types.FrequencySeries` object,
-    #         then leverages the forward wavelet transform implemented in pywavelet to get the WDM representation.
-    #         Note that in pywavelet, the degree of freedom of a frequency series of length ``K`` is ``2 * (K - 1)``,
-    #         even though the length of the original time series could be ``2*K - 1`` as well.
-
-    #     Parameters
-    #     ----------
-    #     Nf : int | None
-    #         The number of frequency bins in the WDM representation. Note that this
-    #         is smaller than the number of frequency bins in the original frequency series.
-
-    #     Nt : int | None
-    #         The number of time bins in the WDM representation.
-
-    #     nx : float
-    #         Shape parameter controling the width of the wavelets.
-    #     """
-    #     ndof = 2 * (len(self.frequencies) - 1)  # pywavelet's convention
-    #     dt = 1 / (ndof * self.df)
-    #     fs = pywFS(
-    #         data=self.entries.squeeze() / dt,
-    #         freq=self.xp.array(self.frequencies),
-    #         t0=0.0,
-    #     )
-    #     return WDM.from_pywWDM(_pyw_f2w(fs, Nf=Nf, Nt=Nt, nx=nx))
-
-    # def to_WDM(
-    #     self,
-    #     /,
-    #     *,
-    #     Nf: int | None = None,
-    #     Nt: int | None = None,
-    #     nx: float = 4.0,
-    # ) -> WDM:
-    #     """Return :meth:`to_wdm` while warning about deprecation.
-
-    #     This alias will be removed in 0.7.0.
-    #     """
-    #     warnings.warn(
-    #         "`to_WDM` is deprecated and will be removed in 0.7.0; "
-    #         + "use `to_wdm` instead.",
-    #         DeprecationWarning,
-    #         stacklevel=2,
-    #     )
-    #     return self.to_wdm(Nf=Nf, Nt=Nt, nx=nx)
-
 
 class TimeSeries[AxisT: "Axis"](_1DSeries[AxisT]):
     """A series of numbers on a time grid."""
@@ -820,64 +724,6 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
             else self.xp.ones_like(self_times)
         )
         return conversions.time2freq(self * tapering_window)
-
-    # NOTE win cannot be a Tapering object. It's probably worth designing this
-    # interface to be consistent with the rest of tlt and close to scipy's stft
-    def stfft(self, win: npt.NDArray[np.floating], hop: int):
-        """Short-time Fourier transform of the series."""
-        SFT = scipy.signal.ShortTimeFFT(win=win, hop=hop, fs=1 / self.dt)
-        times = SFT.t(len(self.times)) + np.asarray(self.times)[0]
-        freqs = SFT.f
-        Sx = SFT.stft(np.asarray(self.entries) * self.dt)
-        return stft(freqs, times, Sx)
-
-    # def to_WDM(
-    #     self,
-    #     /,
-    #     *,
-    #     Nf: int | None = None,
-    #     Nt: int | None = None,
-    #     nx: float = 4.0,
-    #     mult: int = 32,
-    # ):
-    #     """Transform the time series to a WDM representation.
-
-    #     This method performs a forward wavelet transform, converting a
-    #     time series into a wavelet representation.
-
-    #     At least one of `Nf` and `Nt` must be provided.
-
-    #     .. warning::
-
-    #         The WDM transform on discrete-time or discrete-frequency data
-    #         is inherently lossy, since WDM is a Wilson basis conceived for
-    #         continuous-time functions. The smaller ``(Nf, Nt)`` are,
-    #         the more lossy the transform is. You must make sure
-    #         they are large enough for your needs. Use the inverse transform
-    #         :meth:`.WDM.to_time_series` to quantify the loss.
-    #         Even numbers for ``Nf`` and ``Nt`` are recommended.
-
-    #     .. note::
-
-    #         This method first transforms the time series to :class:`pywavelet.types.TimeSeries` object,
-    #         then leverages the forward wavelet transform implemented in pywavelet to get the WDM representation.
-
-    #     Parameters
-    #     ----------
-    #     Nf : int | None
-    #         The number of frequency points in the WDM representation.
-    #     Nt : int | None
-    #         The number of time points in the WDM representation.
-    #     nx : float
-    #         Shape parameter controling the width of the wavelets.
-    #     mult : int
-    #         Number of time points to use for the wavelet transform.
-    #         Ensure `mult` is not larger than half of the number of time points `Nt`.
-    #     """
-    #     # pywavelet's time series' last point is not the end of the time grid,
-    #     # but the start of the last time bin.
-    #     fs = pywTS(data=self.entries, t=np.array(self.times))
-    #     return WDM.from_pywWDM(_pyw_t2w(fs, Nf=Nf, Nt=Nt, nx=nx, mult=mult))
 
 
 class Phasor[AxisT: "Axis"](
@@ -1191,22 +1037,17 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
     """
     Wilson-Daubechies-Meyer (WDM) time-frequency representation.
 
-    This represents data using an evenly-spaced 2D grid in the
-    time-frequency plane with shape (Nf, Nt). Each "pixel" has size
-    ΔF ΔT = 1/2. The times range approximately from 0 to the final
-    observation time, while the frequencies range from 0 to the
+    This represents data using an evenly-spaced 2D grid in the time-frequency plane with
+    shape (Nf+1, Nt). Each "pixel" has size ΔT ΔF = 1/2. The times range approximately
+    from 0 to the final observation time, while the frequencies range from 0 to the
     Nyquist limit (half the sampling rate).
 
-    Currently, transformations to/from FrequencySeries are allowed,
-    but only for full series --- all frequencies and all times.
+    .. attention:: the frequency grid has size Nf+1, not Nf. This is because correctly
+        inverting WDM transforms requires some information from the Nyquist band m=Nf.
+        This data layout contains redundant information but is simpler to interpret and
+        to work with. It follows the convention of `wdm-transform`_.
 
-    .. warning::
-        Elsewhere in this codebase, a grid of N points is considered to have N-1 bins,
-        since the first point is the start of the first bin and the last point is
-        the end of the last bin. However, in the WDM representation, due to the
-        convention of `pywavelet` which is the working horse for the WDM transform,
-        a grid of N points is considered to have N bins. This needs reviewing
-        and fixing in the future, but for now users should be aware of this inconsistency.
+    .. _wdm-transform: https://github.com/pywavelet/wdm_transform
 
     Parameters
     ----------
@@ -1214,10 +1055,10 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
         "Array" of evenly-spaced times with separation ΔT and size `Nt`.
 
     frequencies: real 1D array
-        "Array" of evenly-spaced frequencies with separation ΔF and size `Nf`.
+        Array of evenly-spaced frequencies with separation ΔF and size `Nf+1`.
 
     entries: real 2D array
-        "Array" of data entries, with shape `(Nf, Nt)`.
+        Array of data entries, with shape `(Nf+1, Nt)`.
     """
 
     @property
@@ -1275,7 +1116,7 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
 
     @property
     def Nt(self) -> int:
-        """Number of time points.
+        """Number of time bins.
 
         .. note::
             Throughout this codebase, a grid of N points is considered to have N-1 bins,
@@ -1286,27 +1127,13 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
 
     @property
     def Nf(self) -> int:
-        """Number of frequency points.
-
-        .. note::
-            Throughout this codebase, a grid of N points is considered to have N-1 bins,
-            since the first point is the start of the first bin and the last point is
-            the end of the last bin.
-        """
-        return self.frequencies.num
+        """Number of frequency points."""
+        return self.frequencies.num - 1
 
     @property
     def ND(self) -> int:
         """Total number of data points in the time-frequency plane."""
-        return self.times.num * self.frequencies.num
-
-    @property
-    def duration(self) -> float:
-        """Total signal duration."""
-        # return self.times.stop - self.times.start
-        # Given that a grid of N points has N bins in this class
-        times = self.times
-        return len(times) * times.step
+        return self.Nt * self.Nf
 
     @property
     def sample_interval(self) -> float:
@@ -1315,7 +1142,7 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
 
         Smaller than the wavelet time bin :attr:`.dT`.
         """
-        return self.duration / self.ND
+        return self.dT / self.Nf
 
     dt: property = sample_interval
     """Alias for :attr:`.sample_interval`."""
@@ -1327,7 +1154,7 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
 
         Smaller than the wavelet frequency bin :attr:`.dF`.
         """
-        return 1 / self.duration
+        return 1 / (self.ND * self.dt)
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -1335,109 +1162,20 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
         return self.Nf, self.Nt
 
     @property
-    def sample_rate(self) -> float:
-        """Sampling rate."""
-        # We can verify that this is twice (self.frequencies.stop + self.frequencies.step)
-        # which is the true maximum frequency in the WDM representation, again due to
-        # the special convention in this class that a grid of N points has N bins.
-        return 1 / self.sample_interval
-
-    fs: property = sample_rate
-    """Alias for :attr:`.sample_rate`."""
-
-    # def to_frequency_series(
-    #     self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
-    # ) -> UniformFrequencySeries:
-    #     """Perform an inverse wavelet transform to the frequency domain.
-
-    #     Parameters
-    #     ----------
-    #     nx : float
-    #         Shape parameter controling the width of the wavelets, defaults to 4.0.
-    #     mask : npt.NDArray[np.bool] | None
-    #         Mask to apply on the frequencies and entries of the result, useful
-    #         to avoid singularities. Defaults to None.
-    #     """
-    #     pywwv = self._to_pywWDM()
-    #     # Is there a reason why pywavelet accepts the time step
-    #     # instead of computing it from the WDM representation itself?
-    #     pywfs = cast(Any, _pyw_w2f(pywwv, self.dt, nx))
-    #     freqs = pywfs.freq
-    #     entries = pywfs.data * pywfs.dt
-    #     # To see if we keep or not
-    #     # https://gitlab.in2p3.fr/lisa-apc/typed-lisa-toolkit/-/merge_requests/4#note_576666
-    #     if mask is not None:
-    #         freqs = np.ma.masked_where(mask, freqs)
-    #         entries = np.ma.masked_where(mask, entries)
-    #     return UniformFrequencySeries((freqs,), entries[None, None, None, None, ...])
-
-    # def to_freqseries(
-    #     self, *, nx: float = 4.0, mask: npt.NDArray[np.bool_] | None = None
-    # ) -> UniformFrequencySeries:
-    #     """Return :meth:`to_frequency_series` while warning about deprecation.
-
-    #     This alias will be removed in 0.7.0.
-    #     """
-    #     warnings.warn(
-    #         "`to_freqseries` is deprecated and will be removed in 0.7.0; "
-    #         + "use `to_frequency_series` instead.",
-    #         DeprecationWarning,
-    #         stacklevel=2,
-    #     )
-    #     return self.to_frequency_series(nx=nx, mask=mask)
+    def fs(self) -> float:
+        """Sampling rate 1/Δt for the time series equivalent to this WDM."""
+        return 1 / self.dt
 
     @property
     def nyquist(self) -> float:
         """Nyquist frequency (half the sampling rate)."""
-        # I don't like this property name
-        return self.sample_rate / 2
+        return self.fs / 2
 
-    # @classmethod
-    # def from_pywWDM(cls, pywwv: pywWDM, /) -> Self:
-    #     """Convert a pywWDM object to a WDM."""
-    #     pywwv_any = cast(Any, pywwv)
-    #     entries = pywwv_any.data[None, None, None, None, ...]
-    #     times = Linspace(
-    #         pywwv_any.time[0],
-    #         pywwv_any.time[1] - pywwv_any.time[0],
-    #         len(pywwv_any.time),
-    #     )
-    #     frequencies = Linspace(
-    #         pywwv_any.freq[0],
-    #         pywwv_any.freq[1] - pywwv_any.freq[0],
-    #         len(pywwv_any.freq),
-    #     )
-    #     return cls.make(times=times, frequencies=frequencies, entries=entries)
-
-    # def _to_pywWDM(self) -> pywWDM:
-    #     """Convert self to a pywWDM object."""
-    #     xp = xpc.get_namespace(self.entries)
-    #     return pywWDM(
-    #         data=self.entries.squeeze(),
-    #         time=xp.array(self.times),
-    #         freq=xp.array(self.frequencies),
-    #     )
-
-    def get_plotter(self) -> plotters.WDMPlotter:
-        """Return the plotter for the WDM representation."""
+    def get_plotter(self):
+        """Return the plotter for the representation."""
         from ..viz import plotters
 
         return plotters.WDMPlotter(self)
-
-    def get_embedded[AT0: "Axis", AT1: "Axis"](
-        self,
-        embedding_grid: "Grid2D[AT0, AT1]",
-        *,
-        known_slices: tuple[slice, ...] | None = None,
-    ):
-        """Return the representation embedded in a new 2D grid."""
-        grid, entries = _embed_entries_to_grid(
-            self.grid,
-            self.entries,
-            embedding_grid,
-            known_slices=known_slices,
-        )
-        return wdm(grid[0], grid[1], entries)
 
     # TODO for consistency: receive slices, receive copy bool arg
     def get_subset(
@@ -1462,10 +1200,10 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
         else:
             freq_slice = _slice(None)
         time_grid_sliced = Linspace.from_array(
-            cast(Any, to_array(self.times, xp=self.xp)[time_slice])
+            to_array(self.times, xp=self.xp)[time_slice]
         )
         freq_grid_sliced = Linspace.from_array(
-            cast(Any, to_array(self.frequencies, xp=self.xp)[freq_slice])
+            to_array(self.frequencies, xp=self.xp)[freq_slice]
         )
         return type(self)(
             grid=(freq_grid_sliced, time_grid_sliced),

@@ -12,8 +12,15 @@ import numpy as np
 import numpy.testing as npt
 
 from typed_lisa_toolkit import shop, time_series
-from typed_lisa_toolkit.types import FSData, TSData
+from typed_lisa_toolkit.types import FSData, TSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
+
+
+def _require_wdm_transform():
+    try:
+        import wdm_transform  # noqa: F401
+    except ImportError as exc:
+        raise unittest.SkipTest("wdm_transform is required for WDM conversion tests") from exc
 
 
 def _build_timeseries_jax(n: int = 8):
@@ -99,6 +106,64 @@ class TestConversionsJax(unittest.TestCase):
         self.assertTrue(
             any("denser than the Nyquist limit" in str(item.message) for item in caught)
         )
+
+    def test_time2wdm_roundtrip_timeseries(self):
+        _require_wdm_transform()
+        _, entries, ts = _build_timeseries_jax()
+
+        wdm = shop.time2wdm(ts, Nt=2, Nf=4)
+        recovered = shop.wdm2time(wdm)
+
+        self.assertIsInstance(wdm, reps.WDM)
+        self.assertIsInstance(recovered, reps.UniformTimeSeries)
+        npt.assert_allclose(np.asarray(recovered.times), np.asarray(ts.times))
+        npt.assert_allclose(
+            np.asarray(recovered.entries).squeeze(), np.asarray(entries), atol=1e-12
+        )
+
+    def test_time2wdm_roundtrip_tsdata(self):
+        _require_wdm_transform()
+        times, tsd = _build_tsdata_jax()
+
+        wdmdata = shop.time2wdm(tsd, Nt=2, Nf=4)
+        recovered = shop.wdm2time(wdmdata)
+
+        self.assertIsInstance(wdmdata, WDMData)
+        self.assertIsInstance(recovered, TSData)
+        self.assertEqual(recovered.channel_names, tsd.channel_names)
+        npt.assert_allclose(np.asarray(recovered.times), np.asarray(times))
+        npt.assert_allclose(
+            np.asarray(recovered.get_kernel()), np.asarray(tsd.get_kernel()), atol=1e-12
+        )
+
+    def test_freq2wdm_roundtrip_timeseries(self):
+        _require_wdm_transform()
+        _, _, ts = _build_timeseries_jax()
+
+        fs = shop.time2freq(ts)
+        wdm = shop.freq2wdm(fs, Nt=2, Nf=4)
+        recovered = shop.wdm2freq(wdm)
+
+        self.assertIsInstance(wdm, reps.WDM)
+        self.assertIsInstance(recovered, reps.UniformFrequencySeries)
+        npt.assert_allclose(
+            np.asarray(recovered.entries).squeeze(), np.asarray(fs.entries)
+        )
+        npt.assert_allclose(np.asarray(recovered.frequencies), np.asarray(fs.frequencies))
+
+    def test_freq2wdm_roundtrip_fsdata(self):
+        _require_wdm_transform()
+        _, tsd = _build_tsdata_jax()
+
+        fsd = shop.time2freq(tsd, keep_time=False)
+        wdmdata = shop.freq2wdm(fsd, Nt=2, Nf=4)
+        recovered = shop.wdm2freq(wdmdata)
+
+        self.assertIsInstance(wdmdata, WDMData)
+        self.assertIsInstance(recovered, FSData)
+        self.assertEqual(recovered.channel_names, fsd.channel_names)
+        npt.assert_allclose(np.asarray(recovered.get_kernel()), np.asarray(fsd.get_kernel()))
+        npt.assert_allclose(np.asarray(recovered.frequencies), np.asarray(fsd.frequencies))
 
 
 if __name__ == "__main__":
