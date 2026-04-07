@@ -15,7 +15,7 @@ import warnings
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit import shop, time_series
+from typed_lisa_toolkit import shop, time_series, linspace
 from typed_lisa_toolkit.types import FSData, TSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
 
@@ -30,7 +30,7 @@ def _require_wdm_transform():
 
 
 def _build_timeseries_numpy(n: int = 8):
-    times = np.linspace(0.0, 3.5, n)
+    times = linspace(0.0, 3.5, n)
     entries = np.asarray(
         [0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=np.float64
     )
@@ -141,7 +141,7 @@ class TestConversionsNumpy(unittest.TestCase):
             np.asarray(recovered.get_kernel()), np.asarray(tsd.get_kernel()), atol=1e-12
         )
 
-    def test_freq2wdm_roundtrip_timeseries(self):
+    def test_freq2wdm_roundtrip_frequencyseries(self):
         _require_wdm_transform()
         _, _, ts = _build_timeseries_numpy()
 
@@ -152,10 +152,14 @@ class TestConversionsNumpy(unittest.TestCase):
         self.assertIsInstance(wdm, reps.WDM)
         self.assertIsInstance(recovered, reps.UniformFrequencySeries)
         npt.assert_allclose(
-            np.asarray(recovered.entries).squeeze(), np.asarray(fs.entries)
+            np.asarray(recovered.frequencies),
+            np.asarray(fs.frequencies),
+            err_msg="Frequencies do not match after round-trip conversion.",
         )
         npt.assert_allclose(
-            np.asarray(recovered.frequencies), np.asarray(fs.frequencies)
+            np.asarray(recovered.entries),
+            np.asarray(fs.entries),
+            err_msg="Kernel entries do not match after round-trip conversion.",
         )
 
     def test_freq2wdm_roundtrip_fsdata(self):

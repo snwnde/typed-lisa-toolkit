@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit import shop, time_series
+from typed_lisa_toolkit import shop, time_series, linspace
 from typed_lisa_toolkit.types import FSData, TSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
 
@@ -20,11 +20,13 @@ def _require_wdm_transform():
     try:
         import wdm_transform  # noqa: F401
     except ImportError as exc:
-        raise unittest.SkipTest("wdm_transform is required for WDM conversion tests") from exc
+        raise unittest.SkipTest(
+            "wdm_transform is required for WDM conversion tests"
+        ) from exc
 
 
 def _build_timeseries_jax(n: int = 8):
-    times = jnp.linspace(0.0, 3.5, n, dtype=jnp.float64)
+    times = linspace(0.0, 3.5, n)
     entries = jnp.asarray(
         [0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1],
         dtype=jnp.float64,
@@ -34,7 +36,7 @@ def _build_timeseries_jax(n: int = 8):
 
 
 def _build_tsdata_jax(n: int = 8):
-    times = jnp.linspace(0.0, 3.5, n, dtype=jnp.float64)
+    times = linspace(0.0, 3.5, n)
     x = jnp.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=jnp.float64)
     y = jnp.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=jnp.float64)
     tsd = TSData.from_dict(
@@ -136,7 +138,7 @@ class TestConversionsJax(unittest.TestCase):
             np.asarray(recovered.get_kernel()), np.asarray(tsd.get_kernel()), atol=1e-12
         )
 
-    def test_freq2wdm_roundtrip_timeseries(self):
+    def test_freq2wdm_roundtrip_frequencyseries(self):
         _require_wdm_transform()
         _, _, ts = _build_timeseries_jax()
 
@@ -147,9 +149,11 @@ class TestConversionsJax(unittest.TestCase):
         self.assertIsInstance(wdm, reps.WDM)
         self.assertIsInstance(recovered, reps.UniformFrequencySeries)
         npt.assert_allclose(
-            np.asarray(recovered.entries).squeeze(), np.asarray(fs.entries)
+            np.asarray(recovered.entries), np.asarray(fs.entries)
         )
-        npt.assert_allclose(np.asarray(recovered.frequencies), np.asarray(fs.frequencies))
+        npt.assert_allclose(
+            np.asarray(recovered.frequencies), np.asarray(fs.frequencies)
+        )
 
     def test_freq2wdm_roundtrip_fsdata(self):
         _require_wdm_transform()
@@ -162,8 +166,12 @@ class TestConversionsJax(unittest.TestCase):
         self.assertIsInstance(wdmdata, WDMData)
         self.assertIsInstance(recovered, FSData)
         self.assertEqual(recovered.channel_names, fsd.channel_names)
-        npt.assert_allclose(np.asarray(recovered.get_kernel()), np.asarray(fsd.get_kernel()))
-        npt.assert_allclose(np.asarray(recovered.frequencies), np.asarray(fsd.frequencies))
+        npt.assert_allclose(
+            np.asarray(recovered.get_kernel()), np.asarray(fsd.get_kernel())
+        )
+        npt.assert_allclose(
+            np.asarray(recovered.frequencies), np.asarray(fsd.frequencies)
+        )
 
 
 if __name__ == "__main__":

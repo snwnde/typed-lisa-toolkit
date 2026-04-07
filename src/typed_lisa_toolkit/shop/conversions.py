@@ -64,7 +64,7 @@ def time2freq(
     """Convert time-domain representation or data to frequency-domain representation or data using the real FFT.
 
     .. note::
-        When the input is a :class:`~types.representations.TimeSeries` instance,
+        When the input is a :class:`~types.TimeSeries` instance,
         the ``keep_time`` argument is ignored.
     """
     xp = td.xp
@@ -177,7 +177,7 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
     )
 
     if isinstance(tthing, data.TSData):
-        return data.WDMData.from_dict(
+        return _constructors.wdmdata(
             {key: time2wdm(val, Nt=Nt, Nf=Nf) for (key, val) in tthing.items()},
             name=tthing.name,
         )
@@ -239,7 +239,7 @@ def wdm2time(wdmthing: reps.WDM | data.WDMData, /):
     )
 
     if isinstance(wdmthing, data.WDMData):
-        return data.TSData.from_dict(
+        return _constructors.tsdata(
             {key: wdm2time(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
         )
     assert isinstance(wdmthing, reps.WDM)
@@ -280,7 +280,7 @@ def freq2wdm(
 
     Parameters
     ----------
-    fseries : FrequencySeries or FSdata
+    fseries : :class:`~types.FrequencySeries` or :class:`~types.FSData`
         frequency series, assumed to be full-grid (from DC to Nyquist).
     Nt : int
         Number of WDM time bins.
@@ -288,11 +288,6 @@ def freq2wdm(
         WDM frequency grid has length Nf+1.
     t0 : float, optional
         Initial time of WDM time grid, by default 0.0
-
-    Returns
-    -------
-    WDM or WDMData
-        The transformed series.
     """
     _import_wdm_transform()
     from wdm_transform.transforms import (
@@ -300,7 +295,7 @@ def freq2wdm(
     )
 
     if isinstance(fthing, data.FSData):
-        return data.WDMData.from_dict(
+        return _constructors.wdmdata(
             {key: freq2wdm(val, Nt=Nt, Nf=Nf, t0=t0) for (key, val) in fthing.items()},
             name=fthing.name,
         )
@@ -328,15 +323,8 @@ def wdm2freq(wdm: reps.WDM, /) -> reps.UniformFrequencySeries: ...
 def wdm2freq(wdmthing: reps.WDM | data.WDMData, /):
     """Transform WDM expansion to a frequency series.
 
-    Parameters
-    ----------
-    wdm : WDM or WDMData
-        WDM expansion, assumed to contain all frequencies from DC to Nyquist.
-
-    Returns
-    -------
-    FrequencySeries or FSData
-        Fourier-domain equivalent of the WDM input.
+    .. note::
+        The input WDM representation is assumed to contain all frequencies from DC to Nyquist.
     """
     _import_wdm_transform()
     from wdm_transform.transforms import (
@@ -344,7 +332,7 @@ def wdm2freq(wdmthing: reps.WDM | data.WDMData, /):
     )
 
     if isinstance(wdmthing, data.WDMData):
-        return data.FSData.from_dict(
+        return _constructors.fsdata(
             {key: wdm2freq(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
         )
     assert isinstance(wdmthing, reps.WDM)
@@ -355,5 +343,8 @@ def wdm2freq(wdmthing: reps.WDM | data.WDMData, /):
     )
 
     wtfs = _frequency_wdm(_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
-    freqs = Linspace(start=0.0, step=wdm.df, num=wtfs.n)
-    return _constructors.frequency_series(freqs, entries=_conventionaize(wtfs.data))
+    # wtfs is on a grid from fftfreq but we want rfftfreq
+    _num = wtfs.n // 2 + 1 if wtfs.n % 2 == 0 else (wtfs.n + 1) // 2
+    freqs = _constructors.linspace(start=0.0, step=wdm.df, num=_num)
+    _entries = _conventionaize(wtfs.data[:_num])
+    return _constructors.frequency_series(freqs, entries=_entries)
