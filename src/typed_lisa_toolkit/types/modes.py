@@ -67,7 +67,6 @@ class QuasiNormalMode(NamedTuple):
 
 
 QNM = QuasiNormalMode
-"""Alias for :class:`.QuasiNormalMode`."""
 
 
 @overload

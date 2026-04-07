@@ -25,7 +25,6 @@ from typing import (
 )
 
 import array_api_compat as xpc
-from jax import P
 import numpy as np
 import scipy.signal
 from l2d_interface.contract import LinspaceLike
