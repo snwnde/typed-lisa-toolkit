@@ -47,7 +47,9 @@ pages:
     - source .venv/bin/activate
     - make -C docs clean html
     - mv docs/_build/html public
+    - anybadge -l documentation -v latest -f documentation.svg -c green
   artifacts:
     paths:
       - public
+      - documentation.svg
     expire_in: 1 week

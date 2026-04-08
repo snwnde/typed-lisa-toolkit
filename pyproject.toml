@@ -12,13 +12,15 @@ classifiers = [
 dependencies = [
     "numpy >= 1.26.0",
     "scipy >= 1.12.0",
-    "pywavelet == 0.2.8",
     "h5py",
     "array-api-compat >= 1.13.0",
     "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@a5e33e1477374f946ed3295c77fbac3abae0a6e5",
 ]
 
 [project.optional-dependencies]
+wdm = [
+    "wdm-transform>=0.1.1",
+]
 jax = ["jax"]
 quadax = ["quadax"]
 
@@ -26,13 +28,14 @@ quadax = ["quadax"]
 jax = ["jax"]
 quadax = [{ include-group = "jax" }, "quadax"]
 doc = [
-    "sphinx>=8.2.3",
-    "sphinx-autodoc-typehints>=3.5.2",
-    "sphinx-copybutton>=0.5.2",
-    "sphinxcontrib-bibtex>=2.6.5",
-    "sphinxcontrib-mermaid>=1.2.3",
+    "sphinx",
+    "sphinx-autodoc-typehints",
+    "sphinx-copybutton",
+    "sphinxcontrib-bibtex",
+    "sphinxcontrib-mermaid",
     "furo",
     "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git",
+    "anybadge",
 ]
 dev = [
     { include-group = "doc" },
@@ -67,6 +70,14 @@ style = "semver"
 vcs = "git"
 pattern = "default-unprefixed"
 
+[tool.uv]
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
@@ -97,7 +108,7 @@ addopts = "--import-mode=importlib"
 [tool.basedpyright]
 include = ["src"]
 exclude = ["**/__pycache__"]
-ignore = ["tests"]
+ignore = ["tests", "docs"]
 defineConstant = { DEBUG = true }
 enableTypeIgnoreComments = true
 reportIgnoreCommentWithoutRule = "none"

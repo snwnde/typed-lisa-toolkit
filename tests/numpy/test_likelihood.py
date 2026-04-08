@@ -6,13 +6,19 @@ import unittest
 import numpy as np
 import numpy.testing as npt
 
-from tests._shared.noisemodel_helpers import build_fd_pair, dense_kernel_2ch
-from tests._shared.waveforms_helpers import build_harmonic_projected_frequency_waveform
-from typed_lisa_toolkit.consumers.likelihood import FDWhittleLikelihood
-from typed_lisa_toolkit.consumers.noisemodel import FDNoiseModel, SpectralDensity
-from typed_lisa_toolkit.containers.data import FSData
-from typed_lisa_toolkit.containers.representations import FrequencySeries
-from typed_lisa_toolkit.containers.waveforms import sum_harmonics
+from tests._helpers import (
+    build_fd_pair,
+    build_harmonic_projected_frequency_waveform,
+    dense_kernel_2ch,
+)
+from typed_lisa_toolkit import sum_harmonics
+from typed_lisa_toolkit.types import (
+    FDNoiseModel,
+    FDWhittleLikelihood,
+    FrequencySeries,
+    FSData,
+    SpectralDensity,
+)
 
 
 def _build_fsdata(freqs, x_values, y_values):

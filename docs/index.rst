@@ -14,10 +14,18 @@ contracts defined in `l2d-interface`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Documentation:
+   :caption: Public API:
    :titlesonly:
+   :hidden:
 
-   api/containers/index
-   api/consumers/index
-   api/viz/index
-   api/utils
+   api/toplevel
+   api/types
+   api/shop
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Internal API:
+   :titlesonly:
+   :hidden:
+
+   api/internal/index

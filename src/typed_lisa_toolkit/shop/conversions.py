@@ -1,0 +1,350 @@
+import warnings
+from types import ModuleType
+from typing import Literal, overload
+
+from .. import _constructors  # pyright: ignore[reportPrivateUsage]
+from ..types import Array, data
+from ..types import representations as reps
+from ..types.misc import Axis, Linspace
+
+
+def _import_wdm_transform() -> ModuleType:
+    try:
+        import wdm_transform
+
+        return wdm_transform
+    except ImportError:
+        raise ImportError(
+            "The `wdm_transform` package is required for WDM transformations. Install it with: pip install wdm-transform"
+        ) from None
+
+
+def _conventionaize(ary: "Array") -> "Array":
+    return ary[None, None, None, None, ...]
+
+
+# Meyer window default parameters
+DEFAULT_WINDOW_A = 1 / 3
+DEFAULT_WINDOW_D = 1.0
+
+
+@overload
+def time2freq(
+    tsd: data.TSData,
+    /,
+    *,
+    keep_time: Literal[True] = True,
+) -> data.TimedFSData: ...
+
+
+@overload
+def time2freq(
+    tsd: data.TSData,
+    /,
+    *,
+    keep_time: Literal[False],
+) -> data.FSData: ...
+
+
+@overload
+def time2freq(
+    ts: reps.TimeSeries[Linspace],
+    /,
+    *,
+    keep_time: bool = True,
+) -> reps.UniformFrequencySeries: ...
+
+
+def time2freq(
+    td: reps.TimeSeries[Linspace] | data.TSData,
+    /,
+    *,
+    keep_time: bool = True,
+):
+    """Convert time-domain representation or data to frequency-domain representation or data using the real FFT.
+
+    .. note::
+        When the input is a :class:`~types.TimeSeries` instance,
+        the ``keep_time`` argument is ignored.
+    """
+    xp = td.xp
+    try:
+        fft = xp.fft
+    except AttributeError:
+        raise NotImplementedError(
+            f"{xp.__name__} does not support FFT operations, which are required for `time2freq`."
+        )
+    _freqs = fft.rfftfreq(len(td.times), d=td.times.step)
+    freqs = _constructors.linspace(_freqs[0], _freqs[1] - _freqs[0], len(_freqs))
+    signal = fft.rfft(td.entries * td.times.step, axis=-1)
+    fs = _constructors.frequency_series(
+        frequencies=freqs,
+        entries=signal,
+    )
+    if isinstance(td, reps.TimeSeries):
+        return fs
+    else:
+        fsd = data.FSData(fs, td.channel_names, td.name)
+        if keep_time:
+            fsd = fsd.set_times(td.times)
+        return fsd
+
+
+@overload
+def freq2time(fsd: data.FSData, /, *, times: Axis) -> data.TSData: ...
+
+
+@overload
+def freq2time(
+    fsd: reps.FrequencySeries[Linspace], /, *, times: Axis
+) -> reps.UniformTimeSeries: ...
+
+
+def freq2time(
+    fd: reps.FrequencySeries[Linspace] | data.FSData,
+    /,
+    *,
+    times: Axis,
+):
+    """Convert frequency-domain representation or data to time-domain representation or data using the inverse real FFT."""
+    xp = fd.xp
+    try:
+        fft = xp.fft
+    except AttributeError:
+        raise NotImplementedError(
+            f"{xp.__name__} does not support FFT operations, which are required for `freq2time`."
+        )
+    _times = Linspace.make(times)
+    is_even = len(fd.frequencies) % 2 == 0
+    nyquist_freq = (
+        fd.frequencies.stop
+        if is_even
+        else fd.frequencies.stop + fd.frequencies.step / 2
+    )
+    nyquist_dt = 1.0 / (2 * nyquist_freq)
+    if _times.step < nyquist_dt and not xp.isclose(_times.step, nyquist_dt):
+        warnings.warn("The time grid is denser than the Nyquist limit.")
+
+    signal = fft.irfft(fd.entries / _times.step, n=len(_times), axis=-1)
+    ts = _constructors.time_series(times=_times, entries=signal)
+    if isinstance(fd, reps.FrequencySeries):
+        return ts
+    else:
+        tsd = data.TSData(ts, fd.channel_names, fd.name)
+        return tsd
+
+
+@overload
+def time2wdm(tdata: data.TSData, /, *, Nt: int, Nf: int) -> data.WDMData: ...
+
+
+@overload
+def time2wdm(
+    tseries: reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int
+) -> reps.WDM: ...
+
+
+def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int):
+    """Transform a time series to WDM.
+
+    .. note::
+        The convention for signal duration in :class:`WDM` is Nt*ΔT = N*Δt. This is not
+        equivalent to the convention ``grid[-1] - grid[0]``, more useful for nonuniform
+        grids, that you may be assuming elsewhere.
+
+    Parameters
+    ----------
+    tseries : TimeSeries
+        Regularly-sampled time series of length at least Nf*Nt.
+    Nt : int
+        Length of WDM time grid.
+    Nf : int
+        Nf+1 is the length of the WDM frequency grid.
+
+    Returns
+    -------
+    WDM
+        Transform of the first Nf*Nt points of the time series.
+
+    Raises
+    ------
+    ValueError
+        If the time series is too small for the chosen values of Nf and Nt.
+    """
+    _import_wdm_transform()
+    from wdm_transform.transforms import (
+        forward_wdm as _forward_wdm,
+    )
+
+    if isinstance(tthing, data.TSData):
+        return _constructors.wdmdata(
+            {key: time2wdm(val, Nt=Nt, Nf=Nf) for (key, val) in tthing.items()},
+            name=tthing.name,
+        )
+    assert isinstance(tthing, reps.TimeSeries)
+    tseries = tthing
+
+    if Nt * Nf > tseries.times.num:
+        raise ValueError(f"Time series too small for given Nf and Nt")
+
+    tseries = tseries[: Nt * Nf]
+    _entries = tseries.entries.squeeze()
+    assert _entries.ndim == 1, (
+        "Currently only single-batch time series are supported by time2wdm."
+    )
+    coeffs = _forward_wdm(
+        _entries,
+        nt=Nt,
+        nf=Nf,
+        a=DEFAULT_WINDOW_A,
+        d=DEFAULT_WINDOW_D,
+        dt=tseries.times.step,
+    ).T
+    assert coeffs.shape == (Nf + 1, Nt), "Unexpected shape of WDM coefficients."
+
+    dT = Nf * tseries.times.step
+    dF = 0.5 / dT
+    tgrid = Linspace(start=tseries.times.start, step=dT, num=Nt)
+    fgrid = Linspace(start=0, step=dF, num=Nf + 1)
+
+    return _constructors.wdm(
+        times=tgrid, frequencies=fgrid, entries=_conventionaize(coeffs)
+    )
+
+
+@overload
+def wdm2time(wdmdata: data.WDMData, /) -> data.TSData: ...
+
+
+@overload
+def wdm2time(wdm: reps.WDM, /) -> reps.UniformTimeSeries: ...
+
+
+def wdm2time(wdmthing: reps.WDM | data.WDMData, /):
+    """Transform WDM expansion to equivalent time series.
+
+    Parameters
+    ----------
+    wdm : WDM or WDMData
+        WDM expansion with grid parameters Nf and Nt.
+
+    Returns
+    -------
+    TimeSeries or TSData
+        Time series of size Nt*Nf.
+    """
+    _import_wdm_transform()
+    from wdm_transform.transforms import (
+        inverse_wdm as _inverse_wdm,
+    )
+
+    if isinstance(wdmthing, data.WDMData):
+        return _constructors.tsdata(
+            {key: wdm2time(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
+        )
+    assert isinstance(wdmthing, reps.WDM)
+    wdm = wdmthing
+    _coeffs = wdm.entries.squeeze()
+    assert _coeffs.ndim == 2, (
+        "Currently only single-batch WDMs are supported by wdm2time."
+    )
+
+    entries = _inverse_wdm(
+        coeffs=_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D
+    )
+    tgrid = Linspace(wdm.times.start, wdm.dt, wdm.ND)
+    return _constructors.time_series(tgrid, _conventionaize(entries))
+
+
+@overload
+def freq2wdm(
+    fseries: reps.FrequencySeries[Linspace], /, *, Nt: int, Nf: int, t0: float = 0.0
+) -> reps.WDM: ...
+
+
+@overload
+def freq2wdm(
+    fdata: data.FSData, /, *, Nt: int, Nf: int, t0: float = 0.0
+) -> data.WDMData: ...
+
+
+def freq2wdm(
+    fthing: reps.FrequencySeries[Linspace] | data.FSData,
+    /,
+    *,
+    Nt: int,
+    Nf: int,
+    t0: float = 0.0,
+):
+    """Transform frequency series to WDM.
+
+    Parameters
+    ----------
+    fseries : :class:`~types.FrequencySeries` or :class:`~types.FSData`
+        frequency series, assumed to be full-grid (from DC to Nyquist).
+    Nt : int
+        Number of WDM time bins.
+    Nf : int
+        WDM frequency grid has length Nf+1.
+    t0 : float, optional
+        Initial time of WDM time grid, by default 0.0
+    """
+    _import_wdm_transform()
+    from wdm_transform.transforms import (
+        get_backend as _get_backend,
+    )
+
+    if isinstance(fthing, data.FSData):
+        return _constructors.wdmdata(
+            {key: freq2wdm(val, Nt=Nt, Nf=Nf, t0=t0) for (key, val) in fthing.items()},
+            name=fthing.name,
+        )
+    assert isinstance(fthing, reps.FrequencySeries), (
+        f"Expected a FrequencySeries input, got {type(fthing)}"
+    )
+    fseries = fthing
+    backend = _get_backend()
+    tseries_entries = backend.fft.irfft(fseries.entries, n=Nf * Nt)
+    duration = 1 / fseries.frequencies.step
+    dt = duration / (Nf * Nt)
+    tseries_grid = Linspace(start=t0, step=dt, num=Nf * Nt)
+    tseries = _constructors.time_series(tseries_grid, tseries_entries)
+    return time2wdm(tseries, Nt=Nt, Nf=Nf)
+
+
+@overload
+def wdm2freq(wdmdata: data.WDMData, /) -> data.FSData: ...
+
+
+@overload
+def wdm2freq(wdm: reps.WDM, /) -> reps.UniformFrequencySeries: ...
+
+
+def wdm2freq(wdmthing: reps.WDM | data.WDMData, /):
+    """Transform WDM expansion to a frequency series.
+
+    .. note::
+        The input WDM representation is assumed to contain all frequencies from DC to Nyquist.
+    """
+    _import_wdm_transform()
+    from wdm_transform.transforms import (
+        frequency_wdm as _frequency_wdm,
+    )
+
+    if isinstance(wdmthing, data.WDMData):
+        return _constructors.fsdata(
+            {key: wdm2freq(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
+        )
+    assert isinstance(wdmthing, reps.WDM)
+    wdm = wdmthing
+    _coeffs = wdm.entries.squeeze()
+    assert _coeffs.ndim == 2, (
+        "Currently only single-batch WDMs are supported by wdm2freq."
+    )
+
+    wtfs = _frequency_wdm(_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
+    # wtfs is on a grid from fftfreq but we want rfftfreq
+    _num = wtfs.n // 2 + 1 if wtfs.n % 2 == 0 else (wtfs.n + 1) // 2
+    freqs = _constructors.linspace(start=0.0, step=wdm.df, num=_num)
+    _entries = _conventionaize(wtfs.data[:_num])
+    return _constructors.frequency_series(freqs, entries=_entries)

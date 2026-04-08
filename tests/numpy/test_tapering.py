@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from typed_lisa_toolkit.containers import tapering
+from typed_lisa_toolkit.types import tapering
 
 
 class TestTaperingNumpy(unittest.TestCase):

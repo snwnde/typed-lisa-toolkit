@@ -1,11 +1,5 @@
 """Module for plotting tools.
 
-We provide a set of classes to plot data and representations. The classes
-implemented here are used by classes in :mod:`typed_lisa_toolkit.containers.data`
-and :mod:`typed_lisa_toolkit.containers.representations` to visualize signals.
-It is also possible to call methods from these classes to obtain figures and axes
-to customize the plots.
-
 .. currentmodule:: typed_lisa_toolkit.viz.plotters
 
 Plotters
@@ -55,7 +49,7 @@ import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..containers import data, representations
+from ..types import data, representations
 
 if TYPE_CHECKING:
     Axis = representations.Axis
