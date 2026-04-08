@@ -14,8 +14,8 @@ TYPE_XREF_MAPPING = [
     (r"_HHPWLike", "class", "HomogeneousHarmonicProjectedWaveform", "typed_lisa_toolkit.types.HomogeneousHarmonicProjectedWaveform"),
     (r"_HPWLike", "class", "HarmonicProjectedWaveform", "typed_lisa_toolkit.types.HarmonicProjectedWaveform"),
     (r"_PWLike", "class", "ProjectedWaveform", "typed_lisa_toolkit.types.ProjectedWaveform"),
-    (r"reps\.Phasor\b", "class", "Phasor", "typed_lisa_toolkit.types.Phasor"),
-    (r"reps\.FrequencySeries\b", "class", "FrequencySeries", "typed_lisa_toolkit.types.FrequencySeries"),
+    # (r"reps\.Phasor\b", "class", "Phasor", "typed_lisa_toolkit.types.Phasor"),
+    # (r"reps\.FrequencySeries\b", "class", "FrequencySeries", "typed_lisa_toolkit.types.FrequencySeries"),
 ]
 
 # Derive simple name mapping from xref patterns (for str.replace() in signatures/docstrings)
@@ -23,6 +23,50 @@ TYPE_NAME_MAPPING = {
     pattern.replace(r"\.", ".").replace(r"\b", ""): display_name
     for pattern, _, display_name, _ in TYPE_XREF_MAPPING
 }
+
+
+def _format_type_expr(tp: object) -> str:
+    """Format a type expression for display in generic parameter bounds."""
+    if isinstance(tp, str):
+        text = tp.strip()
+    elif hasattr(tp, "__forward_arg__"):
+        text = str(getattr(tp, "__forward_arg__")).strip()
+    else:
+        name = getattr(tp, "__name__", None)
+        text = name.strip() if isinstance(name, str) else str(tp).replace("typing.", "")
+
+    return text
+
+
+def _get_type_parameters_from_obj(obj: object) -> list[str]:
+    """Extract class type parameters from runtime metadata when available."""
+    params = (
+        getattr(obj, "__type_params__", None)
+        or getattr(obj, "type_params", None)
+        or getattr(obj, "__parameters__", None)
+    )
+    if not params:
+        return []
+
+    entries: list[str] = []
+    for param in params:
+        pname = getattr(param, "__name__", None)
+        name = pname if isinstance(pname, str) and pname else str(param)
+
+        bound = getattr(param, "__bound__", None)
+        if bound is not None:
+            entries.append(f"{name}: {_format_type_expr(bound)}")
+            continue
+
+        constraints = getattr(param, "__constraints__", None)
+        if constraints:
+            ctext = " | ".join(_format_type_expr(c) for c in constraints)
+            entries.append(f"{name}: {ctext}")
+            continue
+
+        entries.append(name)
+
+    return entries
 
 
 def has_numpy_parameters_section(doc: str) -> bool:
@@ -55,6 +99,14 @@ def process_autodoc_signature(app, what, name, obj, options, signature, return_a
         return None
 
     doc = inspect.getdoc(obj) or ""
+
+    # For classes with generic metadata, suppress __init__ details and expose
+    # generic params in PEP-695-like form: ClassName[T: Bound].
+    if what == "class":
+        type_params = _get_type_parameters_from_obj(obj)
+        if type_params:
+            return f"[{', '.join(type_params)}]", None
+        return "", None
     
     # Transform private type names to public types in the signature
     sig_transformed = signature
@@ -93,7 +145,7 @@ def process_autodoc_signature(app, what, name, obj, options, signature, return_a
 
 def process_autodoc_docstring(app, what, name, obj, options, lines):
     """Transform private type names to public types in generated docstrings."""
-    if what not in {"function", "method"}:
+    if what not in {"function", "method", "class"}:
         return
     
     # Transform all private type names in all lines

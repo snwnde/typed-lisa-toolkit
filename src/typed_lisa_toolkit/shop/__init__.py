@@ -17,7 +17,7 @@ Toolkits available in the shop.
 """
 
 from . import conversions
-from .conversions import freq2time, time2freq, time2wdm, wdm2time, wdm2freq, freq2wdm
+from .conversions import freq2time, freq2wdm, time2freq, time2wdm, wdm2freq, wdm2time
 
 __all__ = [
     "conversions",

@@ -24,7 +24,7 @@ from tests._helpers import (
     WDMPropertiesAndMethodsMixin,
     build_canonical_representations,
 )
-from typed_lisa_toolkit import utils, frequency_series, time_series, stft, phasor
+from typed_lisa_toolkit import frequency_series, phasor, stft, time_series, utils
 from typed_lisa_toolkit.types import (
     STFT,
     FrequencySeries,

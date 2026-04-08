@@ -2,7 +2,7 @@
 
 import unittest
 
-from typed_lisa_toolkit.types.modes import Harmonic, QNM, QuasiNormalMode, cast_mode
+from typed_lisa_toolkit.types.modes import QNM, Harmonic, QuasiNormalMode, cast_mode
 
 
 class TestModes(unittest.TestCase):

@@ -18,12 +18,12 @@ from tests._helpers import (
     build_canonical_representations,
 )
 from typed_lisa_toolkit import (
-    utils,
     frequency_series,
-    phasor,
     linspace,
-    time_series,
+    phasor,
     stft,
+    time_series,
+    utils,
 )
 from typed_lisa_toolkit.types import (
     STFT,

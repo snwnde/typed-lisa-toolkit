@@ -5,9 +5,32 @@ Quick Start
 Installation
 ~~~~~~~~~~~~
 
+
+Use as a dependency
+^^^^^^^^^^^^^^^^^^^
+
+Add the following to the dependencies section of `pyproject.toml`:
+
+.. code-block:: toml
+
+   [project.dependencies]
+   typed-lisa-toolkit = { git = "https://gitlab.in2p3.fr/lisa-apc/typed-lisa-toolkit.git" }
+
+.. note:: 
+   The project is planned to be released to PyPI once version 1.0.0 is reached.
+
+Development setup
+^^^^^^^^^^^^^^^^^
+
+Using `uv` is recommended.
+
+1. Clone the repository.
+2. Change into the project directory.
+3. Run the following command:
+
 .. code-block:: bash
 
-   pip install ./typed-lisa-toolkit
+   uv sync --all-extras --all-groups
 
 
 Load LDC data
@@ -23,6 +46,6 @@ pointing to the LDC data path, you can load the data as follows:
 
    import os
    import pathlib
-   from typed_lisa_toolkit.containers import data
+   import typed_lisa_toolkit as tlt
    ldc_data_path = pathlib.Path(os.environ.get('SANGRIA_TRAINING_DATA'))
-   ldc_data = data.load_ldc_data(ldc_data_path)
+   ldc_data = tlt.load_ldc_data(ldc_data_path)

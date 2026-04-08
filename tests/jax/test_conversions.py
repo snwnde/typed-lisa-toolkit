@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit import shop, time_series, linspace
+from typed_lisa_toolkit import linspace, shop, time_series
 from typed_lisa_toolkit.types import FSData, TSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
 

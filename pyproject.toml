@@ -35,6 +35,7 @@ doc = [
     "sphinxcontrib-mermaid",
     "furo",
     "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git",
+    "anybadge",
 ]
 dev = [
     { include-group = "doc" },

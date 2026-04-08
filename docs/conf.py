@@ -96,6 +96,6 @@ html_theme = "furo"
 
 def setup(app):
     """Register autodoc event handlers and Sphinx transforms."""
-    # app.connect("autodoc-process-signature", process_autodoc_signature)
+    app.connect("autodoc-process-signature", process_autodoc_signature)
     app.connect("autodoc-process-docstring", process_autodoc_docstring)
     app.add_transform(TransformPrivateTypes)

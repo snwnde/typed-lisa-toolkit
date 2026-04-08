@@ -51,6 +51,9 @@ class Linspace:
     """A lazy representation of a uniformly spaced array.
 
     .. note::
+        To construct a Linspace, use the :func:`~typed_lisa_toolkit.linspace` function.
+
+    .. note::
 
         This class is designed to represent a uniform grid by
         three numbers. It does not try to implement the full

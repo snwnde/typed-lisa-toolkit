@@ -3,11 +3,25 @@ Top-level API
 
 .. currentmodule:: typed_lisa_toolkit
 
-This page documents all the top-level objects
-of the package.
+Typed LISA Toolkit exposes three complementary API surfaces:
+
+- :mod:`~typed_lisa_toolkit.types` for core typed representations.
+- :mod:`~typed_lisa_toolkit.shop` for converters and transformations.
+- Top-level helper functions for loading data and constructing objects.
+
+This page focuses on the top-level functions.
+
+Namespaces
+----------
+
+Public namespace APIs are documented in:
+
+- :doc:`types`
+- :doc:`shop`
 
 Loaders
 -------
+
 .. autosummary::
    :toctree: _generated
    :template: base.rst
@@ -15,27 +29,15 @@ Loaders
    load_data
    load_ldc_data
 
+Factory Functions
+-----------------
 
-
-Constructors
-------------
-
-The following constructors are available for creating instances
-of the various types defined in :mod:`types`:
-
-
-Misc
-^^^^
-
-.. autosummary::
-   :toctree: _generated
-   :template: base.rst
-
-   linspace
+The top-level helpers below are grouped by purpose.
 
 
 Modes
 ^^^^^
+
 .. autosummary::
    :toctree: _generated
    :template: base.rst
@@ -82,6 +84,8 @@ Data
 Waveforms
 ^^^^^^^^^
 
+Waveform constructors are available in long-form and concise aliases:
+
 .. autosummary::
    :toctree: _generated
    :template: base.rst
@@ -111,3 +115,12 @@ The following functions construct new waveforms by processing existing waveforms
    phasor_to_fs_pw
    phasor_to_fs_hpw
    get_dense_maker
+
+Misc
+^^^^
+
+.. autosummary::
+   :toctree: _generated
+   :template: base.rst
+
+   linspace

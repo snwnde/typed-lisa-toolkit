@@ -1,23 +1,17 @@
 """Unit tests for shop/conversions.py (NumPy backend)."""
 
-from numpy._typing._array_like import NDArray
-
-
-from numpy import float64
-
-
-from typed_lisa_toolkit.types.data import TSData
-
-
 import unittest
 import warnings
 
 import numpy as np
 import numpy.testing as npt
+from numpy import float64
+from numpy._typing._array_like import NDArray
 
-from typed_lisa_toolkit import shop, time_series, linspace
+from typed_lisa_toolkit import linspace, shop, time_series
 from typed_lisa_toolkit.types import FSData, TSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
+from typed_lisa_toolkit.types.data import TSData
 
 
 def _require_wdm_transform():

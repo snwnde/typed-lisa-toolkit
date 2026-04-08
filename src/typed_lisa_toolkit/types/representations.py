@@ -64,7 +64,7 @@ if TYPE_CHECKING:
 
 
 from .. import utils
-from . import tapering, _mixins
+from . import _mixins, tapering
 
 log = logging.getLogger(__name__)
 
@@ -500,7 +500,19 @@ def wdm(
     times: "Axis",
     entries: "Array",
 ) -> "WDM":
-    """Build a :class:`~types.representations.WDM`."""
+    """Build a :class:`~types.representations.WDM`.
+
+    Parameters
+    ----------
+    frequencies:
+        Evenly-spaced frequencies with separation ΔF and size `Nf+1`.
+
+    times:
+        Evenly-spaced times with separation ΔT and size `Nt`.
+
+    entries:
+        Data entries with shape `(Nf+1, Nt)`, real numbers.
+    """
     return WDM.make(frequencies=frequencies, times=times, entries=entries)
 
 
@@ -512,7 +524,13 @@ class _1DSeries[AxisT: "Axis"](  # pyright: ignore[reportUnsafeMultipleInheritan
 
 
 class FrequencySeries[AxisT: "Axis"](_1DSeries[AxisT]):
-    """A series of numbers on a frequency grid."""
+    """A series of numbers on a frequency grid.
+
+    .. note::
+        To construct a :class:`.FrequencySeries`, use the factory
+        function :func:`~typed_lisa_toolkit.frequency_series`.
+
+    """
 
     @property
     def domain(self) -> Literal["frequency"]:
@@ -529,7 +547,7 @@ class FrequencySeries[AxisT: "Axis"](_1DSeries[AxisT]):
         return super().angle(**kwargs).unwrap(period=2 * self.xp.pi)
 
     @property
-    def frequencies(self):
+    def frequencies(self) -> AxisT:
         """The frequencies of the series."""
         return self.grid[0]
 
@@ -572,7 +590,12 @@ class FrequencySeries[AxisT: "Axis"](_1DSeries[AxisT]):
 
 
 class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
-    """A frequency series on a uniform frequency grid."""
+    """A frequency series on a uniform frequency grid.
+
+    .. note::
+        To construct a :class:`.UniformFrequencySeries`, use the factory
+        function :func:`~typed_lisa_toolkit.frequency_series`.
+    """
 
     @property
     def df(self) -> float:
@@ -620,7 +643,12 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
 
 
 class TimeSeries[AxisT: "Axis"](_1DSeries[AxisT]):
-    """A series of numbers on a time grid."""
+    """A series of numbers on a time grid.
+
+    .. note::
+        To construct a :class:`.TimeSeries`, use the factory
+        function :func:`~typed_lisa_toolkit.time_series`.
+    """
 
     @property
     def domain(self) -> Literal["time"]:
@@ -670,7 +698,12 @@ class TimeSeries[AxisT: "Axis"](_1DSeries[AxisT]):
 
 
 class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
-    """A time series on a uniform time grid."""
+    """A time series on a uniform time grid.
+
+    .. note::
+        To construct a :class:`.UniformTimeSeries`, use the factory
+        function :func:`~typed_lisa_toolkit.time_series`.
+    """
 
     @property
     def dt(self) -> float:
@@ -730,6 +763,10 @@ class Phasor[AxisT: "Axis"](
     _Subset1DMixin["Grid1D[AxisT]"],
 ):
     """Phasor representation.
+
+    .. note::
+        To construct a :class:`.Phasor`, use the factory function
+        :func:`~typed_lisa_toolkit.phasor`.
 
     A phasor is a couple of amplitude and phase that represent a complex number.
     This class encapsulates a sequence of phasors at different frequencies, which
@@ -929,7 +966,12 @@ class STFT[
 ](
     _ArithmeticReprOnGrid["Grid2D[FreqAxisT, TimeAxisT]"],
 ):
-    """Time-frequency representation."""
+    """Time-frequency representation.
+
+    .. note::
+        To construct an :class:`.STFT`, use the factory function
+        :func:`~typed_lisa_toolkit.stft`.
+    """
 
     @property
     def domain(self) -> Literal["time-frequency"]:
@@ -1037,28 +1079,21 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
     """
     Wilson-Daubechies-Meyer (WDM) time-frequency representation.
 
+    .. note::
+        To construct a :class:`.WDM`, use the factory function
+        :func:`~typed_lisa_toolkit.wdm`.
+
     This represents data using an evenly-spaced 2D grid in the time-frequency plane with
     shape (Nf+1, Nt). Each "pixel" has size ΔT ΔF = 1/2. The times range approximately
     from 0 to the final observation time, while the frequencies range from 0 to the
     Nyquist limit (half the sampling rate).
 
-    .. attention:: the frequency grid has size Nf+1, not Nf. This is because correctly
+    .. attention:: The frequency grid has size Nf+1, not Nf. This is because correctly
         inverting WDM transforms requires some information from the Nyquist band m=Nf.
         This data layout contains redundant information but is simpler to interpret and
         to work with. It follows the convention of `wdm-transform`_.
 
     .. _wdm-transform: https://github.com/pywavelet/wdm_transform
-
-    Parameters
-    ----------
-    times: real 1D array
-        "Array" of evenly-spaced times with separation ΔT and size `Nt`.
-
-    frequencies: real 1D array
-        Array of evenly-spaced frequencies with separation ΔF and size `Nf+1`.
-
-    entries: real 2D array
-        Array of data entries, with shape `(Nf+1, Nt)`.
     """
 
     @property
@@ -1108,11 +1143,11 @@ class WDM(_ArithmeticReprOnGrid["UniformGrid2D"]):
             entries=entries,
         )
 
-    def is_critically_sampled(self):
+    def is_critically_sampled(self) -> bool:
         """Return True if :attr:`.dT` * :attr:`.dF` = 1/2."""
         # I don't like how this method is implemented,
         # but I don't see a better way for now.
-        return self.xp.isclose(self.dT * self.dF, 1 / 2)
+        return bool(self.xp.isclose(self.dT * self.dF, 1 / 2))
 
     @property
     def Nt(self) -> int:

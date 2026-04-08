@@ -3,7 +3,7 @@ from types import ModuleType
 from typing import Literal, overload
 
 from .. import _constructors  # pyright: ignore[reportPrivateUsage]
-from ..types import data, Array
+from ..types import Array, data
 from ..types import representations as reps
 from ..types.misc import Axis, Linspace
 

@@ -2,9 +2,9 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import tempfile
-from typing import Any
 import unittest
 import warnings
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import h5py
