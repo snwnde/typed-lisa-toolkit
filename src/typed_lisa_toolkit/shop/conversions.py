@@ -1,350 +1,187 @@
-import warnings
+from collections.abc import Mapping
 from types import ModuleType
-from typing import Literal, overload
+from typing import Any, overload, Literal
+import array_api_compat as xpc
 
-from .. import _constructors  # pyright: ignore[reportPrivateUsage]
-from ..types import Array, data
-from ..types import representations as reps
-from ..types.misc import Axis, Linspace
+from ..types import (
+    representations as reps,
+    Axis,
+    TimedFSData,
+    Array,
+    SpectralDensity,
+    EvolutionarySpectralDensity,
+)
+from ..types._mixins import ChannelMapping
 
-
-def _import_wdm_transform() -> ModuleType:
-    try:
-        import wdm_transform
-
-        return wdm_transform
-    except ImportError:
-        raise ImportError(
-            "The `wdm_transform` package is required for WDM transformations. Install it with: pip install wdm-transform"
-        ) from None
-
-
-def _conventionaize(ary: "Array") -> "Array":
-    return ary[None, None, None, None, ...]
+ConvertibleReps = (
+    reps.FrequencySeries[Axis]
+    | reps.TimeSeries[Axis]
+    | reps.WDM
+    | reps.STFT[Axis, Axis]
+)
 
 
-# Meyer window default parameters
-DEFAULT_WINDOW_A = 1 / 3
-DEFAULT_WINDOW_D = 1.0
+def get_xyz2aet_matrix(xp: ModuleType):
+    """Get the matrix that converts from XYZ to AET channels."""
+    matrix = xp.array([[-1.0, 0.0, 1.0], [1.0, -2.0, 1.0], [1.0, 1.0, 1.0]])
+    scales = xp.array([xp.sqrt(2.0), xp.sqrt(6.0), xp.sqrt(3.0)])
+    return matrix / scales[:, None]
 
 
-@overload
-def time2freq(
-    tsd: data.TSData,
-    /,
-    *,
-    keep_time: Literal[True] = True,
-) -> data.TimedFSData: ...
+def get_aet2xyz_matrix(xp: ModuleType):
+    """Get the matrix that converts from AET to XYZ channels."""
+    return get_xyz2aet_matrix(xp).T
 
 
-@overload
-def time2freq(
-    tsd: data.TSData,
-    /,
-    *,
-    keep_time: Literal[False],
-) -> data.FSData: ...
+def _matrix_mult[VT: Array | ConvertibleReps](matrix: Any, *vectors: VT) -> list[VT]:
+    """Perform matrix multiplication between a 3x3 matrix and three vectors."""
+    # We do manually because not all waveforms have an underlying array that we can
+    # use for matrix multiplication.
+    return [
+        matrix[i, 0] * vectors[0]
+        + matrix[i, 1] * vectors[1]
+        + matrix[i, 2] * vectors[2]
+        for i in range(3)
+    ]
 
 
-@overload
-def time2freq(
-    ts: reps.TimeSeries[Linspace],
-    /,
-    *,
-    keep_time: bool = True,
-) -> reps.UniformFrequencySeries: ...
+def _xyz2aet[VT: ConvertibleReps](X: VT, Y: VT, Z: VT) -> tuple[VT, VT, VT]:
+    xp = xpc.get_namespace(X.entries, Y.entries, Z.entries)
+    xyz2aet_matrix = get_xyz2aet_matrix(xp)
+    A, E, T = _matrix_mult(xyz2aet_matrix, X, Y, Z)
+    return A, E, T
 
 
-def time2freq(
-    td: reps.TimeSeries[Linspace] | data.TSData,
-    /,
-    *,
-    keep_time: bool = True,
-):
-    """Convert time-domain representation or data to frequency-domain representation or data using the real FFT.
+def _aet2xyz[VT: ConvertibleReps](A: VT, E: VT, T: VT) -> tuple[VT, VT, VT]:
+    xp = xpc.get_namespace(A.entries, E.entries, T.entries)
+    aet2xyz_matrix = get_aet2xyz_matrix(xp)
+    X, Y, Z = _matrix_mult(aet2xyz_matrix, A, E, T)
+    return X, Y, Z
 
-    .. note::
-        When the input is a :class:`~types.TimeSeries` instance,
-        the ``keep_time`` argument is ignored.
-    """
-    xp = td.xp
-    try:
-        fft = xp.fft
-    except AttributeError:
-        raise NotImplementedError(
-            f"{xp.__name__} does not support FFT operations, which are required for `time2freq`."
-        )
-    _freqs = fft.rfftfreq(len(td.times), d=td.times.step)
-    freqs = _constructors.linspace(_freqs[0], _freqs[1] - _freqs[0], len(_freqs))
-    signal = fft.rfft(td.entries * td.times.step, axis=-1)
-    fs = _constructors.frequency_series(
-        frequencies=freqs,
-        entries=signal,
+
+def _get_type_error_msg(original: Mapping[str, ConvertibleReps], /) -> str:
+    return (
+        "Expected a mapping to :class:`~typed_lisa_toolkit.types.FrequencySeries`,"
+        + " :class:`~typed_lisa_toolkit.types.TimeSeries`,"
+        + ":class:`~typed_lisa_toolkit.types.WDM`, or :class:`~typed_lisa_toolkit.types.STFT`,"
+        + f" got {type(original).__name__}. "
+        + "This function is only intended for use with representations, not raw arrays."
     )
-    if isinstance(td, reps.TimeSeries):
-        return fs
+
+
+def _get_kwargs(original: Mapping[str, ConvertibleReps], /) -> dict[str, object]:
+    if isinstance(original, TimedFSData):
+        return {"times": original.times}
     else:
-        fsd = data.FSData(fs, td.channel_names, td.name)
-        if keep_time:
-            fsd = fsd.set_times(td.times)
-        return fsd
+        return {}
 
 
-@overload
-def freq2time(fsd: data.FSData, /, *, times: Axis) -> data.TSData: ...
+def _convert_mapping[MapT: Mapping[str, ConvertibleReps]](
+    original: MapT, /, *, direction: Literal["xyz2aet", "aet2xyz"]
+) -> MapT:
+    """Convert :ref:`data <data_types>` or :ref:`waveforms <waveform_types>` in XYZ channels to AET channels.
 
-
-@overload
-def freq2time(
-    fsd: reps.FrequencySeries[Linspace], /, *, times: Axis
-) -> reps.UniformTimeSeries: ...
-
-
-def freq2time(
-    fd: reps.FrequencySeries[Linspace] | data.FSData,
-    /,
-    *,
-    times: Axis,
-):
-    """Convert frequency-domain representation or data to time-domain representation or data using the inverse real FFT."""
-    xp = fd.xp
-    try:
-        fft = xp.fft
-    except AttributeError:
-        raise NotImplementedError(
-            f"{xp.__name__} does not support FFT operations, which are required for `freq2time`."
-        )
-    _times = Linspace.make(times)
-    is_even = len(fd.frequencies) % 2 == 0
-    nyquist_freq = (
-        fd.frequencies.stop
-        if is_even
-        else fd.frequencies.stop + fd.frequencies.step / 2
-    )
-    nyquist_dt = 1.0 / (2 * nyquist_freq)
-    if _times.step < nyquist_dt and not xp.isclose(_times.step, nyquist_dt):
-        warnings.warn("The time grid is denser than the Nyquist limit.")
-
-    signal = fft.irfft(fd.entries / _times.step, n=len(_times), axis=-1)
-    ts = _constructors.time_series(times=_times, entries=signal)
-    if isinstance(fd, reps.FrequencySeries):
-        return ts
+    The conversion is performed according to the DDPC Rosetta stone convention.
+    """
+    if direction == "xyz2aet":
+        x, y, z = original["X"], original["Y"], original["Z"]
+        a, e, t = _xyz2aet(x, y, z)
+        _dict = {"A": a, "E": e, "T": t}
     else:
-        tsd = data.TSData(ts, fd.channel_names, fd.name)
-        return tsd
+        a, e, t = original["A"], original["E"], original["T"]
+        x, y, z = _aet2xyz(a, e, t)
+        _dict = {"X": x, "Y": y, "Z": z}
+
+    if not isinstance(original, ChannelMapping):
+        raise TypeError(_get_type_error_msg(original))
+    kwargs = _get_kwargs(original)
+    return type(original).from_dict(_dict, **kwargs)
 
 
-@overload
-def time2wdm(tdata: data.TSData, /, *, Nt: int, Nf: int) -> data.WDMData: ...
-
-
-@overload
-def time2wdm(
-    tseries: reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int
-) -> reps.WDM: ...
-
-
-def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int):
-    """Transform a time series to WDM.
-
-    .. note::
-        The convention for signal duration in :class:`WDM` is Nt*ΔT = N*Δt. This is not
-        equivalent to the convention ``grid[-1] - grid[0]``, more useful for nonuniform
-        grids, that you may be assuming elsewhere.
-
-    Parameters
-    ----------
-    tseries : TimeSeries
-        Regularly-sampled time series of length at least Nf*Nt.
-    Nt : int
-        Length of WDM time grid.
-    Nf : int
-        Nf+1 is the length of the WDM frequency grid.
-
-    Returns
-    -------
-    WDM
-        Transform of the first Nf*Nt points of the time series.
-
-    Raises
-    ------
-    ValueError
-        If the time series is too small for the chosen values of Nf and Nt.
-    """
-    _import_wdm_transform()
-    from wdm_transform.transforms import (
-        forward_wdm as _forward_wdm,
-    )
-
-    if isinstance(tthing, data.TSData):
-        return _constructors.wdmdata(
-            {key: time2wdm(val, Nt=Nt, Nf=Nf) for (key, val) in tthing.items()},
-            name=tthing.name,
+def _convert_spectral_density[SDT: SpectralDensity | EvolutionarySpectralDensity](
+    original: SDT, /, *, direction: Literal["xyz2aet", "aet2xyz"]
+) -> SDT:
+    _kernel = original.get_kernel()
+    # If original is of type SpectralDensity, the kernel shape is (n_freqs, n_channels, n_channels);
+    # if original is of type EvolutionarySpectralDensity, the kernel shape is (n_freqs, n_times, n_channels, n_channels).
+    orig_channel_order = original.channel_order
+    xp = xpc.get_namespace(_kernel)
+    if direction == "xyz2aet":
+        convert_matrix = get_xyz2aet_matrix(xp)
+        assert orig_channel_order == ("X", "Y", "Z"), (
+            f"Expected original channel order to be ('X', 'Y', 'Z'), got {orig_channel_order}."
         )
-    assert isinstance(tthing, reps.TimeSeries)
-    tseries = tthing
-
-    if Nt * Nf > tseries.times.num:
-        raise ValueError(f"Time series too small for given Nf and Nt")
-
-    tseries = tseries[: Nt * Nf]
-    _entries = tseries.entries.squeeze()
-    assert _entries.ndim == 1, (
-        "Currently only single-batch time series are supported by time2wdm."
-    )
-    coeffs = _forward_wdm(
-        _entries,
-        nt=Nt,
-        nf=Nf,
-        a=DEFAULT_WINDOW_A,
-        d=DEFAULT_WINDOW_D,
-        dt=tseries.times.step,
-    ).T
-    assert coeffs.shape == (Nf + 1, Nt), "Unexpected shape of WDM coefficients."
-
-    dT = Nf * tseries.times.step
-    dF = 0.5 / dT
-    tgrid = Linspace(start=tseries.times.start, step=dT, num=Nt)
-    fgrid = Linspace(start=0, step=dF, num=Nf + 1)
-
-    return _constructors.wdm(
-        times=tgrid, frequencies=fgrid, entries=_conventionaize(coeffs)
-    )
-
-
-@overload
-def wdm2time(wdmdata: data.WDMData, /) -> data.TSData: ...
-
-
-@overload
-def wdm2time(wdm: reps.WDM, /) -> reps.UniformTimeSeries: ...
-
-
-def wdm2time(wdmthing: reps.WDM | data.WDMData, /):
-    """Transform WDM expansion to equivalent time series.
-
-    Parameters
-    ----------
-    wdm : WDM or WDMData
-        WDM expansion with grid parameters Nf and Nt.
-
-    Returns
-    -------
-    TimeSeries or TSData
-        Time series of size Nt*Nf.
-    """
-    _import_wdm_transform()
-    from wdm_transform.transforms import (
-        inverse_wdm as _inverse_wdm,
-    )
-
-    if isinstance(wdmthing, data.WDMData):
-        return _constructors.tsdata(
-            {key: wdm2time(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
+        new_channel_order = "A", "E", "T"
+    else:
+        convert_matrix = get_aet2xyz_matrix(xp)
+        assert orig_channel_order == ("A", "E", "T"), (
+            f"Expected original channel order to be ('A', 'E', 'T'), got {orig_channel_order}."
         )
-    assert isinstance(wdmthing, reps.WDM)
-    wdm = wdmthing
-    _coeffs = wdm.entries.squeeze()
-    assert _coeffs.ndim == 2, (
-        "Currently only single-batch WDMs are supported by wdm2time."
+        new_channel_order = "X", "Y", "Z"
+    converted_kernel = xp.einsum(
+        "ij,...jk,kl->...il",
+        convert_matrix,
+        _kernel,
+        convert_matrix.T,
     )
-
-    entries = _inverse_wdm(
-        coeffs=_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D
-    )
-    tgrid = Linspace(wdm.times.start, wdm.dt, wdm.ND)
-    return _constructors.time_series(tgrid, _conventionaize(entries))
-
-
-@overload
-def freq2wdm(
-    fseries: reps.FrequencySeries[Linspace], /, *, Nt: int, Nf: int, t0: float = 0.0
-) -> reps.WDM: ...
-
-
-@overload
-def freq2wdm(
-    fdata: data.FSData, /, *, Nt: int, Nf: int, t0: float = 0.0
-) -> data.WDMData: ...
-
-
-def freq2wdm(
-    fthing: reps.FrequencySeries[Linspace] | data.FSData,
-    /,
-    *,
-    Nt: int,
-    Nf: int,
-    t0: float = 0.0,
-):
-    """Transform frequency series to WDM.
-
-    Parameters
-    ----------
-    fseries : :class:`~types.FrequencySeries` or :class:`~types.FSData`
-        frequency series, assumed to be full-grid (from DC to Nyquist).
-    Nt : int
-        Number of WDM time bins.
-    Nf : int
-        WDM frequency grid has length Nf+1.
-    t0 : float, optional
-        Initial time of WDM time grid, by default 0.0
-    """
-    _import_wdm_transform()
-    from wdm_transform.transforms import (
-        get_backend as _get_backend,
-    )
-
-    if isinstance(fthing, data.FSData):
-        return _constructors.wdmdata(
-            {key: freq2wdm(val, Nt=Nt, Nf=Nf, t0=t0) for (key, val) in fthing.items()},
-            name=fthing.name,
+    freqs = original._frequencies  # pyright: ignore[reportPrivateUsage]
+    if isinstance(original, SpectralDensity):
+        return type(original)(
+            frequencies=freqs,
+            inverse_sdm=converted_kernel,
+            channel_order=new_channel_order,
         )
-    assert isinstance(fthing, reps.FrequencySeries), (
-        f"Expected a FrequencySeries input, got {type(fthing)}"
-    )
-    fseries = fthing
-    backend = _get_backend()
-    tseries_entries = backend.fft.irfft(fseries.entries, n=Nf * Nt)
-    duration = 1 / fseries.frequencies.step
-    dt = duration / (Nf * Nt)
-    tseries_grid = Linspace(start=t0, step=dt, num=Nf * Nt)
-    tseries = _constructors.time_series(tseries_grid, tseries_entries)
-    return time2wdm(tseries, Nt=Nt, Nf=Nf)
-
-
-@overload
-def wdm2freq(wdmdata: data.WDMData, /) -> data.FSData: ...
-
-
-@overload
-def wdm2freq(wdm: reps.WDM, /) -> reps.UniformFrequencySeries: ...
-
-
-def wdm2freq(wdmthing: reps.WDM | data.WDMData, /):
-    """Transform WDM expansion to a frequency series.
-
-    .. note::
-        The input WDM representation is assumed to contain all frequencies from DC to Nyquist.
-    """
-    _import_wdm_transform()
-    from wdm_transform.transforms import (
-        frequency_wdm as _frequency_wdm,
-    )
-
-    if isinstance(wdmthing, data.WDMData):
-        return _constructors.fsdata(
-            {key: wdm2freq(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
+    else:
+        times = original._times  # pyright: ignore[reportPrivateUsage]
+        return type(original)(
+            frequencies=freqs,
+            times=times,
+            inverse_esdm=converted_kernel,
+            channel_order=new_channel_order,
         )
-    assert isinstance(wdmthing, reps.WDM)
-    wdm = wdmthing
-    _coeffs = wdm.entries.squeeze()
-    assert _coeffs.ndim == 2, (
-        "Currently only single-batch WDMs are supported by wdm2freq."
-    )
 
-    wtfs = _frequency_wdm(_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
-    # wtfs is on a grid from fftfreq but we want rfftfreq
-    _num = wtfs.n // 2 + 1 if wtfs.n % 2 == 0 else (wtfs.n + 1) // 2
-    freqs = _constructors.linspace(start=0.0, step=wdm.df, num=_num)
-    _entries = _conventionaize(wtfs.data[:_num])
-    return _constructors.frequency_series(freqs, entries=_entries)
+
+@overload
+def xyz2aet[MapT: Mapping[str, ConvertibleReps]](xyz: MapT, /) -> MapT: ...
+
+
+@overload
+def xyz2aet(xyz: SpectralDensity, /) -> SpectralDensity: ...
+
+
+@overload
+def xyz2aet(xyz: EvolutionarySpectralDensity, /) -> EvolutionarySpectralDensity: ...
+
+
+def xyz2aet(xyz: Any, /):
+    """Convert :ref:`data <data_types>`, :ref:`waveforms <waveform_types>` or :ref:`spectral density matrices <spectral_density_matrices>` in XYZ channels to AET channels.
+
+    The conversion is performed according to the DDPC Rosetta stone convention.
+    """
+    if isinstance(xyz, (SpectralDensity, EvolutionarySpectralDensity)):
+        return _convert_spectral_density(xyz, direction="xyz2aet")
+    else:
+        return _convert_mapping(xyz, direction="xyz2aet")
+
+
+@overload
+def aet2xyz[MapT: Mapping[str, ConvertibleReps]](aet: MapT, /) -> MapT: ...
+
+
+@overload
+def aet2xyz(aet: SpectralDensity, /) -> SpectralDensity: ...
+
+
+@overload
+def aet2xyz(aet: EvolutionarySpectralDensity, /) -> EvolutionarySpectralDensity: ...
+
+
+def aet2xyz(aet: Any, /):
+    """Convert :ref:`data <data_types>`, :ref:`waveforms <waveform_types>` or :ref:`spectral density matrices <spectral_density_matrices>` in AET channels to XYZ channels.
+
+    The conversion is performed according to the DDPC Rosetta stone convention.
+    """
+    if isinstance(aet, (SpectralDensity, EvolutionarySpectralDensity)):
+        return _convert_spectral_density(aet, direction="aet2xyz")
+    else:
+        return _convert_mapping(aet, direction="aet2xyz")
