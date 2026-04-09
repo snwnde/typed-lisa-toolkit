@@ -1,11 +1,4 @@
-"""Representation types.
-
-**Multi-Backend Support:**
-
-The underlying arrays can be from any array library that supports the Python "Array" API standard,
-including NumPy and JAX.
-
-"""
+"""Representation types."""
 
 from __future__ import annotations
 
@@ -614,7 +607,7 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
             This method is deprecated and will be removed in 0.8.0; use
             `shop.freq2time` instead.
         """
-        from ..shop import conversions
+        from ..shop import transforms
 
         if len(args) > 1:
             raise TypeError("irfft() accepts at most one positional optional argument.")
@@ -639,7 +632,7 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
         self_frequencies = to_array(self.frequencies)
         tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
         _times = Linspace.make(time_grid)
-        return conversions.freq2time(self * tapering_window, times=_times)
+        return transforms.freq2time(self * tapering_window, times=_times)
 
 
 class TimeSeries[AxisT: "Axis"](_1DSeries[AxisT]):
@@ -727,7 +720,7 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
             This method is deprecated and will be removed in 0.8.0; use
             `shop.time2freq` instead.
         """
-        from ..shop import conversions
+        from ..shop import transforms
 
         if len(args) > 1:
             raise TypeError("rfft() accepts at most one positional optional argument.")
@@ -756,7 +749,7 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
             if tapering is not None
             else self.xp.ones_like(self_times)
         )
-        return conversions.time2freq(self * tapering_window)
+        return transforms.time2freq(self * tapering_window)
 
 
 class Phasor[AxisT: "Axis"](

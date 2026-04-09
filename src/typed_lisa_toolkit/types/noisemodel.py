@@ -1,49 +1,4 @@
-"""Noise model types.
-
-A noise model carries the knowledge of noise properties in the dm.
-It defines the inner product and determines how to whiten the dm.
-
-.. currentmodule:: typed_lisa_toolkit.types.noisemodel
-
-Protocols
----------
-
-.. autoclass:: IntegrationPolicy
-   :members:
-   :member-order: groupwise
-
-Spectral Density Matrices
--------------------------
-
-.. autoclass:: SpectralDensity
-   :members:
-   :member-order: groupwise
-   :inherited-members:
-
-.. autoclass:: DiagonalSpectralDensity
-    :members:
-    :member-order: groupwise
-    :inherited-members:
-
-.. autoclass:: EvolutionarySpectralDensity
-    :members:
-    :member-order: groupwise
-    :inherited-members:
-
-Noise Models
-------------
-
-.. autoclass:: FDNoiseModel
-    :members:
-    :member-order: groupwise
-    :inherited-members:
-
-.. autoclass:: TFNoiseModel
-    :members:
-    :member-order: groupwise
-    :inherited-members:
-
-"""
+"""Noise model types."""
 
 import logging
 from types import ModuleType
@@ -213,7 +168,7 @@ class SpectralDensity:
         # kernel shape: (n_freqs, n_channels, n_channels)
         self._frequencies: Array = frequencies
         self._inverse_sdm: Array = inverse_sdm
-        self.channel_order: Sequence[ChnName] = channel_order
+        self.channel_order: tuple[ChnName, ...] = tuple(channel_order)
 
     def to_subband(self, f_interval: tuple[float, float]) -> Self:
         """Return a new SpectralDensity instance with the frequency grid restricted to the given subband."""
@@ -569,7 +524,7 @@ class EvolutionarySpectralDensity:
         self._frequencies: "Array" = frequencies
         self._times: "Array" = times
         self._inverse_esdm: "Array" = inverse_esdm
-        self.channel_order: Sequence[ChnName] = channel_order
+        self.channel_order: tuple[ChnName, ...] = tuple(channel_order)
 
     def get_kernel(self, backend: str | None = None) -> "Array":
         """Return the inverse of the evolutionary spectral density matrix.

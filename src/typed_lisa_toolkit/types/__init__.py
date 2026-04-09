@@ -20,6 +20,7 @@ Representation Types
    STFT
    WDM
 
+.. _data_types:
 
 Data Types
 ^^^^^^^^^^
@@ -53,6 +54,8 @@ Mode Types
     QNM
 
 
+.. _waveform_types:
+
 Waveform Types
 ^^^^^^^^^^^^^^
 
@@ -67,6 +70,8 @@ Waveform Types
     ProjectedWaveform
     HarmonicProjectedWaveform
     HomogeneousHarmonicProjectedWaveform
+
+.. _spectral_density_matrices:
 
 Spectral Density Matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^

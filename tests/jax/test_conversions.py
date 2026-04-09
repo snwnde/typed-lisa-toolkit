@@ -1,10 +1,8 @@
 """Unit tests for shop/conversions.py (JAX backend)."""
 
 import unittest
-import warnings
 
 import jax
-from jax.random import t
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
@@ -12,165 +10,87 @@ import numpy as np
 import numpy.testing as npt
 
 from typed_lisa_toolkit import linspace, shop, time_series
-from typed_lisa_toolkit.types import FSData, TSData, WDMData
-from typed_lisa_toolkit.types import representations as reps
+from typed_lisa_toolkit.types import EvolutionarySpectralDensity, SpectralDensity, TSData
 
 
-def _require_wdm_transform():
-    try:
-        import wdm_transform  # noqa: F401
-    except ImportError as exc:
-        raise unittest.SkipTest(
-            "wdm_transform is required for WDM conversion tests"
-        ) from exc
-
-
-def _build_timeseries_jax(n: int = 8):
-    times = linspace(0.0, 3.5, n)
-    entries = jnp.asarray(
-        [0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1],
-        dtype=jnp.float64,
-    )
-    ts = time_series(times, entries[None, None, None, None, :])
-    return times, entries, ts
-
-
-def _build_tsdata_jax(n: int = 8):
+def _build_xyz_tsdata_jax(n: int = 8) -> TSData:
     times = linspace(0.0, 3.5, n)
     x = jnp.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=jnp.float64)
     y = jnp.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=jnp.float64)
-    tsd = TSData.from_dict(
+    z = jnp.asarray([-0.2, 0.3, -0.1, 0.5, -0.7, 0.9, -0.4, 0.2], dtype=jnp.float64)
+    return TSData.from_dict(
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
+            "Z": time_series(times, z[None, None, None, None, :]),
         }
     )
-    return times, tsd
+
+
+def _build_xyz_spectral_density_jax() -> SpectralDensity:
+    frequencies = jnp.array([0.25, 0.5, 0.75], dtype=jnp.float64)
+    inverse_sdm = jnp.broadcast_to(
+        jnp.array(
+            [[2.0, 0.2, -0.1], [0.2, 1.5, 0.3], [-0.1, 0.3, 1.2]],
+            dtype=jnp.float64,
+        ),
+        (len(frequencies), 3, 3),
+    )
+    return SpectralDensity(frequencies, inverse_sdm, ["X", "Y", "Z"])
+
+
+def _build_xyz_evolutionary_spectral_density_jax() -> EvolutionarySpectralDensity:
+    frequencies = jnp.array([0.25, 0.5], dtype=jnp.float64)
+    times = jnp.array([0.0, 1.0], dtype=jnp.float64)
+    base = jnp.array(
+        [[2.0, 0.2, -0.1], [0.2, 1.5, 0.3], [-0.1, 0.3, 1.2]],
+        dtype=jnp.float64,
+    )
+    scales = jnp.array([[1.0, 1.05], [1.1, 1.15]], dtype=jnp.float64)
+    inverse_esdm = scales[:, :, None, None] * base[None, None, :, :]
+    return EvolutionarySpectralDensity(frequencies, times, inverse_esdm, ["X", "Y", "Z"])
 
 
 class TestConversionsJax(unittest.TestCase):
-    def test_time2freq_timeseries_returns_representation(self):
-        _, entries, ts = _build_timeseries_jax()
+    def test_xyz_aet_roundtrip_tsdata(self):
+        xyz = _build_xyz_tsdata_jax()
 
-        fs = shop.time2freq(ts)
+        aet = shop.xyz2aet(xyz)
+        recovered = shop.aet2xyz(aet)
 
-        self.assertIsInstance(fs, reps.UniformFrequencySeries)
-        expected = jnp.fft.rfft(entries * ts.dt)
-        npt.assert_allclose(np.asarray(fs.entries).squeeze(), np.asarray(expected))
-
-    def test_time2freq_tsdata_keep_time_switches_type(self):
-        times, tsd = _build_tsdata_jax()
-
-        fs_no_time = shop.time2freq(tsd, keep_time=False)
-        fs_with_time = shop.time2freq(tsd, keep_time=True)
-
-        self.assertIsInstance(fs_no_time, FSData)
-        self.assertNotIn("times", dir(fs_no_time))
-        self.assertIsInstance(fs_with_time, FSData)
-        npt.assert_allclose(np.asarray(fs_with_time.times), np.asarray(times))
-        self.assertEqual(fs_with_time.channel_names, tsd.channel_names)
-
-    def test_freq2time_frequencyseries_roundtrip(self):
-        _, entries, ts = _build_timeseries_jax()
-
-        fs = shop.time2freq(ts)
-        recovered = shop.freq2time(fs, times=np.asarray(ts.times))
-
-        self.assertIsInstance(recovered, reps.UniformTimeSeries)
+        self.assertEqual(aet.channel_names, ("A", "E", "T"))
+        self.assertEqual(recovered.channel_names, xyz.channel_names)
+        npt.assert_allclose(np.asarray(recovered.times), np.asarray(xyz.times))
         npt.assert_allclose(
-            np.asarray(recovered.entries).squeeze(), np.asarray(entries), atol=1e-12
+            np.asarray(recovered.get_kernel()), np.asarray(xyz.get_kernel()), atol=1e-12
         )
 
-    def test_freq2time_fsdata_returns_tsdata(self):
-        times, tsd = _build_tsdata_jax()
+    def test_xyz_aet_roundtrip_spectral_density(self):
+        xyz_sdm = _build_xyz_spectral_density_jax()
 
-        fsd = shop.time2freq(tsd, keep_time=False)
-        recovered = shop.freq2time(fsd, times=np.asarray(times))
+        aet_sdm = shop.xyz2aet(xyz_sdm)
+        recovered = shop.aet2xyz(aet_sdm)
 
-        self.assertIsInstance(recovered, TSData)
-        self.assertEqual(recovered.channel_names, tsd.channel_names)
-        npt.assert_allclose(np.asarray(recovered.times), np.asarray(times))
+        self.assertEqual(aet_sdm.channel_order, ("A", "E", "T"))
+        self.assertEqual(recovered.channel_order, xyz_sdm.channel_order)
         npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(tsd.get_kernel()), atol=1e-12
+            np.asarray(recovered.get_kernel()),
+            np.asarray(xyz_sdm.get_kernel()),
+            atol=1e-12,
         )
 
-    def test_freq2time_warns_for_denser_than_nyquist_times(self):
-        _, _, ts = _build_timeseries_jax()
-        fs = shop.time2freq(ts)
+    def test_xyz_aet_roundtrip_evolutionary_spectral_density(self):
+        xyz_esdm = _build_xyz_evolutionary_spectral_density_jax()
 
-        dense_times = np.linspace(
-            float(ts.times.start), float(ts.times.stop), 2 * len(ts.times) - 1
-        )
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            _ = shop.freq2time(fs, times=dense_times)
+        aet_esdm = shop.xyz2aet(xyz_esdm)
+        recovered = shop.aet2xyz(aet_esdm)
 
-        self.assertTrue(
-            any("denser than the Nyquist limit" in str(item.message) for item in caught)
-        )
-
-    def test_time2wdm_roundtrip_timeseries(self):
-        _require_wdm_transform()
-        _, entries, ts = _build_timeseries_jax()
-
-        wdm = shop.time2wdm(ts, Nt=2, Nf=4)
-        recovered = shop.wdm2time(wdm)
-
-        self.assertIsInstance(wdm, reps.WDM)
-        self.assertIsInstance(recovered, reps.UniformTimeSeries)
-        npt.assert_allclose(np.asarray(recovered.times), np.asarray(ts.times))
+        self.assertEqual(aet_esdm.channel_order, ("A", "E", "T"))
+        self.assertEqual(recovered.channel_order, xyz_esdm.channel_order)
         npt.assert_allclose(
-            np.asarray(recovered.entries).squeeze(), np.asarray(entries), atol=1e-12
-        )
-
-    def test_time2wdm_roundtrip_tsdata(self):
-        _require_wdm_transform()
-        times, tsd = _build_tsdata_jax()
-
-        wdmdata = shop.time2wdm(tsd, Nt=2, Nf=4)
-        recovered = shop.wdm2time(wdmdata)
-
-        self.assertIsInstance(wdmdata, WDMData)
-        self.assertIsInstance(recovered, TSData)
-        self.assertEqual(recovered.channel_names, tsd.channel_names)
-        npt.assert_allclose(np.asarray(recovered.times), np.asarray(times))
-        npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(tsd.get_kernel()), atol=1e-12
-        )
-
-    def test_freq2wdm_roundtrip_frequencyseries(self):
-        _require_wdm_transform()
-        _, _, ts = _build_timeseries_jax()
-
-        fs = shop.time2freq(ts)
-        wdm = shop.freq2wdm(fs, Nt=2, Nf=4)
-        recovered = shop.wdm2freq(wdm)
-
-        self.assertIsInstance(wdm, reps.WDM)
-        self.assertIsInstance(recovered, reps.UniformFrequencySeries)
-        npt.assert_allclose(
-            np.asarray(recovered.entries), np.asarray(fs.entries)
-        )
-        npt.assert_allclose(
-            np.asarray(recovered.frequencies), np.asarray(fs.frequencies)
-        )
-
-    def test_freq2wdm_roundtrip_fsdata(self):
-        _require_wdm_transform()
-        _, tsd = _build_tsdata_jax()
-
-        fsd = shop.time2freq(tsd, keep_time=False)
-        wdmdata = shop.freq2wdm(fsd, Nt=2, Nf=4)
-        recovered = shop.wdm2freq(wdmdata)
-
-        self.assertIsInstance(wdmdata, WDMData)
-        self.assertIsInstance(recovered, FSData)
-        self.assertEqual(recovered.channel_names, fsd.channel_names)
-        npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(fsd.get_kernel())
-        )
-        npt.assert_allclose(
-            np.asarray(recovered.frequencies), np.asarray(fsd.frequencies)
+            np.asarray(recovered.get_kernel()),
+            np.asarray(xyz_esdm.get_kernel()),
+            atol=1e-12,
         )
 
 

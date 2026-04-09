@@ -13,13 +13,17 @@ Toolkits available in the shop.
     wdm2time
     wdm2freq
     freq2wdm
+    xyz2aet
+    aet2xyz
 
 """
 
-from . import conversions
-from .conversions import freq2time, freq2wdm, time2freq, time2wdm, wdm2freq, wdm2time
+from . import transforms, conversions
+from .transforms import freq2time, freq2wdm, time2freq, time2wdm, wdm2freq, wdm2time
+from .conversions import xyz2aet, aet2xyz
 
 __all__ = [
+    "transforms",
     "conversions",
     "freq2time",
     "time2freq",
@@ -27,4 +31,6 @@ __all__ = [
     "wdm2time",
     "wdm2freq",
     "freq2wdm",
+    "xyz2aet",
+    "aet2xyz",
 ]
