@@ -1206,10 +1206,11 @@ wheels = [
 
 [[package]]
 name = "l2d-interface"
-version = "0.0.0.post26+a5e33e1"
-source = { git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=a5e33e1477374f946ed3295c77fbac3abae0a6e5#a5e33e1477374f946ed3295c77fbac3abae0a6e5" }
+version = "0.0.0.post27+874c331"
+source = { git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=874c331c4541cd53808b5ce7777fa4cb2686de43#874c331c4541cd53808b5ce7777fa4cb2686de43" }
 dependencies = [
     { name = "array-api-typing" },
+    { name = "typing-extensions" },
 ]
 
 [[package]]
@@ -2777,7 +2778,7 @@ requires-dist = [
     { name = "array-api-compat", specifier = ">=1.13.0" },
     { name = "h5py" },
     { name = "jax", marker = "extra == 'jax'" },
-    { name = "l2d-interface", git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=a5e33e1477374f946ed3295c77fbac3abae0a6e5" },
+    { name = "l2d-interface", git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=874c331c4541cd53808b5ce7777fa4cb2686de43" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "quadax", marker = "extra == 'quadax'" },
     { name = "scipy", specifier = ">=1.12.0" },
