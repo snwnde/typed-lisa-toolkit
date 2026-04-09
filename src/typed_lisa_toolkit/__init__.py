@@ -34,7 +34,7 @@ from ._constructors import (
     wdm,
     wdmdata,
 )
-from ._loaders import load_data, load_ldc_data
+from ._loaders import load_data, load_ldc_data, load_mojito, load_sangria
 
 __all__ = [
     "utils",
@@ -67,7 +67,9 @@ __all__ = [
     "get_dense_maker",
     "cast_mode",
     "load_data",
+    "load_sangria",
     "load_ldc_data",
+    "load_mojito",
     "tsdata",
     "fsdata",
     "stftdata",
