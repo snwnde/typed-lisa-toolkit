@@ -247,7 +247,11 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             timed.save(handle.name)
-            loaded = load_data(handle.name)
+            with self.assertWarnsRegex(
+                DeprecationWarning,
+                "load_data",
+            ):
+                loaded = load_data(handle.name)
 
         self.assertIsInstance(loaded, TimedFSData)
         npt.assert_allclose(np.asarray(loaded.times), times)
@@ -309,7 +313,11 @@ class TestDataContainersNumpy(unittest.TestCase):
         _, _, _, tsdata = _build_tsdata_numpy()
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             tsdata.save(handle.name)
-            loaded = load_data(handle.name)
+            with self.assertWarnsRegex(
+                DeprecationWarning,
+                "load_data",
+            ):
+                loaded = load_data(handle.name)
         self.assertIsInstance(loaded, TSData)
         npt.assert_allclose(
             np.asarray(loaded.get_kernel()), np.asarray(tsdata.get_kernel())
@@ -437,7 +445,11 @@ class TestDataContainersNumpy(unittest.TestCase):
             with h5py.File(handle.name, "w") as f:
                 f.attrs["type"] = "UnknownData"
             with self.assertRaises(ValueError):
-                load_data(handle.name)
+                with self.assertWarnsRegex(
+                    DeprecationWarning,
+                    "load_data",
+                ):
+                    load_data(handle.name)
 
     def test_load_data_dispatches_fsdata(self):
         _, _, _, tsdata = _build_tsdata_numpy()
@@ -445,7 +457,11 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             fsdata.save(handle.name)
-            loaded = load_data(handle.name)
+            with self.assertWarnsRegex(
+                DeprecationWarning,
+                "load_data",
+            ):
+                loaded = load_data(handle.name)
 
         self.assertIsInstance(loaded, FSData)
         npt.assert_allclose(

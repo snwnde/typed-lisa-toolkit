@@ -5,9 +5,8 @@ from __future__ import annotations
 import abc
 import logging
 import pathlib
-import warnings
 
-# import warnings
+import warnings
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, cast, overload
 
@@ -658,7 +657,7 @@ def wdmdata(
     mapping: Mapping[str, reps.WDM],
     name: str | None = None,
 ) -> WDMData:
-    """Construct a :class:`~types.data.WDMData` instance from channel mappings."""
+    """Construct a :class:`~types.WDMData` instance from channel mappings."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return WDMData.from_dict(mapping, name=name)
 
@@ -670,7 +669,27 @@ def construct_tsdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> TSData:
-    """Construct :class:`~types.data.TSData` from grid, entries, and channel names."""
+    """Construct :class:`~types.TSData` from grid, entries, and channel names.
+
+    Parameters
+    ----------
+    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Time grid of the data.
+
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)`` where ``Nt`` is the size of ``times``.
+
+    channels: tuple[str, ...]
+        Names of the channels in the data.
+
+    name: str | None
+        Name of the data. Default is ``None``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    """
     return TSData.from_entries(
         times=times, entries=entries, channels=channels, name=name
     )
@@ -683,7 +702,27 @@ def construct_fsdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> FSData:
-    """Construct :class:`~types.data.FSData` from grid, entries, and channel names."""
+    """Construct :class:`~types.data.FSData` from grid, entries, and channel names.
+
+    Parameters
+    ----------
+    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Frequency grid of the data.
+
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+
+    channels: tuple[str, ...]
+        Names of the channels in the data.
+
+    name: str | None
+        Name of the data. Default is ``None``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    """
     return FSData.from_entries(
         frequencies=frequencies,
         entries=entries,
@@ -700,7 +739,33 @@ def construct_timed_fsdata(
     times: Linspace | npt.NDArray[np.floating[Any]],
     name: str | None = None,
 ) -> TimedFSData:
-    """Construct :class:`~types.data.TimedFSData` from grid, entries, and channel names."""
+    """Construct :class:`~types.data.TimedFSData` from grid, entries, and channel names.
+
+    Parameters
+    ----------
+    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Frequency grid of the data.
+
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+
+    channels: tuple[str, ...]
+        Names of the channels in the data.
+
+    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Associated time grid of the data.
+
+    name: str | None
+        Name of the data. Default is ``None``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    Note that the associated time grid does not count as a grid dimension of the data,
+    hence the shape of `entries` does include the time dimension.
+
+    """
     rep = reps.frequency_series(Linspace.make(frequencies), entries)
     return TimedFSData.from_representation(
         rep, channels=channels, times=times, name=name
@@ -715,7 +780,31 @@ def construct_stftdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> STFTData:
-    """Construct :class:`~types.data.STFTData` from grid, entries, and channel names."""
+    """Construct :class:`~types.data.STFTData` from grid, entries, and channel names.
+
+    Parameters
+    ----------
+    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Frequency grid of the data.
+
+    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Time grid of the data.
+
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf, Nt)`` where ``Nf`` and ``Nt`` are the sizes
+        of ``frequencies`` and ``times``, respectively.
+
+    channels: tuple[str, ...]
+        Names of the channels in the data.
+
+    name: str | None
+        Name of the data. Default is ``None``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    """
     return STFTData.from_entries(
         frequencies=frequencies,
         times=times,
@@ -733,7 +822,31 @@ def construct_wdmdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> WDMData:
-    """Construct :class:`~types.data.WDMData` from grid, entries, and channel names."""
+    """Construct :class:`~types.data.WDMData` from grid, entries, and channel names.
+
+    Parameters
+    ----------
+    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Frequency grid of the data.
+
+    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Time grid of the data.
+
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf+1, Nt)`` where ``Nf+1`` and ``Nt`` are the sizes
+        of ``frequencies`` and ``times``, respectively.
+
+    channels: tuple[str, ...]
+        Names of the channels in the data.
+
+    name: str | None
+        Name of the data. Default is ``None``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    """
     return WDMData.from_entries(
         frequencies=frequencies,
         times=times,
@@ -744,9 +857,18 @@ def construct_wdmdata(
 
 
 def load_data(file_path: str | pathlib.Path, legacy: bool = False):
-    """Load the data from a saved HDF5 file (*Deprecated*)."""
+    """Load the data from a saved HDF5 file (*Deprecated*).
+    
+    Warning
+    -------
+    This function is deprecated and will be removed in 0.8.0; use the
+    class method ``load`` of the specific data type instead, namely :meth:`TSData.load <typed_lisa_toolkit.types.TSData.load>`, 
+    :meth:`FSData.load <typed_lisa_toolkit.types.FSData.load>`, :meth:`TimedFSData.load <typed_lisa_toolkit.types.TimedFSData.load>`,
+    :meth:`STFTData.load <typed_lisa_toolkit.types.STFTData.load>`, or :meth:`WDMData.load <typed_lisa_toolkit.types.WDMData.load>`.
+
+    """
     warnings.warn(
-        "The function `load_data` is deprecated and will be removed in 0.8"
+        "The function `load_data` is deprecated and will be removed in 0.8.0;"
         + "Use the class method `load` of the specific data type instead,"
         + "e.g., `TSData.load`, `FSData.load`, or `TimedFSData.load`.",
         DeprecationWarning,

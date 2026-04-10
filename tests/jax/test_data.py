@@ -235,7 +235,11 @@ class TestDataContainersJAX(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             timed.save(handle.name)
-            loaded = load_data(handle.name)
+            with self.assertWarnsRegex(
+                DeprecationWarning,
+                "load_data",
+            ):
+                loaded = load_data(handle.name)
 
         self.assertIsInstance(loaded, TimedFSData)
         npt.assert_allclose(np.asarray(loaded.times), times)
@@ -296,7 +300,11 @@ class TestDataContainersJAX(unittest.TestCase):
         _, tsdata = _build_tsdata_jax()
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             tsdata.save(handle.name)
-            loaded = load_data(handle.name)
+            with self.assertWarnsRegex(
+                DeprecationWarning,
+                "load_data",
+            ):
+                loaded = load_data(handle.name)
         self.assertIsInstance(loaded, TSData)
         npt.assert_allclose(
             np.asarray(loaded.get_kernel()), np.asarray(tsdata.get_kernel())
@@ -422,7 +430,11 @@ class TestDataContainersJAX(unittest.TestCase):
             with h5py.File(handle.name, "w") as f:
                 f.attrs["type"] = "UnknownData"
             with self.assertRaises(ValueError):
-                load_data(handle.name)
+                with self.assertWarnsRegex(
+                    DeprecationWarning,
+                    "load_data",
+                ):
+                    load_data(handle.name)
 
     def test_load_data_dispatches_fsdata(self):
         _, tsdata = _build_tsdata_jax()
@@ -430,7 +442,11 @@ class TestDataContainersJAX(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             fsdata.save(handle.name)
-            loaded = load_data(handle.name)
+            with self.assertWarnsRegex(
+                DeprecationWarning,
+                "load_data",
+            ):
+                loaded = load_data(handle.name)
 
         self.assertIsInstance(loaded, FSData)
         npt.assert_allclose(
@@ -612,12 +628,32 @@ class TestDataContainersJAX(unittest.TestCase):
         freqs = jnp.fft.rfftfreq(len(times), d=float(times[1] - times[0]))
 
         stft_mapping = {
-            "X": stft(freqs, times, jnp.ones((1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64)),
-            "Y": stft(freqs, times, jnp.ones((1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64)),
+            "X": stft(
+                freqs,
+                times,
+                jnp.ones((1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64),
+            ),
+            "Y": stft(
+                freqs,
+                times,
+                jnp.ones((1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64),
+            ),
         }
         wdm_mapping = {
-            "X": wdm(frequencies=freqs, times=times, entries=jnp.ones((1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64)),
-            "Y": wdm(frequencies=freqs, times=times, entries=jnp.ones((1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64)),
+            "X": wdm(
+                frequencies=freqs,
+                times=times,
+                entries=jnp.ones(
+                    (1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64
+                ),
+            ),
+            "Y": wdm(
+                frequencies=freqs,
+                times=times,
+                entries=jnp.ones(
+                    (1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64
+                ),
+            ),
         }
 
         stft_data = STFTData.from_dict(stft_mapping)
