@@ -19,6 +19,7 @@ from tests._helpers import (
     build_wdm_pair,
 )
 from typed_lisa_toolkit import (
+    fsdata,
     load_data,
     load_ldc_data,
     shop,
@@ -77,46 +78,6 @@ class TestDataContainersNumpy(unittest.TestCase):
             np.fft.rfftfreq(len(times), d=tsdata.dt),
         )
 
-    # def test_fsdata_to_wdmdata_and_back_preserves_channels(self):
-    #     _, _, _, tsdata = _build_tsdata_numpy()
-    #     fsdata = tsdata.to_fsdata(keep_times=False)
-
-    #     wdmdata = fsdata.to_wdm_data(Nf=2, Nt=2)
-    #     recovered = wdmdata.to_fsdata()
-
-    #     self.assertIsInstance(wdmdata, WDMData)
-    #     self.assertIsInstance(recovered, FSData)
-    #     self.assertEqual(wdmdata.channel_names, fsdata.channel_names)
-    #     self.assertEqual(recovered.channel_names, fsdata.channel_names)
-    #     self.assertEqual(np.asarray(wdmdata["X"].entries).shape[-2:], (2, 2))
-    #     self.assertEqual(
-    #         np.asarray(recovered.get_kernel()).shape[-1],
-    #         np.asarray(recovered.frequencies).shape[0],
-    #     )
-
-    # def test_wdm_fs_wdm_roundtrip_preserves_grid_and_entries(self):
-    #     wdmdata = build_wdm_pair(np)["left"]
-    #     nf, nt = wdmdata["X"].Nf, wdmdata["X"].Nt
-    #
-    #     fsdata = wdmdata.to_fsdata()
-    #     roundtrip = fsdata.to_wdm_data(Nf=nf, Nt=nt)
-    #
-    #     self.assertIsInstance(roundtrip, WDMData)
-    #     self.assertEqual(roundtrip.channel_names, wdmdata.channel_names)
-    #     npt.assert_allclose(
-    #         np.asarray(roundtrip["X"].times), np.asarray(wdmdata["X"].times)
-    #     )
-    #     npt.assert_allclose(
-    #         np.asarray(roundtrip["X"].frequencies),
-    #         np.asarray(wdmdata["X"].frequencies),
-    #     )
-    #     npt.assert_allclose(
-    #         np.asarray(roundtrip.get_kernel()),
-    #         np.asarray(wdmdata.get_kernel()),
-    #         rtol=1e-7,
-    #         atol=1e-7,
-    #     )
-
     def test_phase2_deprecated_methods_work(self):
         _, _, _, tsdata = _build_tsdata_numpy()
         fsdata = self._assert_to_fsdata_deprecation(tsdata, keep_times=False)
@@ -142,7 +103,7 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            fs_from_ts_pos = tsdata.representation.rfft(None)
+            fs_from_ts_pos = tsdata._representation.rfft(None)
         self.assertTrue(
             any(
                 str(item.message)
@@ -159,12 +120,12 @@ class TestDataContainersNumpy(unittest.TestCase):
         )
         npt.assert_allclose(
             np.asarray(fs_from_ts_pos.entries),
-            np.asarray(shop.time2freq(tsdata.representation).entries),
+            np.asarray(shop.time2freq(tsdata._representation).entries),
         )
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            ts_from_fs_pos = fsdata.representation.irfft(np.asarray(times), None)
+            ts_from_fs_pos = fsdata._representation.irfft(np.asarray(times), None)
         self.assertTrue(
             any(
                 str(item.message)
@@ -181,7 +142,9 @@ class TestDataContainersNumpy(unittest.TestCase):
         )
         npt.assert_allclose(
             np.asarray(ts_from_fs_pos.entries),
-            np.asarray(shop.freq2time(fsdata.representation, times=np.asarray(times)).entries),
+            np.asarray(
+                shop.freq2time(fsdata._representation, times=np.asarray(times)).entries
+            ),
         )
 
     def test_fsdata_frequencies_and_df(self):
@@ -247,7 +210,7 @@ class TestDataContainersNumpy(unittest.TestCase):
     def test_from_waveform_preserves_entries_and_channels(self):
         case = build_harmonic_projected_frequency_waveform(np)
 
-        data = FSData.from_waveform(case["resp_22"])
+        data = fsdata(case["resp_22"])
 
         self.assertEqual(data.channel_names, case["resp_22"].channel_names)
         npt.assert_allclose(
@@ -258,11 +221,11 @@ class TestDataContainersNumpy(unittest.TestCase):
     def test_get_embedded_expands_frequency_grid(self):
         case = build_fdata(np)
         embedding = np.array([0.5, 1.0, 2.0, 3.0, 4.0, 5.0])
-    
+
         embedded = case.get_embedded((embedding,))
         got = np.asarray(embedded.get_kernel())
         source = np.asarray(case.get_kernel())
-    
+
         self.assertEqual(np.asarray(embedded.frequencies).shape[0], 6)
         npt.assert_allclose(got[..., 1:4], source)
         npt.assert_allclose(got[..., 0], 0.0)
@@ -351,10 +314,10 @@ class TestDataContainersNumpy(unittest.TestCase):
 
     def test_channel_mapping_create_like(self):
         case = build_fdata(np)
-        new_entries = np.zeros_like(np.asarray(case.entries))
+        new_entries = np.zeros_like(np.asarray(case.get_kernel()))
         new_data = case.create_like(new_entries, case.channel_names)
         self.assertIsInstance(new_data, FSData)
-        npt.assert_allclose(np.asarray(new_data.entries), 0.0)
+        npt.assert_allclose(np.asarray(new_data.get_kernel()), 0.0)
 
     def test_channel_mapping_repr_includes_class_name(self):
         case = build_fdata(np)
@@ -369,7 +332,7 @@ class TestDataContainersNumpy(unittest.TestCase):
 
     def test_from_dict_empty_raises(self):
         with self.assertRaises(ValueError):
-            FSData.from_dict({})
+            fsdata({})
 
     def test_timedfsdata_set_times_updates_in_place(self):
         case = build_fdata(np)
@@ -399,15 +362,15 @@ class TestDataContainersNumpy(unittest.TestCase):
         left_copy = FSData.from_dict({chn: left[chn] for chn in left.channel_names})
         left_copy += right
         npt.assert_allclose(
-            np.asarray(left_copy.entries),
-            np.asarray(left.entries) + np.asarray(right.entries),
+            np.asarray(left_copy.get_kernel()),
+            np.asarray(left.get_kernel()) + np.asarray(right.get_kernel()),
         )
 
         # Reflected multiplication: scalar * data (tests _binary_op reflected=True)
         scaled = 2.0 * left
         npt.assert_allclose(
-            np.asarray(scaled.entries),
-            2.0 * np.asarray(left.entries),
+            np.asarray(scaled.get_kernel()),
+            2.0 * np.asarray(left.get_kernel()),
         )
 
     def test_channel_mapping_properties_namespace_and_pick_string(self):
@@ -415,23 +378,25 @@ class TestDataContainersNumpy(unittest.TestCase):
         left = case
 
         self.assertIs(left.xp, left.__xp__())
-        self.assertEqual(left.grid, left.representation.grid)
-        self.assertEqual(left.domain, left.representation.domain)
-        self.assertEqual(left.kind, left.representation.kind)
-        npt.assert_allclose(np.asarray(left.get_kernel()), np.asarray(left.entries))
+        self.assertEqual(left.grid, left._representation.grid)
+        self.assertEqual(left.domain, left._representation.domain)
+        self.assertEqual(left.kind, left._representation.kind)
+        npt.assert_allclose(
+            np.asarray(left.get_kernel()), np.asarray(left.get_kernel())
+        )
 
         picked = left.pick("X")
         self.assertEqual(picked.channel_names, ("X",))
-        self.assertEqual(np.asarray(picked.entries).shape[1], 1)
+        self.assertEqual(np.asarray(picked.get_kernel()).shape[1], 1)
 
     def test_data_unary_op_and_mismatched_binary_op(self):
         case = build_fd_pair(np)
         left = case["left"]
-        right = FSData(left.representation, ("A", "B"))
+        right = FSData(left._representation, ("A", "B"))
 
         absolute = abs(left)
         npt.assert_allclose(
-            np.asarray(absolute.entries), np.abs(np.asarray(left.entries))
+            np.asarray(absolute.get_kernel()), np.abs(np.asarray(left.get_kernel()))
         )
 
         with self.assertRaises(ValueError):
@@ -440,7 +405,7 @@ class TestDataContainersNumpy(unittest.TestCase):
     def test_timedfsdata_requires_times(self):
         case = build_fdata(np)
         with self.assertRaises(ValueError):
-            TimedFSData(case.representation, case.channel_names)
+            TimedFSData(case._representation, case.channel_names)
 
     def test_tsdata_get_zero_padded(self):
         _, _, _, tsdata = _build_tsdata_numpy()
@@ -448,15 +413,15 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         self.assertIsInstance(padded, TSData)
         self.assertEqual(
-            np.asarray(padded.entries).shape[-1],
-            np.asarray(tsdata.entries).shape[-1] + 3,
+            np.asarray(padded.get_kernel()).shape[-1],
+            np.asarray(tsdata.get_kernel()).shape[-1] + 3,
         )
         npt.assert_allclose(
-            np.asarray(padded.entries)[..., 1:-2],
-            np.asarray(tsdata.entries),
+            np.asarray(padded.get_kernel())[..., 1:-2],
+            np.asarray(tsdata.get_kernel()),
         )
-        npt.assert_allclose(np.asarray(padded.entries)[..., :1], 0.0)
-        npt.assert_allclose(np.asarray(padded.entries)[..., -2:], 0.0)
+        npt.assert_allclose(np.asarray(padded.get_kernel())[..., :1], 0.0)
+        npt.assert_allclose(np.asarray(padded.get_kernel())[..., -2:], 0.0)
 
     def test_load_data_unknown_type_raises(self):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
@@ -474,7 +439,9 @@ class TestDataContainersNumpy(unittest.TestCase):
             loaded = load_data(handle.name)
 
         self.assertIsInstance(loaded, FSData)
-        npt.assert_allclose(np.asarray(loaded.entries), np.asarray(fsdata.entries))
+        npt.assert_allclose(
+            np.asarray(loaded.get_kernel()), np.asarray(fsdata.get_kernel())
+        )
 
     def test_load_ldc_data_aet_to_xyz(self):
         n = 16
@@ -494,7 +461,7 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         self.assertIsInstance(loaded, TSData)
         self.assertEqual(loaded.channel_names, ("X", "Y", "Z"))
-        self.assertEqual(np.asarray(loaded.entries).shape[-1], n)
+        self.assertEqual(np.asarray(loaded.get_kernel()).shape[-1], n)
 
     def test_load_ldc_data_xyz_to_ae(self):
         n = 16
@@ -514,7 +481,7 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         self.assertIsInstance(loaded, TSData)
         self.assertEqual(loaded.channel_names, ("A", "E"))
-        self.assertEqual(np.asarray(loaded.entries).shape[-1], n)
+        self.assertEqual(np.asarray(loaded.get_kernel()).shape[-1], n)
 
     def test_load_ldc_data_direct_pick_branch(self):
         n = 16

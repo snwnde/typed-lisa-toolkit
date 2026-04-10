@@ -990,7 +990,7 @@ class TestComplexProperties(unittest.TestCase):
     def setUp(self):
         """Create test fixtures for complex property tests."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 2, 1, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_freq = 50
 
         # Frequency grid

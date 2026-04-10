@@ -6,7 +6,11 @@ import numpy as np
 import numpy.testing as npt
 
 from typed_lisa_toolkit import shop, time_series
-from typed_lisa_toolkit.types import EvolutionarySpectralDensity, SpectralDensity, TSData
+from typed_lisa_toolkit.types import (
+    EvolutionarySpectralDensity,
+    SpectralDensity,
+    TSData,
+)
 
 
 def _build_xyz_tsdata_numpy(n: int = 8) -> TSData:

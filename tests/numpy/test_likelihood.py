@@ -11,7 +11,7 @@ from tests._helpers import (
     build_harmonic_projected_frequency_waveform,
     dense_kernel_2ch,
 )
-from typed_lisa_toolkit import sum_harmonics
+from typed_lisa_toolkit import fsdata, sum_harmonics
 from typed_lisa_toolkit.types import (
     FDNoiseModel,
     FDWhittleLikelihood,
@@ -74,7 +74,7 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
 
     def test_harmonic_projected_template_is_summed_before_evaluation(self):
         case = build_harmonic_projected_frequency_waveform(np)
-        data = FSData.from_waveform(sum_harmonics(case["wf"]))
+        data = fsdata(sum_harmonics(case["wf"]))
         model = FDNoiseModel(
             SpectralDensity(case["frequencies"], dense_kernel_2ch(np), ["X", "Y"])
         )
@@ -83,7 +83,7 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
         got = np.asarray(likelihood.get_cross_product(case["wf"]))
         expected = np.asarray(
             model.reset().get_scalar_product(
-                data, FSData.from_waveform(sum_harmonics(case["wf"]))
+                data, fsdata(sum_harmonics(case["wf"]))
             )
         )
 

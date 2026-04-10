@@ -14,11 +14,12 @@ import abc
 import logging
 import operator
 from collections.abc import Callable, Iterator, Mapping
-from typing import TYPE_CHECKING, Any, Self, cast, overload
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import array_api_compat as xpc
+import l2d_interface.validators as l2dv
 
-from .misc import AnyGrid, Array
+from .misc import AnyGrid, Array, Domain
 
 
 if TYPE_CHECKING:
@@ -246,20 +247,20 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
 
     def __init__(
         self,
-        representation: "AnyReps",
+        _input_repr: "AnyReps",
         channels: tuple[str, ...],
         name: str | None = None,
     ):
         self._channel_names: tuple[str, ...] = tuple(channels)
-        self._init_repr(representation)
-        entries = self.representation.entries
+        self._init_repr(_input_repr)
+        entries = self._representation.entries
         if entries.shape[1] != len(self.channel_names):
             raise ValueError(
-                "Channel count mismatch between representation entries and channel names."
+                "Channel count mismatch between _representation entries and channel names."
             )
         if entries.shape[2] != 1:
             raise ValueError(
-                "Data containers require n_harmonics=1 in the representation entries."
+                "Data containers require n_harmonics=1 in the _representation entries."
             )
         self._channel_to_idx: dict[str, int] = {
             chn: i for i, chn in enumerate(channels)
@@ -267,24 +268,28 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
         self.name: str | None = name
 
     @property
-    def representation(self) -> RepT:
-        """Return the underlying representation."""
-        return cast(RepT, self._representation)
+    def _representation(self) -> RepT:
+        """Return the underlying _representation."""
+        return cast(RepT, self._input_repr)
 
-    def _init_repr(self, representation: "AnyReps"):
-        self._representation: AnyReps = representation
+    def _init_repr(self, _input_repr: "AnyReps"):
+        self._input_repr: AnyReps = _input_repr
 
-    def create_new(self, representation: "AnyReps", channels: tuple[str, ...]) -> Self:
-        """Create a new instance with a representation and channels."""
-        return type(self)(representation, channels, self.name)
+    def _create_new(
+        self, _representation: "AnyReps", channels: tuple[str, ...]
+    ) -> Self:
+        """Create a new instance with a _representation and channels."""
+        return type(self)(_representation, channels, self.name)
 
     def create_like(self, entries: "Array", channels: tuple[str, ...]) -> Self:
         """Create a new instance with different entries but the same grid and type."""
-        return type(self)(self.representation.create_like(entries), channels, self.name)
+        return type(self)(
+            self._representation.create_like(entries), channels, self.name
+        )
 
     def __xp__(self, api_version: str | None = None) -> Any:
-        """Get the array namespace from the representation entries."""
-        return xpc.get_namespace(self.representation.entries, api_version=api_version)
+        """Get the array namespace from the _representation entries."""
+        return xpc.get_namespace(self._representation.entries, api_version=api_version)
 
     def _binary_op(
         self,
@@ -302,49 +307,38 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
             if self.channel_names != other.channel_names:
                 raise ValueError("Cannot operate on data with different channel sets.")
             if reflected:
-                new_repr = op(other.representation, self.representation)
+                new_repr = op(other._representation, self._representation)
             else:
-                new_repr = op(self.representation, other.representation)
+                new_repr = op(self._representation, other._representation)
         else:
             # Scalar or array-like broadcast
             if reflected:
-                new_repr = op(other, self.representation)
+                new_repr = op(other, self._representation)
             else:
-                new_repr = op(self.representation, other)
+                new_repr = op(self._representation, other)
 
         if inplace:
-            self._representation = cast("AnyReps", new_repr)
+            self._input_repr = cast("AnyReps", new_repr)
             return self
 
-        return self.create_new(cast(RepT, new_repr), self.channel_names)
+        return self._create_new(cast(RepT, new_repr), self.channel_names)
 
     def _unary_op(self, op: Callable[[object], object], /, **kwargs: Any) -> Self:
         """Apply unary operation using native array ops."""
-        new_repr = op(self.representation, **kwargs)
-        return self.create_new(cast(RepT, new_repr), self.channel_names)
+        new_repr = op(self._representation, **kwargs)
+        return self._create_new(cast(RepT, new_repr), self.channel_names)
 
     def pick(self, channels: str | tuple[str, ...]) -> Self:
-        """Pick specific channels.
-
-        Parameters
-        ----------
-        channels : str or tuple[str, ...]
-            Channel name(s) to pick.
-
-        Returns
-        -------
-        Self
-            New instance with only the specified channels.
-        """
+        """Return a new instance containing only the specified channels."""
         if isinstance(channels, str):
             channels = (channels,)
 
         indices = tuple([self._channel_to_idx[chn] for chn in channels])
         # Slice entries to pick only these channels (canonical shape: n_batches, n_channels, ...)
-        xp = xpc.get_namespace(self.representation.entries)
-        picked_entries = xp.asarray(self.representation.entries)[:, indices, ...]
-        picked_repr = self.representation.create_like(picked_entries)
-        return self.create_new(picked_repr, channels)
+        xp = xpc.get_namespace(self._representation.entries)
+        picked_entries = xp.asarray(self._representation.entries)[:, indices, ...]
+        picked_repr = self._representation.create_like(picked_entries)
+        return self._create_new(picked_repr, channels)
 
     @classmethod
     def from_dict[RT: "AnyReps"](
@@ -366,7 +360,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
 
         .. note:: The name is only used for labeling the data container in plots.
 
-        .. note:: This method returns `self` to allow for fluent method chaining.
+        .. note:: This method returns ``self`` to allow for fluent method chaining.
         """
         self.name = name
         return self
@@ -375,8 +369,8 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
     def __getitem__(self, key: str) -> RepT:
         """Get a channel by name as a view with preserved channel dimension (size 1)."""
         idx = self._channel_to_idx[key]
-        entries_view = self.representation.entries[:, idx : idx + 1, 0:1, ...]
-        return self.representation.create_like(entries_view)
+        entries_view = self._representation.entries[:, idx : idx + 1, 0:1, ...]
+        return self._representation.create_like(entries_view)
 
     def __iter__(self) -> Iterator[str]:
         """Iterate over channel names."""
@@ -392,35 +386,40 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
             return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
         return f"{self.__class__.__name__}({items!r})"
 
-    @overload
-    def grid[GridT: AnyGrid](  # pyright: ignore[reportInconsistentOverload]
+    def get_grid[GridT: AnyGrid](
         self: "ChannelMapping[reps.Representation[GridT]]",
-    ) -> GridT: ...
+    ) -> GridT:
+        """Return the grid."""
+        return self._representation.grid
 
     @property
     def grid(self):
-        """Return the grid."""
-        return self.representation.grid
+        """Return the grid.
+        
+        .. note::
+            This is the property version of :meth:`get_grid`. 
+        """
+        return self.get_grid()
 
     @property
-    def domain(self):
+    def domain(self) -> Domain:
         """Physical domain shared by all channels."""
-        return self.representation.domain
+        return self._representation.domain
 
     @property
     def kind(self):
         """Semantic kind shared by all channels."""
-        return self.representation.kind
+        return self._representation.kind
 
-    @property
-    def entries(self) -> Any:
-        """Return the raw entries array for direct matrix operations.
-
-        Shape is (n_channels, ...) where ... depends on the representation type.
-        Use this for complicated array operations with numpy/jax.
-        """
-        return self.representation.entries
-
-    def get_kernel(self):
+    def get_kernel(self) -> Array:
         """Return kernel entries in conventional shape."""
-        return self.representation.entries
+        return self._representation.entries
+
+
+def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"]):
+    """Validate that a mapping maps to valid representations."""
+    for key, rep in mapping.items():
+        try:
+            l2dv.validate_representation(rep)
+        except ValueError as error:
+            raise ValueError(f"Invalid representation for key {key!r}.") from error

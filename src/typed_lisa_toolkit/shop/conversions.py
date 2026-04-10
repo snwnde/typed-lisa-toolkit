@@ -1,15 +1,18 @@
 from collections.abc import Mapping
 from types import ModuleType
-from typing import Any, overload, Literal
+from typing import Any, Literal, overload
+
 import array_api_compat as xpc
 
 from ..types import (
-    representations as reps,
-    Axis,
-    TimedFSData,
     Array,
-    SpectralDensity,
+    Axis,
     EvolutionarySpectralDensity,
+    SpectralDensity,
+    TimedFSData,
+)
+from ..types import (
+    representations as reps,
 )
 from ..types._mixins import ChannelMapping
 
