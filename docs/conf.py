@@ -71,6 +71,10 @@ from _sphinx_handlers import (
 #     "FormattedWaveform": "FormattedWaveform",
 # }
 
+intersphinx_mapping = {
+    "l2d-interface": ("https://l2d-interface-c43116.pages.in2p3.fr/", None),
+}
+
 extlinks = {
     "doi": ("https://dx.doi.org/%s", "doi:%s"),
 }

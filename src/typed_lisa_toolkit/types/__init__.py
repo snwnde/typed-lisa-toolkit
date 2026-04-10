@@ -11,6 +11,7 @@ Representation Types
 .. autosummary::
    :toctree: _generated
    :template: reps_class.rst
+   :nosignatures:
 
    TimeSeries
    UniformTimeSeries
@@ -30,6 +31,7 @@ Data Types
 .. autosummary::
    :toctree: _generated
    :template: class.rst
+   :nosignatures:
 
     TSData
     FSData
@@ -48,6 +50,7 @@ Mode Types
 .. autosummary::
    :toctree: _generated
    :template: type.rst
+   :nosignatures:
 
     Harmonic
     QuasiNormalMode
@@ -64,6 +67,7 @@ Waveform Types
 .. autosummary::
    :toctree: _generated
    :template: class.rst
+   :nosignatures:
 
     HarmonicWaveform
     HomogeneousHarmonicWaveform
@@ -81,6 +85,7 @@ Spectral Density Matrices
 .. autosummary::
    :toctree: _generated
    :template: type.rst
+   :nosignatures:
 
    SpectralDensity
    DiagonalSpectralDensity
@@ -95,6 +100,7 @@ Noise Model Types
 .. autosummary::
    :toctree: _generated
    :template: type.rst
+   :nosignatures:
 
    FDNoiseModelLike
    FDNoiseModel
@@ -107,6 +113,7 @@ Likelihood Types
 .. autosummary::
     :toctree: _generated
     :template: type.rst
+    :nosignatures:
 
     Likelihood
     FDWhittleLikelihood
@@ -119,6 +126,7 @@ Miscellaneous
 .. autosummary::
    :toctree: _generated
    :template: type.rst
+   :nosignatures:
 
    Array
    ArrayFunc
@@ -135,6 +143,7 @@ Miscellaneous
 .. autosummary::
    :toctree: _generated
    :template: type.rst
+   :nosignatures:
 
    Linspace
    IntegrationMethod

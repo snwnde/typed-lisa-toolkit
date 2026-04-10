@@ -17,12 +17,12 @@ import numpy.typing as npt
 
 from . import _mixins, tapering
 from . import representations as reps
-from .misc import AnyGrid, Array, Axis, Linspace
+from .misc import AnyGrid, Array, Axis, Grid1D, Linspace
 
 if TYPE_CHECKING:
     from MojitoProcessor import SignalProcessor
 
-    from . import waveforms as wf
+    # from .waveforms import ProjectedWaveform
     from .representations import Representation
 
     AnyReps = Representation[AnyGrid]
@@ -49,18 +49,18 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
 
     @property
     @abc.abstractmethod
-    def representation(self) -> RepT:
-        """Return the underlying representation."""
+    def _representation(self) -> RepT:
+        """Return the underlying _representation."""
 
     @abc.abstractmethod
-    def create_new(self, representation: RepT, channels: tuple[str, ...]) -> Self: ...
+    def _create_new(self, _representation: RepT, channels: tuple[str, ...]) -> Self: ...
 
     def get_subset(
         self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
     ) -> Self:
         """Return the subset as a new instance."""
-        subset = self.representation.get_subset(interval=interval, slice=slice)
-        return self.create_new(
+        subset = self._representation.get_subset(interval=interval, slice=slice)
+        return self._create_new(
             subset,
             self.channel_names,
         )
@@ -91,15 +91,15 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
 class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
     """Channel-indexed data containers.
 
-    Stores a single homogeneous representation with channels as the first dimension,
+    Stores a single homogeneous _representation with channels as the first dimension,
     providing per-channel access via views and the Mapping protocol.
     """
 
     _reps_type: type[RepT]
 
-    def _init_repr(self, representation: "AnyReps"):
-        self._representation: "AnyReps" = self._reps_type(
-            representation.grid, representation.entries
+    def _init_repr(self, _input_repr: "AnyReps"):
+        self._input_repr: "AnyReps" = self._reps_type(
+            _input_repr.grid, _input_repr.entries
         )
 
     def _get_plotter(self) -> type[Any]:
@@ -112,18 +112,16 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
     def save(self, file_path: str | pathlib.Path):
         """Save the data to an HDF5 file.
 
-        HDF5 File Structure
-        -------------------
         The data are saved in the following structure:
 
-        - The root level contains the attribute 'type' with the class name.
+        - The root level contains the attribute ``type`` with the class name.
         - Each channel is saved as a group.
         - The group contains two datasets:
 
-          - `grid` for the grid.
-          - `entries` for the entries.
+          - ``grid`` for the grid.
+          - ``entries`` for the entries.
 
-        - For :class:`.TimedFSData`, there will be a dataset 'times' at the root level containing the time grid.
+        - For :class:`.TimedFSData`, there will be a dataset ``times`` at the root level containing the time grid.
 
         """
         with h5py.File(str(file_path), "a") as f:
@@ -131,8 +129,8 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
             f.attrs["channels"] = self.channel_names
             self._additional_save(f)
             grp = f.create_group("data")
-            grp.create_dataset("grid", data=self.representation.grid)
-            grp.create_dataset("entries", data=cast(Any, self.representation.entries))
+            grp.create_dataset("grid", data=self._representation.grid)
+            grp.create_dataset("entries", data=cast(Any, self._representation.entries))
 
     @classmethod
     def _additional_load(cls, f: h5py.File) -> dict[str, Any]:
@@ -169,10 +167,10 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
             repr_obj = cls._reps_type(grid_data, entries_data)
         return cls(repr_obj, channels, **additions)
 
-    @classmethod
-    def from_waveform(cls, waveform: "wf.ProjectedWaveform[RepT]"):
-        """Create a new instance from a projected waveform."""
-        return cls(waveform.representation, waveform.channel_names)
+    # @classmethod
+    # def from_waveform(cls, waveform: "ProjectedWaveform[RepT]"):
+    #     """Create a new instance from a projected waveform."""
+    #     return cls(waveform._representation, waveform.channel_names)
 
 
 class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
@@ -181,37 +179,43 @@ class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
 
 
 class TSData(_SeriesData[reps.UniformTimeSeries]):
-    """Multi-channel time series data container."""
+    """Multi-channel time series data container.
+
+    .. note::
+        To construct a :class:`.TSData`, use the factory
+        function :func:`~typed_lisa_toolkit.tsdata`.
+
+    """
 
     _reps_type: type[reps.UniformTimeSeries] = reps.UniformTimeSeries
 
     @property
     def times(self):
         """Return the times."""
-        return self.representation.times
+        return self._representation.times
 
     @property
     def dt(self) -> float:
         """Return the time step."""
-        return self.representation.dt
+        return self._representation.dt
 
     @property
     def t_start(self) -> float:
         """Return the start time."""
-        return self.representation.t_start
+        return self._representation.t_start
 
     @property
     def t_end(self) -> float:
         """Return the end time."""
-        return self.representation.t_end
+        return self._representation.t_end
 
     def get_frequencies(self):
         """Return the frequencies grid matching the time grid."""
-        return np.fft.rfftfreq(len(self.times), d=self.dt)
+        return self.xp.fft.rfftfreq(len(self.times), d=self.dt)
 
-    def get_embedded(self, embedding_grid: "reps.Grid1D[Axis]"):
+    def get_embedded(self, embedding_grid: "Grid1D[Axis]"):
         """Return data embedded on a new 1D grid."""
-        embedded = self.representation.get_embedded(embedding_grid)
+        embedded = self._representation.get_embedded(embedding_grid)
         return type(self)(
             embedded,
             self.channel_names,
@@ -241,15 +245,17 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     ):
         """Return the frequency series data (*Deprecated*).
 
+        .. warning::
+            This method is deprecated and will be removed in 0.8.0; use 
+            :func:`~typed_lisa_toolkit.shop.time2freq` instead.
+
         Returns
         -------
         :class:`.FSData` | :class:`.TimedFSData`
             The frequency series data. If `keep_times` is `True`, the time grid is kept.
 
-        .. warning::
-            This method is deprecated and will be removed in 0.8.0; use `shop.time2freq` instead.
         """
-        fsrepr = self.representation.rfft(tapering=tapering)
+        fsrepr = self._representation.rfft(tapering=tapering)
         if keep_times:
             return TimedFSData(fsrepr, self.channel_names, times=self.times)
         return FSData(fsrepr, self.channel_names)
@@ -260,7 +266,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         tapering: tapering.Tapering | None = None,
     ) -> Self:
         """Return the zero-padded data."""
-        xp = xpc.get_namespace(self.entries)
+        xp = xpc.get_namespace(self.get_kernel())
         _times = xp.asarray(self.times)
         pad_width = tuple(int(xp.rint(time / self.dt)) for time in pad_time)
         time_end_values = (
@@ -275,7 +281,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         )
 
         tapering_window = tapering(_times) if tapering is not None else 1
-        signal = self.entries * tapering_window
+        signal = self.get_kernel() * tapering_window
         padded_signal = xp.pad(
             signal,
             ((0, 0), (0, 0), (0, 0), (0, 0), pad_width),
@@ -283,7 +289,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         )
 
         padded_repr = reps.UniformTimeSeries((padded_time,), padded_signal)
-        return self.create_new(padded_repr, self.channel_names)
+        return self._create_new(padded_repr, self.channel_names)
 
     def _get_plotter(self):
         from ..viz import plotters
@@ -292,37 +298,43 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
 
 
 class FSData(_SeriesData[reps.UniformFrequencySeries]):
-    """Multi-channel frequency series data container."""
+    """Multi-channel frequency series data container.
+
+    .. note::
+        To construct a :class:`.FSData`, use the factory
+        function :func:`~typed_lisa_toolkit.fsdata`.
+
+    """
 
     _reps_type: type[reps.UniformFrequencySeries] = reps.UniformFrequencySeries
 
     @property
     def frequencies(self):
         """Return the frequencies."""
-        return self.representation.frequencies
+        return self._representation.frequencies
 
     @property
     def df(self):
         """Return the frequency step."""
-        return self.representation.df
+        return self._representation.df
 
     @property
     def f_min(self):
         """Return the minimum frequency."""
-        return self.representation.f_min
+        return self._representation.f_min
 
     @property
     def f_max(self):
         """Return the maximum frequency."""
-        return self.representation.f_max
+        return self._representation.f_max
 
-    def set_times(self, times: "Axis"):
-        """Set the time grid."""
-        return TimedFSData(self.representation, self.channel_names, times)
+    def set_times(self, times: "Axis") -> TimedFSData:
+        """Return a :class:`.TimedFSData` with the time grid set."""
+        return TimedFSData(self._representation, self.channel_names, times)
 
-    def get_embedded(self, embedding_grid: "reps.Grid1D[Axis]"):
+    def get_embedded(self, embedding_grid: "Grid1D[Axis]"):
         """Return data embedded on a new 1D grid."""
-        embedded = self.representation.get_embedded(embedding_grid)
+        embedded = self._representation.get_embedded(embedding_grid)
         return type(self)(
             embedded,
             self.channel_names,
@@ -338,9 +350,9 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
 
         .. warning::
             This method is deprecated and will be removed in 0.8.0; use
-            `shop.freq2time` instead.
+            :func:`~typed_lisa_toolkit.shop.freq2time` instead.
         """
-        tsrepr = self.representation.irfft(np.asarray(times), tapering=tapering)
+        tsrepr = self._representation.irfft(np.asarray(times), tapering=tapering)
         return TSData(tsrepr, self.channel_names)
 
     def _get_plotter(self):
@@ -350,16 +362,21 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
 
 
 class TimedFSData(FSData):
-    """Multi-channel frequency series data with time information."""
+    """Multi-channel frequency series data with time information.
+
+    .. note::
+        To construct a :class:`.TimedFSData`, use the factory
+        function :func:`~typed_lisa_toolkit.timed_fsdata`.
+    """
 
     def __init__(
         self,
-        representation: "AnyReps",
+        _representation: "AnyReps",
         channels: tuple[str, ...],
         times: Axis | None = None,
         name: str | None = None,
     ):
-        super().__init__(representation, channels, name)
+        super().__init__(_representation, channels, name)
         if times is None:
             raise ValueError("TimedFSData requires times parameter")
         self.set_times(times)
@@ -372,23 +389,24 @@ class TimedFSData(FSData):
         times_data = cast(h5py.Dataset, f["times"])[()]
         return {"times": times_data}
 
-    def set_times(self, times: Axis):
+    def set_times(self, times: Axis) -> Self:
         """Set the time grid.
 
-        This method returns `self` to allow for fluent method chaining.
+        .. note::
+            This method returns ``self`` to allow for fluent method chaining.
         """
         self.times: Linspace = Linspace.make(times)
         self.dt: float = self.times.step
         return self
 
-    def create_new(self, representation: "AnyReps", channels: tuple[str, ...]):
+    def _create_new(self, _representation: "AnyReps", channels: tuple[str, ...]):
         """Create a new instance preserving times."""
-        new = type(self)(representation, channels, times=self.times, name=self.name)
+        new = type(self)(_representation, channels, times=self.times, name=self.name)
         return new
 
     def drop_times(self):
         """Drop the time grid."""
-        return FSData(self.representation, self.channel_names, self.name)
+        return FSData(self._representation, self.channel_names, self.name)
 
     def to_tsdata(
         self,
@@ -400,15 +418,20 @@ class TimedFSData(FSData):
 
         .. warning::
             This method is deprecated and will be removed in 0.8.0; use
-            `to_tsdata(times=self.times, tapering=...)` instead.
+            :func:`~typed_lisa_toolkit.shop.freq2time` instead.
         """
         del times
-        tsrepr = self.representation.irfft(np.asarray(self.times), tapering=tapering)
+        tsrepr = self._representation.irfft(np.asarray(self.times), tapering=tapering)
         return TSData(tsrepr, self.channel_names, self.name)
 
 
 class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
-    """Dictionary data container of short-time Fourier transform data."""
+    """Multi-channel short-time Fourier transform data container.
+
+    .. note::
+        To construct a :class:`.STFTData`, use the factory
+        function :func:`~typed_lisa_toolkit.stftdata`.
+    """
 
     _reps_type: type[reps.STFT["Linspace", "Linspace"]] = reps.STFT[
         "Linspace", "Linspace"
@@ -449,7 +472,12 @@ class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
 
 
 class WDMData(Data[reps.WDM]):
-    """Dictionary data container of WDM time-frequency data."""
+    """Multi-channel wavelet domain model data container.
+
+    .. note::
+        To construct a :class:`.WDMData`, use the factory
+        function :func:`~typed_lisa_toolkit.wdmdata`.
+    """
 
     _reps_type: type[reps.WDM] = reps.WDM
 
@@ -491,6 +519,7 @@ def tsdata(
     mapping: Mapping[str, reps.TimeSeries[Linspace]], name: str | None = None
 ) -> TSData:
     """Construct a :class:`~types.data.TSData` instance."""
+    _ = _mixins.validate_maps_to_reps(mapping)
     return TSData.from_dict(mapping, name=name)
 
 
@@ -498,6 +527,7 @@ def fsdata(
     mapping: Mapping[str, reps.FrequencySeries[Linspace]], name: str | None = None
 ) -> FSData:
     """Construct a :class:`~types.data.FSData` instance."""
+    _ = _mixins.validate_maps_to_reps(mapping)
     return FSData.from_dict(mapping, name=name)
 
 
@@ -507,6 +537,7 @@ def timed_fsdata(
     name: str | None = None,
 ) -> TimedFSData:
     """Construct a :class:`~types.data.TimedFSData` instance."""
+    _ = _mixins.validate_maps_to_reps(mapping)
     return TimedFSData.from_dict(mapping, times=times, name=name)
 
 
@@ -515,6 +546,7 @@ def stftdata(
     name: str | None = None,
 ) -> STFTData:
     """Construct a :class:`~types.data.STFTData` instance."""
+    _ = _mixins.validate_maps_to_reps(mapping)
     return STFTData.from_dict(mapping, name=name)
 
 
@@ -523,6 +555,7 @@ def wdmdata(
     name: str | None = None,
 ) -> WDMData:
     """Construct a :class:`~types.data.WDMData` instance."""
+    _ = _mixins.validate_maps_to_reps(mapping)
     return WDMData.from_dict(mapping, name=name)
 
 
@@ -611,6 +644,7 @@ def load_ldc_data(file_path: str | pathlib.Path, **kwargs: Any) -> TSData:
     """Load the LDC dataset."""
     # Currently among LDC datasets only Sangria and Sangria HM are supported
     return load_sangria(file_path, **kwargs)
+
 
 def load_mojito(processed_data: SignalProcessor):
     """Load the data from a preprocessed Mojito data object."""

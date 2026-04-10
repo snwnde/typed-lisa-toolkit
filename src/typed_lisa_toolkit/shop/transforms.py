@@ -76,7 +76,7 @@ def time2freq(
         )
     _freqs = fft.rfftfreq(len(td.times), d=td.times.step)
     freqs = _constructors.linspace(_freqs[0], _freqs[1] - _freqs[0], len(_freqs))
-    signal = fft.rfft(td.entries * td.times.step, axis=-1)
+    signal = fft.rfft(td.get_kernel() * td.times.step, axis=-1)
     fs = _constructors.frequency_series(
         frequencies=freqs,
         entries=signal,
@@ -125,7 +125,7 @@ def freq2time(
     if _times.step < nyquist_dt and not xp.isclose(_times.step, nyquist_dt):
         warnings.warn("The time grid is denser than the Nyquist limit.")
 
-    signal = fft.irfft(fd.entries / _times.step, n=len(_times), axis=-1)
+    signal = fft.irfft(fd.get_kernel() / _times.step, n=len(_times), axis=-1)
     ts = _constructors.time_series(times=_times, entries=signal)
     if isinstance(fd, reps.FrequencySeries):
         return ts

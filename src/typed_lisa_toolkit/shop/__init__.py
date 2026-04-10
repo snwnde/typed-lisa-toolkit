@@ -18,9 +18,9 @@ Toolkits available in the shop.
 
 """
 
-from . import transforms, conversions
+from . import conversions, transforms
+from .conversions import aet2xyz, xyz2aet
 from .transforms import freq2time, freq2wdm, time2freq, time2wdm, wdm2freq, wdm2time
-from .conversions import xyz2aet, aet2xyz
 
 __all__ = [
     "transforms",

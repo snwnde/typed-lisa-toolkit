@@ -246,6 +246,10 @@ class _InitMixin[GridT: AnyGrid](abc.ABC):
         """Return the shape of the grid dimensions."""
         return _get_entry_grid_shape(self.entries)
 
+    def get_kernel(self) -> "Array":
+        """Return the entries of the representation."""
+        return self.entries
+
 
 class _Subset1DMixin[GridT: "Grid1D[Axis]"](_InitMixin[GridT], abc.ABC):
     def get_subset(
@@ -414,6 +418,13 @@ class _Uniform1DMixin(abc.ABC):
         return self.grid[0].step
 
 
+def _validate_shape(entries: "Array", expected_shape: tuple[int, ...]) -> None:
+    if entries.shape != expected_shape:
+        raise ValueError(
+            f"Invalid entries shape for series. Expected {expected_shape}, got {entries.shape}."
+        )
+
+
 @overload
 def frequency_series(
     frequencies: "Linspace",
@@ -432,7 +443,25 @@ def frequency_series[AxisT: "Axis"](
     frequencies: AxisT,
     entries: "Array",
 ) -> "FrequencySeries[AxisT] | UniformFrequencySeries":
-    """Build a :class:`~types.representations.FrequencySeries` or :class:`~types.representations.UniformFrequencySeries`."""
+    """Build a :class:`~types.FrequencySeries` or :class:`~types.UniformFrequencySeries`.
+
+    Parameters
+    ----------
+    frequencies: AxisT
+        Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
+        :class:`array <typed_lisa_toolkit.types.misc.Array>` of positive frequencies.
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf)`` where ``Nf`` is the size of ``frequencies``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    """
+    _validate_shape(
+        entries,
+        (entries.shape[0], entries.shape[1], entries.shape[2], 1, len(frequencies)),
+    )
     try:
         _frequencies = Linspace.make(frequencies)
     except ValueError:
@@ -459,7 +488,25 @@ def time_series[AxisT: "Axis"](
     times: AxisT,
     entries: "Array",
 ) -> "TimeSeries[AxisT] | UniformTimeSeries":
-    """Build a :class:`~types.representations.TimeSeries` or :class:`~types.representations.UniformTimeSeries`."""
+    """Build a :class:`~types.TimeSeries` or :class:`~types.UniformTimeSeries`.
+
+    Parameters
+    ----------
+    times: AxisT
+        Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
+        :class:`array <typed_lisa_toolkit.types.misc.Array>` of time points.
+
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, 1, Nt)`` where ``Nt`` is the size of ``times``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    """
+    _validate_shape(
+        entries, (entries.shape[0], entries.shape[1], entries.shape[2], 1, len(times))
+    )
     try:
         _times = Linspace.make(times)
     except ValueError:
@@ -473,7 +520,41 @@ def phasor[AxisT: "Axis"](
     amplitudes: "Array",
     phases: "Array",
 ) -> "Phasor[AxisT]":
-    """Build a :class:`~types.representations.Phasor`."""
+    """Build a :class:`~types.Phasor`.
+
+    Parameters
+    ----------
+    frequencies: AxisT
+        Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
+        :class:`array <typed_lisa_toolkit.types.misc.Array>` of positive frequencies.
+
+    amplitudes: :class:`~typed_lisa_toolkit.types.misc.Array`
+        Either an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf)`` where ``Nf`` is the size of ``frequencies``,
+        or a 1D array of shape ``(Nf,)`` that will be broadcasted to the shape ``(1, 1, 1, 1, Nf)``.
+        Must be of the same shape as ``phases``.
+
+    phases: :class:`~typed_lisa_toolkit.types.misc.Array`
+        Either an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf)`` where ``Nf`` is the size of ``frequencies``,
+        or a 1D array of shape ``(Nf,)`` that will be broadcasted to the shape ``(1, 1, 1, 1, Nf)``
+        Must be of the same shape as ``amplitudes``.
+    """
+    if amplitudes.shape != phases.shape:
+        raise ValueError(
+            f"Amplitudes and phases must have the same shape. Got {amplitudes.shape} and {phases.shape}."
+        )
+    if amplitudes.ndim == 1:
+        pass
+    else:
+        _validate_shape(
+            amplitudes,
+            (
+                amplitudes.shape[0],
+                amplitudes.shape[1],
+                amplitudes.shape[2],
+                1,
+                len(frequencies),
+            ),
+        )
     return Phasor[AxisT].make(
         frequencies=frequencies, amplitudes=amplitudes, phases=phases
     )
@@ -484,7 +565,38 @@ def stft[FreqAxisT: "Axis", TimeAxisT: "Axis"](
     times: TimeAxisT,
     entries: "Array",
 ) -> "STFT[FreqAxisT, TimeAxisT]":
-    """Build an :class:`~types.representations.STFT`."""
+    """Build an :class:`~types.STFT`.
+
+    Parameters
+    ----------
+    frequencies: FreqAxisT
+        Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
+        :class:`array <typed_lisa_toolkit.types.misc.Array>` of positive frequencies.
+
+    times: TimeAxisT
+        Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
+        :class:`array <typed_lisa_toolkit.types.misc.Array>` of time points.
+
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf, Nt)``
+        where ``Nf`` and ``Nt`` are the sizes of ``frequencies`` and ``times`` respectively.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    """
+    _validate_shape(
+        entries,
+        (
+            entries.shape[0],
+            entries.shape[1],
+            entries.shape[2],
+            1,
+            len(frequencies),
+            len(times),
+        ),
+    )
     return STFT[FreqAxisT, TimeAxisT]((frequencies, times), entries)
 
 
@@ -497,15 +609,31 @@ def wdm(
 
     Parameters
     ----------
-    frequencies:
-        Evenly-spaced frequencies with separation ΔF and size `Nf+1`.
+    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Evenly-spaced frequencies with separation ΔF and size ``Nf+1``.
 
-    times:
-        Evenly-spaced times with separation ΔT and size `Nt`.
+    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
+        Evenly-spaced times with separation ΔT and size ``Nt``.
 
-    entries:
-        Data entries with shape `(Nf+1, Nt)`, real numbers.
+    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf+1, Nt)``.
+
+    Note
+    ----
+    See the general description of the shape convention for
+    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
+    _validate_shape(
+        entries,
+        (
+            entries.shape[0],
+            entries.shape[1],
+            entries.shape[2],
+            1,
+            len(frequencies),
+            len(times),
+        ),
+    )
     return WDM.make(frequencies=frequencies, times=times, entries=entries)
 
 

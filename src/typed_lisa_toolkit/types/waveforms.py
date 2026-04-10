@@ -31,6 +31,15 @@ from .. import utils
 log = logging.getLogger(__name__)
 
 
+def _validate_maps_to_pws(mapping: Mapping[Any, ProjectedWaveform[AnyReps]]):
+    """Validate that a mapping maps to projected waveforms."""
+    for key, pw in mapping.items():
+        try:
+            _ = _mixins.validate_maps_to_reps(pw)
+        except ValueError as error:
+            raise ValueError(f"Invalid projected waveform for key {key!r}.") from error
+
+
 class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
     """Mixin for picking a single mode from a waveform."""
 
@@ -55,18 +64,7 @@ class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
         return f"{self.__class__.__name__}({items!r})"
 
     def pick(self, modes: ModeT | tuple[ModeT, ...]) -> Self:
-        """Pick specific modes.
-
-        Parameters
-        ----------
-        modes : Mode or tuple[Mode, ...]
-            Mode(s) to pick.
-
-        Returns
-        -------
-        Self
-            New instance with only the specified mode(s).
-        """
+        """Return a new instance containing only the specified modes."""
         try:
             return self._pick(modes)  # type: ignore[arg-type]
         except KeyError:
@@ -164,9 +162,9 @@ class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
         The shape is ``(n_batches, n_channels, n_harmonics, n_features, *grid_like)``
         The returned array is suitable for downstream processing (e.g., by noise models to compute inner products).
         """
-        xp = xpc.get_namespace(self._first.entries)
+        xp = xpc.get_namespace(self._first.get_kernel())
         return xp.concat(
-            [self[harmonic].entries for harmonic in self.harmonics], axis=2
+            [self[harmonic].get_kernel() for harmonic in self.harmonics], axis=2
         )
 
 
@@ -181,6 +179,7 @@ def harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
         A mapping from :ref:`modes <mode_types>`
         to :ref:`representations <representation_types>`.
     """
+    _ = _mixins.validate_maps_to_reps(modes_to_reps)
     return HarmonicWaveform(modes_to_reps)
 
 
@@ -195,6 +194,7 @@ def homogeneous_harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
         A mapping from :ref:`modes <mode_types>`
         to :ref:`representations <representation_types>`.
     """
+    _ = _mixins.validate_maps_to_reps(modes_to_reps)
     return HomogeneousHarmonicWaveform(modes_to_reps)
 
 
@@ -209,6 +209,7 @@ def projected_waveform[RepT: "AnyReps"](
         A mapping from channel names (:py:class:`str`) to
         :ref:`representations <representation_types>`.
     """
+    _ = _mixins.validate_maps_to_reps(channels_to_reps)
     return ProjectedWaveform[RepT].from_dict(channels_to_reps)
 
 
@@ -223,6 +224,7 @@ def harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
         A mapping from :ref:`modes <mode_types>`
         to :class:`~types.ProjectedWaveform` instances.
     """
+    _ = _validate_maps_to_pws(modes_to_pws)
     return HarmonicProjectedWaveform(modes_to_pws)
 
 
@@ -237,6 +239,7 @@ def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
         A mapping from :ref:`modes <mode_types>`
         to :class:`~types.ProjectedWaveform` instances.
     """
+    _ = _validate_maps_to_pws(modes_to_pws)
     return HomogeneousHarmonicProjectedWaveform(modes_to_pws)
 
 

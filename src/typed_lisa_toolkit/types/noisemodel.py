@@ -639,5 +639,4 @@ class TFNoiseModel:
     def whiten(self, _data: TFEntry) -> TFEntry:
         """Whiten the data according to the noise model."""
         whitened_array = self._get_whitened_entries(_data)
-        whitened_repr = _data.representation.create_like(whitened_array)
-        return _data.create_new(whitened_repr, _data.channel_names)
+        return _data.create_like(whitened_array, _data.channel_names)

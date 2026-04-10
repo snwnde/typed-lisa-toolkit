@@ -11,6 +11,7 @@ from typed_lisa_toolkit.types import (
     STFT,
     WDM,
     FSData,
+    HarmonicProjectedWaveform,
     HarmonicWaveform,
     HomogeneousHarmonicProjectedWaveform,
     Linspace,
@@ -42,12 +43,14 @@ def _randn_array(xp, shape):
     return xp.asarray(rng.standard_normal(shape))
 
 
-def _change_shape(ary, fmt=0):
-    if fmt == 0:
-        return ary[None, None, None, None, :]
-    elif fmt == 1:
-        return ary[None, None, None, None, :, :]
-    raise ValueError("Invalid fmt value")
+def _canonicalize_1d_entries(values):
+    """Convert 1D values to canonical entries shape: (B, C, H, F, N)."""
+    return values[None, None, None, None, :]
+
+
+def _canonicalize_2d_entries(values):
+    """Convert 2D values to canonical entries shape: (B, C, H, F, Nf, Nt)."""
+    return values[None, None, None, None, :, :]
 
 
 def _build_uniform_frequencies(xp):
@@ -67,8 +70,8 @@ def _build_wdm_axes(xp):
     return times, frequencies
 
 
-def _build_complex_entries(xp, values, *, fmt=0, random_scale=False):
-    entries = _change_shape(xp.asarray(values, dtype=xp.complex128), fmt=fmt)
+def _build_complex_entries(xp, values, *, random_scale=False):
+    entries = _canonicalize_1d_entries(xp.asarray(values, dtype=xp.complex128))
     if random_scale:
         entries = entries * rng.standard_normal(entries.shape)
     return entries
@@ -93,15 +96,7 @@ def _build_wdmdata(times, frequencies, channel_entries):
 
 
 def _stack_batched_entries(xp, base_entries, variant_entries):
-    return xp.stack([base_entries, variant_entries], axis=0)
-
-
-def _to_fs_batched_entries(entries):
-    return entries[:, None, None, None, :]
-
-
-def _to_wdm_batched_entries(entries):
-    return entries[:, None, None, None, :, :]
+    return xp.concatenate([base_entries, variant_entries], axis=0)
 
 
 def _build_2ch_kernel(xp, values_x, values_y, offdiag):
@@ -191,7 +186,7 @@ def build_wdm(xp):
 
 
 def build_fd_pair(xp):
-    frequencies = _build_frequencies(xp)
+    frequencies = _build_uniform_frequencies(xp)
     left_x = _build_complex_entries(xp, [1.0 + 1.0j, 2.0 - 1.0j, -1.0 + 0.5j])
     left_y = _build_complex_entries(xp, [0.5 - 0.25j, -1.0j, 2.0 + 0.0j])
     right_x = _build_complex_entries(xp, [2.0 - 1.0j, -1.0 + 2.0j, 0.5 + 0.25j])
@@ -215,10 +210,10 @@ def build_wdm_pair(xp):
     times, frequencies = _build_wdm_axes(xp)
     nt, nf = len(times), len(frequencies)
 
-    left_x = _change_shape(xp.outer(xp.cos(frequencies), xp.sin(times)), fmt=1)
-    left_y = _change_shape(xp.ones((nf, nt), dtype=xp.float64), fmt=1)
-    right_x = _change_shape(left_x, fmt=1)
-    right_y = _change_shape(left_y, fmt=1)
+    left_x = _canonicalize_2d_entries(xp.outer(xp.cos(frequencies), xp.sin(times)))
+    left_y = _canonicalize_2d_entries(xp.ones((nf, nt), dtype=xp.float64))
+    right_x = left_x
+    right_y = left_y
 
     left = _build_wdmdata(times, frequencies, {"X": left_x, "Y": left_y})
     right = _build_wdmdata(times, frequencies, {"X": right_x, "Y": right_y})
@@ -270,15 +265,13 @@ def build_fd_pair_batched_2x2(xp):
     left = _build_fsdata(
         frequencies,
         {
-            name: _to_fs_batched_entries(entries)
-            for name, entries in left_entries.items()
+            name: entries for name, entries in left_entries.items()
         },
     )
     right = _build_fsdata(
         frequencies,
         {
-            name: _to_fs_batched_entries(entries)
-            for name, entries in right_entries.items()
+            name: entries for name, entries in right_entries.items()
         },
     )
 
@@ -317,16 +310,14 @@ def build_wdm_pair_batched_2x2(xp):
         times,
         frequencies,
         {
-            name: _to_wdm_batched_entries(entries)
-            for name, entries in left_entries.items()
+            name: entries for name, entries in left_entries.items()
         },
     )
     right = _build_wdmdata(
         times,
         frequencies,
         {
-            name: _to_wdm_batched_entries(entries)
-            for name, entries in right_entries.items()
+            name: entries for name, entries in right_entries.items()
         },
     )
 
@@ -510,18 +501,6 @@ class AdvancedRepresentationMethodsMixin:
         self.assertIsInstance(angles, UniformFrequencySeries)
         self.assertEqual(angles.entries.shape, fs.entries.shape)
 
-    # def test_time_series_stfft(self):
-    #     xp = self.xp
-    #     n = 64
-    #     times = Linspace(0.0, 1.0 / 128, n)
-    #     signal = xp.asarray(np.sin(2 * np.pi * np.arange(n) / 16).astype(float))
-    #     entries = signal[None, None, None, None, :]
-    #     ts = UniformTimeSeries(grid=(times,), entries=entries)
-    #     win = np.hanning(16).astype(float)
-    #     stft = ts.stfft(win, hop=8)
-    #     self.assertIsInstance(stft, STFT)
-    #     self.assertEqual(stft.entries.ndim, 6)
-
     def test_stft_make_classmethod(self):
         times = np.linspace(0, 10, 100)
         freqs = np.linspace(0, 1, 50)
@@ -626,32 +605,77 @@ class FakeHarmonicWaveform(dict[modes.Harmonic, FakeResponse]):
         return tuple(self.keys())
 
 
-def make_mock_phasor(*, f_min: float, f_max: float):
+def make_valid_mock_representation(*, name: str | None = None, frequencies: Any = None):
+    """Return a MagicMock that satisfies representation runtime validators."""
+    rep = MagicMock(name=name)
+    if frequencies is None:
+        grid = np.asarray([0.0, 1.0, 2.0], dtype=np.float64)
+    else:
+        grid = np.asarray(frequencies, dtype=np.float64)
+    rep.domain = "frequency"
+    rep.grid = (grid,)
+    rep.entries = np.zeros((1, 1, 1, 1, len(grid)), dtype=np.complex128)
+
+    def _create_like(entries):
+        entries_arr = np.asarray(entries)
+        out = make_valid_mock_representation(
+            name=name,
+            frequencies=np.arange(entries_arr.shape[-1], dtype=np.float64),
+        )
+        out.entries = entries_arr
+        # Preserve waveform-helper methods/metadata when ProjectedWaveform views call create_like.
+        for attr in ("f_min", "f_max"):
+            if hasattr(rep, attr):
+                setattr(out, attr, getattr(rep, attr))
+        for method in ("get_interpolated", "get_embedded", "to_frequency_series"):
+            if hasattr(rep, method):
+                setattr(out, method, getattr(rep, method))
+        return out
+
+    rep.create_like.side_effect = _create_like
+    return rep
+
+
+def set_mock_frequency_entries(rep: Any, frequencies: Any):
+    """Assign canonical frequency-domain entries/grid to a representation mock."""
+    grid = np.asarray(frequencies, dtype=np.float64)
+    rep.domain = "frequency"
+    rep.grid = (grid,)
+    rep.entries = np.zeros((1, 1, 1, 1, len(grid)), dtype=np.complex128)
+
+
+def make_mock_phasor(*, f_min: float, f_max: float, frequencies: Any = None):
     """Return (phasor, interpolated, embedded) mock triple with a preset frequency range."""
-    phasor = MagicMock()
+    phasor = make_valid_mock_representation(name="phasor", frequencies=frequencies)
     phasor.f_min = f_min
     phasor.f_max = f_max
 
-    interpolated = MagicMock()
-    embedded = MagicMock()
+    interpolated = make_valid_mock_representation(
+        name="interpolated", frequencies=frequencies
+    )
+    embedded = make_valid_mock_representation(name="embedded", frequencies=frequencies)
 
     phasor.get_interpolated.return_value = interpolated
     interpolated.get_embedded.return_value = embedded
     return phasor, interpolated, embedded
 
 
-def build_fake_harmonic_projected_waveform():
-    """Build a two-mode, two-channel fake waveform where every phasor has a distinct
-    frequency range so windowing assertions are unambiguous."""
+def build_harmonic_projected_phasor_waveform(*, frequencies: Any = None):
+    """Build a two-mode HarmonicProjectedWaveform-like object with phasor leaves.
+
+    The outer container is a real HarmonicProjectedWaveform instance while each
+    mode payload remains a lightweight channel mapping to preserve distinct
+    per-channel mocks in helper-oriented tests.
+    """
     mode_22 = modes.Harmonic(2, 2)
     mode_33 = modes.Harmonic(3, 3)
 
-    p22x, i22x, e22x = make_mock_phasor(f_min=1.0, f_max=3.0)
-    p22y, i22y, e22y = make_mock_phasor(f_min=1.5, f_max=2.5)
-    p33x, i33x, e33x = make_mock_phasor(f_min=0.5, f_max=2.0)
-    p33y, i33y, e33y = make_mock_phasor(f_min=2.0, f_max=4.0)
+    p22x, i22x, e22x = make_mock_phasor(f_min=1.0, f_max=3.0, frequencies=frequencies)
+    p22y, i22y, e22y = make_mock_phasor(f_min=1.5, f_max=2.5, frequencies=frequencies)
+    p33x, i33x, e33x = make_mock_phasor(f_min=0.5, f_max=2.0, frequencies=frequencies)
+    p33y, i33y, e33y = make_mock_phasor(f_min=2.0, f_max=4.0, frequencies=frequencies)
 
-    wf = FakeHarmonicWaveform(
+    wf = HarmonicProjectedWaveform(
         {
             mode_22: FakeResponse({"X": p22x, "Y": p22y}),
             mode_33: FakeResponse({"X": p33x, "Y": p33y}),
@@ -663,6 +687,11 @@ def build_fake_harmonic_projected_waveform():
         mode_33: {"X": (p33x, i33x, e33x), "Y": (p33y, i33y, e33y)},
     }
     return wf, handles
+
+
+def build_fake_harmonic_projected_waveform():
+    """Backward-compatible alias for tests still using the old helper name."""
+    return build_harmonic_projected_phasor_waveform()
 
 
 def _make_fs(xp, frequencies, values):
