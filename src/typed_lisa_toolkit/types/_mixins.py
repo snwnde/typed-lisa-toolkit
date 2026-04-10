@@ -250,7 +250,14 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
         _input_repr: "AnyReps",
         channels: tuple[str, ...],
         name: str | None = None,
+        *,
+        _unsafe_internal: bool = False,
     ):
+        if not _unsafe_internal:
+            raise TypeError(
+                f"Direct `{type(self).__name__}` construction is disabled. "
+                + "Use factory functions in the top-level API instead."
+            )
         self._channel_names: tuple[str, ...] = tuple(channels)
         self._init_repr(_input_repr)
         entries = self._representation.entries
@@ -279,12 +286,37 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
         self, _representation: "AnyReps", channels: tuple[str, ...]
     ) -> Self:
         """Create a new instance with a _representation and channels."""
-        return type(self)(_representation, channels, self.name)
+        return type(self).from_representation(
+            _representation,
+            channels,
+            self.name,
+        )
+
+    @classmethod
+    def from_representation(
+        cls,
+        representation: "AnyReps",
+        channels: tuple[str, ...],
+        name: str | None = None,
+        **additions: Any,
+    ) -> Self:
+        """Construct from an existing representation and explicit channel names."""
+        if additions:
+            unexpected = ", ".join(additions.keys())
+            raise ValueError(f"Unexpected keyword arguments: {unexpected}")
+        return cls(
+            representation,
+            channels,
+            name,
+            _unsafe_internal=True,
+        )
 
     def create_like(self, entries: "Array", channels: tuple[str, ...]) -> Self:
         """Create a new instance with different entries but the same grid and type."""
-        return type(self)(
-            self._representation.create_like(entries), channels, self.name
+        return type(self).from_representation(
+            self._representation.create_like(entries),
+            channels,
+            self.name,
         )
 
     def __xp__(self, api_version: str | None = None) -> Any:
@@ -338,7 +370,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
         xp = xpc.get_namespace(self._representation.entries)
         picked_entries = xp.asarray(self._representation.entries)[:, indices, ...]
         picked_repr = self._representation.create_like(picked_entries)
-        return self._create_new(picked_repr, channels)
+        return type(self).from_representation(picked_repr, channels, self.name)
 
     @classmethod
     def from_dict[RT: "AnyReps"](
@@ -353,7 +385,9 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
         entries = xp.concatenate([data_dict[chn].entries for chn in channels], axis=1)
         # Assume all representations have the same grid and type
         first = next(iter(data_dict.values()))
-        return cls(first.create_like(entries), channels, **additions)
+        return cls.from_representation(
+            first.create_like(entries), channels, **additions
+        )
 
     def set_name(self, name: str | None) -> Self:
         """Set the name of the data container.
@@ -395,9 +429,9 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
     @property
     def grid(self):
         """Return the grid.
-        
+
         .. note::
-            This is the property version of :meth:`get_grid`. 
+            This is the property version of :meth:`get_grid`.
         """
         return self.get_grid()
 

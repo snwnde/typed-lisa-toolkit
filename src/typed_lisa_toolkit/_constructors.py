@@ -1,4 +1,15 @@
-from .types.data import fsdata, stftdata, timed_fsdata, tsdata, wdmdata
+from .types.data import (
+    construct_fsdata,
+    construct_stftdata,
+    construct_timed_fsdata,
+    construct_tsdata,
+    construct_wdmdata,
+    fsdata,
+    stftdata,
+    timed_fsdata,
+    tsdata,
+    wdmdata,
+)
 from .types.misc import linspace
 from .types.modes import cast_mode
 from .types.representations import (
@@ -61,5 +72,10 @@ __all__ = [
     "stftdata",
     "wdmdata",
     "timed_fsdata",
+    "construct_tsdata",
+    "construct_fsdata",
+    "construct_timed_fsdata",
+    "construct_stftdata",
+    "construct_wdmdata",
     "linspace",
 ]

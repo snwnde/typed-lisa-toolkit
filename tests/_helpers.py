@@ -583,7 +583,7 @@ class DataAbstractBranchesMixin:
 
         times = np.linspace(0.0, 1.0, 4)
         representation = TimeSeries["Axis"]((times,), np.ones((1, 1, 1, 1, 4)))
-        dummy = Dummy(representation, ("X",))
+        dummy = Dummy.from_representation(representation, ("X",))
 
         with self.assertRaises(NotImplementedError):  # type: ignore[attr-defined]
             dummy._get_plotter()

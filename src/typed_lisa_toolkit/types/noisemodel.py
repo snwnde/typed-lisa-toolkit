@@ -468,8 +468,9 @@ class FDNoiseModel[DensityT: SpectralDensity]:
             norm="forward",
             axis=-1,
         )
-        return dm.TSData(
-            reps.UniformTimeSeries((left.times,), cross_correlation), left.channel_names
+        return dm.TSData.from_representation(
+            reps.UniformTimeSeries((left.times,), cross_correlation),
+            channels=left.channel_names,
         )
 
     def whiten(self, _data: FDEntry):

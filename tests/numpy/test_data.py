@@ -19,11 +19,20 @@ from tests._helpers import (
     build_wdm_pair,
 )
 from typed_lisa_toolkit import (
+    construct_fsdata,
+    construct_stftdata,
+    construct_timed_fsdata,
+    construct_tsdata,
+    construct_wdmdata,
     fsdata,
     load_data,
     load_ldc_data,
     shop,
+    stft,
+    time_series,
+    wdm,
 )
+from typed_lisa_toolkit.types.data import load_mojito
 from typed_lisa_toolkit.types import (
     FSData,
     STFTData,
@@ -169,10 +178,10 @@ class TestDataContainersNumpy(unittest.TestCase):
 
     def test_init_rejects_non_unit_harmonic_dimension(self):
         times = np.linspace(0.0, 1.0, 4)
-        bad_repr = TimeSeries((times,), np.ones((1, 2, 2, 1, 4)))
+        bad_repr = time_series(times, np.ones((1, 2, 2, 1, 4)))
 
         with self.assertRaises(ValueError):
-            TSData(bad_repr, ("X", "Y"))
+            TSData.from_representation(bad_repr, ("X", "Y"))
 
     def test_fsdata_set_times_drop_times_and_to_tsdata(self):
         case = build_fdata(np)
@@ -359,7 +368,7 @@ class TestDataContainersNumpy(unittest.TestCase):
         right = case["right"]
 
         # In-place addition via += (tests _binary_op inplace=True path)
-        left_copy = FSData.from_dict({chn: left[chn] for chn in left.channel_names})
+        left_copy = fsdata({chn: left[chn] for chn in left.channel_names})
         left_copy += right
         npt.assert_allclose(
             np.asarray(left_copy.get_kernel()),
@@ -392,7 +401,7 @@ class TestDataContainersNumpy(unittest.TestCase):
     def test_data_unary_op_and_mismatched_binary_op(self):
         case = build_fd_pair(np)
         left = case["left"]
-        right = FSData(left._representation, ("A", "B"))
+        right = FSData.from_representation(left._representation, ("A", "B"))
 
         absolute = abs(left)
         npt.assert_allclose(
@@ -405,7 +414,7 @@ class TestDataContainersNumpy(unittest.TestCase):
     def test_timedfsdata_requires_times(self):
         case = build_fdata(np)
         with self.assertRaises(ValueError):
-            TimedFSData(case._representation, case.channel_names)
+            TimedFSData.from_representation(case._representation, case.channel_names)
 
     def test_tsdata_get_zero_padded(self):
         _, _, _, tsdata = _build_tsdata_numpy()
@@ -558,6 +567,125 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         self.assertEqual(result, "tf-drawn")
         plotter.draw.assert_called_once()
+
+    def test_factory_constructors_build_expected_types(self):
+        times = np.linspace(0.0, 3.0, 8)
+        freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+
+        ts_entries = np.ones((1, 2, 1, 1, len(times)))
+        fs_entries = np.ones((1, 2, 1, 1, len(freqs)), dtype=np.complex128)
+        stft_entries = np.ones((1, 2, 1, 1, len(freqs), len(times)))
+        wdm_entries = np.ones((1, 2, 1, 1, len(freqs), len(times)))
+
+        ts = construct_tsdata(
+            times=times,
+            entries=ts_entries,
+            channels=("X", "Y"),
+            name="ts",
+        )
+        fs = construct_fsdata(
+            frequencies=freqs,
+            entries=fs_entries,
+            channels=("X", "Y"),
+            name="fs",
+        )
+        tfs = construct_timed_fsdata(
+            frequencies=freqs,
+            entries=fs_entries,
+            channels=("X", "Y"),
+            times=times,
+            name="tfs",
+        )
+        stft_data = construct_stftdata(
+            frequencies=freqs,
+            times=times,
+            entries=stft_entries,
+            channels=("X", "Y"),
+            name="stft",
+        )
+        wdm_data = construct_wdmdata(
+            frequencies=freqs,
+            times=times,
+            entries=wdm_entries,
+            channels=("X", "Y"),
+            name="wdm",
+        )
+
+        self.assertIsInstance(ts, TSData)
+        self.assertIsInstance(fs, FSData)
+        self.assertIsInstance(tfs, TimedFSData)
+        self.assertIsInstance(stft_data, STFTData)
+        self.assertIsInstance(wdm_data, WDMData)
+        self.assertEqual(ts.channel_names, ("X", "Y"))
+        self.assertEqual(fs.channel_names, ("X", "Y"))
+        self.assertEqual(tfs.channel_names, ("X", "Y"))
+        self.assertEqual(stft_data.channel_names, ("X", "Y"))
+        self.assertEqual(wdm_data.channel_names, ("X", "Y"))
+
+    def test_stftdata_and_wdmdata_mapping_factories(self):
+        times = np.linspace(0.0, 3.0, 8)
+        freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+
+        stft_mapping = {
+            "X": stft(freqs, times, np.ones((1, 1, 1, 1, len(freqs), len(times)))),
+            "Y": stft(freqs, times, np.ones((1, 1, 1, 1, len(freqs), len(times)))),
+        }
+        wdm_mapping = {
+            "X": wdm(frequencies=freqs, times=times, entries=np.ones((1, 1, 1, 1, len(freqs), len(times)))),
+            "Y": wdm(frequencies=freqs, times=times, entries=np.ones((1, 1, 1, 1, len(freqs), len(times)))),
+        }
+
+        stft_data = STFTData.from_dict(stft_mapping)
+        wdm_data = WDMData.from_dict(wdm_mapping)
+
+        self.assertIsInstance(stft_data, STFTData)
+        self.assertIsInstance(wdm_data, WDMData)
+        self.assertEqual(stft_data.channel_names, ("X", "Y"))
+        self.assertEqual(wdm_data.channel_names, ("X", "Y"))
+
+    def test_fsdata_legacy_load(self):
+        freqs = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+        x = np.array([1.0 + 0.5j, -1.0j, 2.0 + 0.0j], dtype=np.complex128)
+        y = np.array([0.5 - 0.25j, -1.0 + 0.25j, 2.0 + 0.5j], dtype=np.complex128)
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                for name, values in {"X": x, "Y": y}.items():
+                    grp = f.create_group(name)
+                    grp.create_dataset("grid", data=freqs)
+                    grp.create_dataset("entries", data=values)
+
+            loaded = FSData.load(handle.name, legacy=True)
+
+        self.assertIsInstance(loaded, FSData)
+        self.assertEqual(loaded.channel_names, ("X", "Y"))
+        npt.assert_allclose(np.asarray(loaded["X"].entries).squeeze(), x)
+        npt.assert_allclose(np.asarray(loaded["Y"].entries).squeeze(), y)
+
+    def test_load_sangria_non_time_domain_raises(self):
+        dataset = np.zeros(8, dtype=[("f", "f8"), ("A", "f8"), ("E", "f8")])
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            with h5py.File(handle.name, "w") as f:
+                f.create_dataset("obs/tdi", data=dataset)
+            with self.assertRaises(ValueError):
+                load_ldc_data(handle.name, name="obs/tdi", channels="AE")
+
+    def test_load_mojito_builds_tsdata(self):
+        t = np.linspace(0.0, 1.0, 8)
+        processor = MagicMock()
+        processor.channels = ["X", "Y"]
+        processor.t = t
+        processor.data = {
+            "X": np.sin(2.0 * np.pi * t),
+            "Y": np.cos(2.0 * np.pi * t),
+        }
+
+        loaded = load_mojito(processor)
+
+        self.assertIsInstance(loaded, TSData)
+        self.assertEqual(loaded.channel_names, ("X", "Y"))
+        self.assertEqual(np.asarray(loaded.get_kernel()).shape[-1], len(t))
 
 
 class TestDataInternalAbstractBranches(DataAbstractBranchesMixin, unittest.TestCase):

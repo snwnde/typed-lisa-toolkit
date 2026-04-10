@@ -84,7 +84,11 @@ def time2freq(
     if isinstance(td, reps.TimeSeries):
         return fs
     else:
-        fsd = data.FSData(fs, td.channel_names, td.name)
+        fsd = data.FSData.from_representation(
+            fs,
+            channels=td.channel_names,
+            name=td.name,
+        )
         if keep_time:
             fsd = fsd.set_times(td.times)
         return fsd
@@ -130,7 +134,11 @@ def freq2time(
     if isinstance(fd, reps.FrequencySeries):
         return ts
     else:
-        tsd = data.TSData(ts, fd.channel_names, fd.name)
+        tsd = data.TSData.from_representation(
+            ts,
+            channels=fd.channel_names,
+            name=fd.name,
+        )
         return tsd
 
 

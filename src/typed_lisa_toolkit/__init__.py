@@ -80,6 +80,11 @@ Data
    stftdata
    wdmdata
    timed_fsdata
+   construct_tsdata
+   construct_fsdata
+   construct_stftdata
+   construct_wdmdata
+   construct_timed_fsdata
 
 
 Waveforms
@@ -131,6 +136,11 @@ Misc
 from . import shop, types, utils, viz
 from ._constructors import (
     cast_mode,
+    construct_fsdata,
+    construct_stftdata,
+    construct_timed_fsdata,
+    construct_tsdata,
+    construct_wdmdata,
     densify_phasor,
     densify_phasor_hpw,
     densify_phasor_hw,
@@ -203,5 +213,10 @@ __all__ = [
     "stftdata",
     "wdmdata",
     "timed_fsdata",
+   "construct_tsdata",
+   "construct_fsdata",
+   "construct_timed_fsdata",
+   "construct_stftdata",
+   "construct_wdmdata",
     "linspace",
 ]

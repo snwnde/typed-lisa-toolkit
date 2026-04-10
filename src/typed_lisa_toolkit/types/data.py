@@ -5,6 +5,7 @@ from __future__ import annotations
 import abc
 import logging
 import pathlib
+import warnings
 
 # import warnings
 from collections.abc import Iterable, Mapping
@@ -165,7 +166,7 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
             grid_data = cast(h5py.Dataset, data_group["grid"])[()]
             entries_data = cast(h5py.Dataset, data_group["entries"])[()]
             repr_obj = cls._reps_type(grid_data, entries_data)
-        return cls(repr_obj, channels, **additions)
+        return cls.from_representation(repr_obj, channels, **additions)
 
     # @classmethod
     # def from_waveform(cls, waveform: "ProjectedWaveform[RepT]"):
@@ -182,12 +183,26 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     """Multi-channel time series data container.
 
     .. note::
-        To construct a :class:`.TSData`, use the factory
-        function :func:`~typed_lisa_toolkit.tsdata`.
+        To construct a :class:`.TSData`, use factory
+        functions: :func:`~typed_lisa_toolkit.tsdata`
+        or :func:`~typed_lisa_toolkit.construct_tsdata`.
 
     """
 
     _reps_type: type[reps.UniformTimeSeries] = reps.UniformTimeSeries
+
+    @classmethod
+    def from_entries(
+        cls,
+        *,
+        times: Axis,
+        entries: Array,
+        channels: tuple[str, ...],
+        name: str | None = None,
+    ) -> Self:
+        """Construct from raw time-domain entries and explicit channel names."""
+        rep = reps.time_series(Linspace.make(times), entries)
+        return cls.from_representation(rep, channels, name=name)
 
     @property
     def times(self):
@@ -216,10 +231,11 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     def get_embedded(self, embedding_grid: "Grid1D[Axis]"):
         """Return data embedded on a new 1D grid."""
         embedded = self._representation.get_embedded(embedding_grid)
-        return type(self)(
+        return type(self).from_representation(
             embedded,
-            self.channel_names,
-        ).set_name(self.name)
+            channels=self.channel_names,
+            name=self.name,
+        )
 
     @overload
     def to_fsdata(
@@ -246,7 +262,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         """Return the frequency series data (*Deprecated*).
 
         .. warning::
-            This method is deprecated and will be removed in 0.8.0; use 
+            This method is deprecated and will be removed in 0.8.0; use
             :func:`~typed_lisa_toolkit.shop.time2freq` instead.
 
         Returns
@@ -257,8 +273,17 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         """
         fsrepr = self._representation.rfft(tapering=tapering)
         if keep_times:
-            return TimedFSData(fsrepr, self.channel_names, times=self.times)
-        return FSData(fsrepr, self.channel_names)
+            return TimedFSData.from_representation(
+                fsrepr,
+                channels=self.channel_names,
+                times=self.times,
+                name=self.name,
+            )
+        return FSData.from_representation(
+            fsrepr,
+            channels=self.channel_names,
+            name=self.name,
+        )
 
     def get_zero_padded(
         self,
@@ -288,7 +313,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             mode="constant",
         )
 
-        padded_repr = reps.UniformTimeSeries((padded_time,), padded_signal)
+        padded_repr = reps.time_series(Linspace.make(padded_time), padded_signal)
         return self._create_new(padded_repr, self.channel_names)
 
     def _get_plotter(self):
@@ -301,12 +326,26 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     """Multi-channel frequency series data container.
 
     .. note::
-        To construct a :class:`.FSData`, use the factory
-        function :func:`~typed_lisa_toolkit.fsdata`.
+        To construct a :class:`.FSData`, use factory
+        functions: :func:`~typed_lisa_toolkit.fsdata`
+        or :func:`~typed_lisa_toolkit.construct_fsdata`.
 
     """
 
     _reps_type: type[reps.UniformFrequencySeries] = reps.UniformFrequencySeries
+
+    @classmethod
+    def from_entries(
+        cls,
+        *,
+        frequencies: Axis,
+        entries: Array,
+        channels: tuple[str, ...],
+        name: str | None = None,
+    ) -> Self:
+        """Construct from raw frequency-domain entries and explicit channel names."""
+        rep = reps.UniformFrequencySeries((Linspace.make(frequencies),), entries)
+        return cls.from_representation(rep, channels, name=name)
 
     @property
     def frequencies(self):
@@ -330,15 +369,21 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
 
     def set_times(self, times: "Axis") -> TimedFSData:
         """Return a :class:`.TimedFSData` with the time grid set."""
-        return TimedFSData(self._representation, self.channel_names, times)
+        return TimedFSData.from_representation(
+            self._representation,
+            channels=self.channel_names,
+            times=times,
+            name=self.name,
+        )
 
     def get_embedded(self, embedding_grid: "Grid1D[Axis]"):
         """Return data embedded on a new 1D grid."""
         embedded = self._representation.get_embedded(embedding_grid)
-        return type(self)(
+        return type(self).from_representation(
             embedded,
-            self.channel_names,
-        ).set_name(self.name)
+            channels=self.channel_names,
+            name=self.name,
+        )
 
     def to_tsdata(
         self,
@@ -353,7 +398,11 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
             :func:`~typed_lisa_toolkit.shop.freq2time` instead.
         """
         tsrepr = self._representation.irfft(np.asarray(times), tapering=tapering)
-        return TSData(tsrepr, self.channel_names)
+        return TSData.from_representation(
+            tsrepr,
+            channels=self.channel_names,
+            name=self.name,
+        )
 
     def _get_plotter(self):
         from ..viz import plotters
@@ -365,21 +414,31 @@ class TimedFSData(FSData):
     """Multi-channel frequency series data with time information.
 
     .. note::
-        To construct a :class:`.TimedFSData`, use the factory
-        function :func:`~typed_lisa_toolkit.timed_fsdata`.
+        To construct a :class:`.TimedFSData`, use factory
+        functions: :func:`~typed_lisa_toolkit.timed_fsdata`
+        or :func:`~typed_lisa_toolkit.construct_timed_fsdata`.
     """
 
-    def __init__(
-        self,
-        _representation: "AnyReps",
+    @classmethod
+    def from_representation(
+        cls,
+        representation: "AnyReps",
         channels: tuple[str, ...],
-        times: Axis | None = None,
         name: str | None = None,
-    ):
-        super().__init__(_representation, channels, name)
+        **kwargs: Any,
+    ) -> Self:
+        """Construct from an existing representation and explicit channel names."""
+        times = cast(Axis | None, kwargs.pop("times", None))
         if times is None:
-            raise ValueError("TimedFSData requires times parameter")
-        self.set_times(times)
+            raise ValueError(
+                f"{cls.__name__}.from_representation requires keyword argument `times`."
+            )
+        obj = super().from_representation(
+            representation,
+            channels=channels,
+            name=name,
+        )
+        return obj.set_times(times)
 
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=np.asarray(self.times))
@@ -401,12 +460,21 @@ class TimedFSData(FSData):
 
     def _create_new(self, _representation: "AnyReps", channels: tuple[str, ...]):
         """Create a new instance preserving times."""
-        new = type(self)(_representation, channels, times=self.times, name=self.name)
+        new = type(self).from_representation(
+            _representation,
+            channels=channels,
+            times=self.times,
+            name=self.name,
+        )
         return new
 
     def drop_times(self):
         """Drop the time grid."""
-        return FSData(self._representation, self.channel_names, self.name)
+        return FSData.from_representation(
+            self._representation,
+            channels=self.channel_names,
+            name=self.name,
+        )
 
     def to_tsdata(
         self,
@@ -421,21 +489,42 @@ class TimedFSData(FSData):
             :func:`~typed_lisa_toolkit.shop.freq2time` instead.
         """
         del times
-        tsrepr = self._representation.irfft(np.asarray(self.times), tapering=tapering)
-        return TSData(tsrepr, self.channel_names, self.name)
+        tsrepr = self._representation.irfft(
+            self.xp.asarray(self.times), tapering=tapering
+        )
+        return TSData.from_representation(
+            tsrepr,
+            channels=self.channel_names,
+            name=self.name,
+        )
 
 
 class STFTData(Data[reps.STFT["Linspace", "Linspace"]]):
     """Multi-channel short-time Fourier transform data container.
 
     .. note::
-        To construct a :class:`.STFTData`, use the factory
-        function :func:`~typed_lisa_toolkit.stftdata`.
+        To construct a :class:`.STFTData`, use factory
+        functions: :func:`~typed_lisa_toolkit.stftdata`
+        or :func:`~typed_lisa_toolkit.construct_stftdata`.
     """
 
     _reps_type: type[reps.STFT["Linspace", "Linspace"]] = reps.STFT[
         "Linspace", "Linspace"
     ]
+
+    @classmethod
+    def from_entries(
+        cls,
+        *,
+        frequencies: Axis,
+        times: Axis,
+        entries: Array,
+        channels: tuple[str, ...],
+        name: str | None = None,
+    ) -> Self:
+        """Construct from raw time-frequency entries and explicit channel names."""
+        rep = reps.stft(frequencies, times, entries)
+        return cls.from_representation(rep, channels=channels, name=name)
 
     def get_subset(
         self,
@@ -475,11 +564,26 @@ class WDMData(Data[reps.WDM]):
     """Multi-channel wavelet domain model data container.
 
     .. note::
-        To construct a :class:`.WDMData`, use the factory
-        function :func:`~typed_lisa_toolkit.wdmdata`.
+        To construct a :class:`.WDMData`, use factory
+        functions: :func:`~typed_lisa_toolkit.wdmdata`
+        or :func:`~typed_lisa_toolkit.construct_wdmdata`.
     """
 
     _reps_type: type[reps.WDM] = reps.WDM
+
+    @classmethod
+    def from_entries(
+        cls,
+        *,
+        frequencies: Axis,
+        times: Axis,
+        entries: Array,
+        channels: tuple[str, ...],
+        name: str | None = None,
+    ) -> Self:
+        """Construct from raw WDM entries and explicit channel names."""
+        rep = reps.wdm(frequencies, times, entries)
+        return cls.from_representation(rep, channels=channels, name=name)
 
     def get_subset(
         self,
@@ -518,7 +622,7 @@ class WDMData(Data[reps.WDM]):
 def tsdata(
     mapping: Mapping[str, reps.TimeSeries[Linspace]], name: str | None = None
 ) -> TSData:
-    """Construct a :class:`~types.data.TSData` instance."""
+    """Construct a :class:`~types.data.TSData` instance from channel mappings."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return TSData.from_dict(mapping, name=name)
 
@@ -526,7 +630,7 @@ def tsdata(
 def fsdata(
     mapping: Mapping[str, reps.FrequencySeries[Linspace]], name: str | None = None
 ) -> FSData:
-    """Construct a :class:`~types.data.FSData` instance."""
+    """Construct a :class:`~types.data.FSData` instance from channel mappings."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return FSData.from_dict(mapping, name=name)
 
@@ -536,7 +640,7 @@ def timed_fsdata(
     times: Linspace | npt.NDArray[np.floating[Any]],
     name: str | None = None,
 ) -> TimedFSData:
-    """Construct a :class:`~types.data.TimedFSData` instance."""
+    """Construct a :class:`~types.data.TimedFSData` instance from channel mappings."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return TimedFSData.from_dict(mapping, times=times, name=name)
 
@@ -545,7 +649,7 @@ def stftdata(
     mapping: Mapping[str, reps.STFT[Linspace, Linspace]],
     name: str | None = None,
 ) -> STFTData:
-    """Construct a :class:`~types.data.STFTData` instance."""
+    """Construct a :class:`~types.data.STFTData` instance from channel mappings."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return STFTData.from_dict(mapping, name=name)
 
@@ -554,13 +658,100 @@ def wdmdata(
     mapping: Mapping[str, reps.WDM],
     name: str | None = None,
 ) -> WDMData:
-    """Construct a :class:`~types.data.WDMData` instance."""
+    """Construct a :class:`~types.data.WDMData` instance from channel mappings."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return WDMData.from_dict(mapping, name=name)
 
 
+def construct_tsdata(
+    *,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    name: str | None = None,
+) -> TSData:
+    """Construct :class:`~types.data.TSData` from grid, entries, and channel names."""
+    return TSData.from_entries(
+        times=times, entries=entries, channels=channels, name=name
+    )
+
+
+def construct_fsdata(
+    *,
+    frequencies: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    name: str | None = None,
+) -> FSData:
+    """Construct :class:`~types.data.FSData` from grid, entries, and channel names."""
+    return FSData.from_entries(
+        frequencies=frequencies,
+        entries=entries,
+        channels=channels,
+        name=name,
+    )
+
+
+def construct_timed_fsdata(
+    *,
+    frequencies: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    times: Linspace | npt.NDArray[np.floating[Any]],
+    name: str | None = None,
+) -> TimedFSData:
+    """Construct :class:`~types.data.TimedFSData` from grid, entries, and channel names."""
+    rep = reps.frequency_series(Linspace.make(frequencies), entries)
+    return TimedFSData.from_representation(
+        rep, channels=channels, times=times, name=name
+    )
+
+
+def construct_stftdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    name: str | None = None,
+) -> STFTData:
+    """Construct :class:`~types.data.STFTData` from grid, entries, and channel names."""
+    return STFTData.from_entries(
+        frequencies=frequencies,
+        times=times,
+        entries=entries,
+        channels=channels,
+        name=name,
+    )
+
+
+def construct_wdmdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    name: str | None = None,
+) -> WDMData:
+    """Construct :class:`~types.data.WDMData` from grid, entries, and channel names."""
+    return WDMData.from_entries(
+        frequencies=frequencies,
+        times=times,
+        entries=entries,
+        channels=channels,
+        name=name,
+    )
+
+
 def load_data(file_path: str | pathlib.Path, legacy: bool = False):
-    """Load the data from a saved HDF5 file."""
+    """Load the data from a saved HDF5 file (*Deprecated*)."""
+    warnings.warn(
+        "The function `load_data` is deprecated and will be removed in 0.8"
+        + "Use the class method `load` of the specific data type instead,"
+        + "e.g., `TSData.load`, `FSData.load`, or `TimedFSData.load`.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     with h5py.File(str(file_path), "r") as f:
         data_type = str(f.attrs["type"])
     if data_type == "TSData":
@@ -656,4 +847,4 @@ def load_mojito(processed_data: SignalProcessor):
         )
         for chnname in channel_names
     }
-    return TSData.from_dict(_mapping)
+    return tsdata(cast(Mapping[str, reps.UniformTimeSeries], _mapping))

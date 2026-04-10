@@ -37,6 +37,11 @@ from typed_lisa_toolkit import (
     tsdata,
     wdm,
     wdmdata,
+    construct_fsdata,
+    construct_stftdata,
+    construct_timed_fsdata,
+    construct_tsdata,
+    construct_wdmdata,
 )
 from typed_lisa_toolkit.types import FrequencySeries, TSData
 
@@ -85,6 +90,11 @@ class TestPublicApi(unittest.TestCase):
         self.assertIs(tlt.pw, pw)
         self.assertIs(tlt.hpw, hpw)
         self.assertIs(tlt.hhpw, hhpw)
+        self.assertIs(tlt.construct_fsdata, construct_fsdata)
+        self.assertIs(tlt.construct_stftdata, construct_stftdata)
+        self.assertIs(tlt.construct_timed_fsdata, construct_timed_fsdata)
+        self.assertIs(tlt.construct_tsdata, construct_tsdata)
+        self.assertIs(tlt.construct_wdmdata, construct_wdmdata)
 
     def test_types_namespace_exports_are_available(self):
         self.assertIs(tlt.types.TSData, TSData)
@@ -109,6 +119,31 @@ class TestPublicApi(unittest.TestCase):
             "pw",
             "hpw",
             "hhpw",
+            "harmonic_waveform",
+            "homogeneous_harmonic_waveform",
+            "projected_waveform",
+            "harmonic_projected_waveform",
+            "homogeneous_harmonic_projected_waveform",
+            "linspace",
+            "cast_mode",
+            "densify_phasor",
+            "densify_phasor_hw",
+            "densify_phasor_pw",
+            "densify_phasor_hpw",
+            "phasor_to_fs_hw",
+            "phasor_to_fs_pw",
+            "phasor_to_fs_hpw",
+            "get_dense_maker",
+            "tsdata",
+            "fsdata",
+            "stftdata",
+            "wdmdata",
+            "timed_fsdata",
+            "construct_tsdata",
+            "construct_fsdata",
+            "construct_timed_fsdata",
+            "construct_stftdata",
+            "construct_wdmdata",
         ):
             self.assertIn(name, tlt.__all__)
 
