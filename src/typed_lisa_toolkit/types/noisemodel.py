@@ -16,7 +16,7 @@ from .. import utils
 from . import data as dm
 from . import representations as reps
 from . import waveforms
-from .misc import Array, Axis
+from .misc import Array, Axis, Grid2D, Linspace
 
 
 def _import_quadax() -> ModuleType:
@@ -46,7 +46,10 @@ log = logging.getLogger(__name__)
 
 ChnName = str
 FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries["Axis"]]
-TFEntry = dm.WDMData | waveforms.ProjectedWaveform[reps.WDM]
+TFEntry = (
+    dm.WDMData[Grid2D[Linspace, Linspace]]
+    | waveforms.ProjectedWaveform[reps.WDM[Grid2D[Linspace, Linspace]]]
+)
 IntegrationMethod = Literal["trapezoid", "simpson"]
 
 

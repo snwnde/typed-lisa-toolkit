@@ -148,10 +148,10 @@ class FDWhittleLikelihood(Likelihood[FDUniformHomogeneous]):
         xp = template.__xp__()
         if isinstance(template, wf.HomogeneousHarmonicProjectedWaveform):
             __temp = wf.sum_harmonics(template)
-            freqs = __temp.get_grid()[0].asarray(xp)
+            freqs = __temp.grid[0].asarray(xp)
             _temp = dm.fsdata(__temp)
         else:
-            freqs = template.get_grid()[0].asarray(xp)
+            freqs = template.grid[0].asarray(xp)
             _temp = dm.fsdata(template)
         try:
             f_interval = (

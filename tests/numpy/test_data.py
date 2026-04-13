@@ -32,15 +32,14 @@ from typed_lisa_toolkit import (
     time_series,
     wdm,
 )
-from typed_lisa_toolkit.types.data import load_mojito
 from typed_lisa_toolkit.types import (
     FSData,
     STFTData,
     TimedFSData,
-    TimeSeries,
     TSData,
     WDMData,
 )
+from typed_lisa_toolkit.types.data import load_mojito
 
 
 def _build_tsdata_numpy():
@@ -49,8 +48,8 @@ def _build_tsdata_numpy():
     y = np.array([1.0, 0.0, -0.5, 0.25, 0.5, -0.75, 0.0, 1.0])
     data = TSData.from_dict(
         {
-            "X": TimeSeries((times,), x[None, None, None, None, :]),
-            "Y": TimeSeries((times,), y[None, None, None, None, :]),
+            "X": time_series(times, x[None, None, None, None, :]),
+            "Y": time_series(times, y[None, None, None, None, :]),
         }
     )
     return times, x, y, data
@@ -60,7 +59,7 @@ class TestDataContainersNumpy(unittest.TestCase):
     def _assert_to_fsdata_deprecation(self, tsdata: TSData, *, keep_times: bool):
         with self.assertWarnsRegex(
             DeprecationWarning,
-            r"UniformTimeSeries\.rfft",
+            r"The 'to_fsdata' method is deprecated",
         ):
             return tsdata.to_fsdata(keep_times=keep_times)
 
@@ -71,7 +70,7 @@ class TestDataContainersNumpy(unittest.TestCase):
     ):
         with self.assertWarnsRegex(
             DeprecationWarning,
-            r"UniformFrequencySeries\.irfft",
+            r"The 'to_tsdata' method is deprecated",
         ):
             if times is None:
                 return fs_like.to_tsdata()
@@ -247,11 +246,7 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             timed.save(handle.name)
-            with self.assertWarnsRegex(
-                DeprecationWarning,
-                "load_data",
-            ):
-                loaded = load_data(handle.name)
+            loaded = load_data(handle.name, domain="frequency", kind="timed")
 
         self.assertIsInstance(loaded, TimedFSData)
         npt.assert_allclose(np.asarray(loaded.times), times)
@@ -313,11 +308,7 @@ class TestDataContainersNumpy(unittest.TestCase):
         _, _, _, tsdata = _build_tsdata_numpy()
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             tsdata.save(handle.name)
-            with self.assertWarnsRegex(
-                DeprecationWarning,
-                "load_data",
-            ):
-                loaded = load_data(handle.name)
+            loaded = load_data(handle.name, domain="time", kind=None)
         self.assertIsInstance(loaded, TSData)
         npt.assert_allclose(
             np.asarray(loaded.get_kernel()), np.asarray(tsdata.get_kernel())
@@ -449,7 +440,7 @@ class TestDataContainersNumpy(unittest.TestCase):
                     DeprecationWarning,
                     "load_data",
                 ):
-                    load_data(handle.name)
+                    load_data(handle.name, legacy=True)
 
     def test_load_data_dispatches_fsdata(self):
         _, _, _, tsdata = _build_tsdata_numpy()
@@ -457,11 +448,7 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             fsdata.save(handle.name)
-            with self.assertWarnsRegex(
-                DeprecationWarning,
-                "load_data",
-            ):
-                loaded = load_data(handle.name)
+            loaded = load_data(handle.name, domain="frequency", kind=None)
 
         self.assertIsInstance(loaded, FSData)
         npt.assert_allclose(
@@ -647,8 +634,16 @@ class TestDataContainersNumpy(unittest.TestCase):
             "Y": stft(freqs, times, np.ones((1, 1, 1, 1, len(freqs), len(times)))),
         }
         wdm_mapping = {
-            "X": wdm(frequencies=freqs, times=times, entries=np.ones((1, 1, 1, 1, len(freqs), len(times)))),
-            "Y": wdm(frequencies=freqs, times=times, entries=np.ones((1, 1, 1, 1, len(freqs), len(times)))),
+            "X": wdm(
+                frequencies=freqs,
+                times=times,
+                entries=np.ones((1, 1, 1, 1, len(freqs), len(times))),
+            ),
+            "Y": wdm(
+                frequencies=freqs,
+                times=times,
+                entries=np.ones((1, 1, 1, 1, len(freqs), len(times))),
+            ),
         }
 
         stft_data = STFTData.from_dict(stft_mapping)
@@ -671,7 +666,11 @@ class TestDataContainersNumpy(unittest.TestCase):
                     grp.create_dataset("grid", data=freqs)
                     grp.create_dataset("entries", data=values)
 
-            loaded = FSData.load(handle.name, legacy=True)
+            with self.assertWarnsRegex(
+                DeprecationWarning,
+                r"The 'load' method is deprecated",
+            ):
+                loaded = FSData.load(handle.name, legacy=True)
 
         self.assertIsInstance(loaded, FSData)
         self.assertEqual(loaded.channel_names, ("X", "Y"))
@@ -706,3 +705,111 @@ class TestDataContainersNumpy(unittest.TestCase):
 
 class TestDataInternalAbstractBranches(DataAbstractBranchesMixin, unittest.TestCase):
     """Abstract/NotImplementedError branch tests (shared via mixin)."""
+
+
+class TestDataLoadValidationBranches(unittest.TestCase):
+    def test_load_data_warns_when_domain_not_provided(self):
+        _, _, _, tsdata = _build_tsdata_numpy()
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            tsdata.save(handle.name)
+            with self.assertWarns(FutureWarning):
+                loaded = load_data(handle.name, kind=None)
+
+        self.assertIsInstance(loaded, TSData)
+
+    def test_load_data_domain_mismatch_raises(self):
+        _, _, _, tsdata = _build_tsdata_numpy()
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            tsdata.save(handle.name)
+            with self.assertRaises(ValueError):
+                load_data(handle.name, domain="frequency", kind=None)
+
+    def test_load_data_kind_mismatch_raises(self):
+        _, _, _, tsdata = _build_tsdata_numpy()
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+        ):
+            fsd = tsdata.to_fsdata(keep_times=False)
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            fsd.save(handle.name)
+            with self.assertRaises(ValueError):
+                load_data(handle.name, domain="frequency", kind="timed")
+
+    def test_load_data_sparse_not_supported_for_time_or_frequency(self):
+        _, _, _, tsdata = _build_tsdata_numpy()
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            tsdata.save(handle.name)
+            with self.assertRaises(ValueError):
+                load_data(handle.name, domain="time", kind=None, sparse=True)
+
+    def test_load_data_dispatches_sparse_stft_and_dense_wdm(self):
+        times = np.linspace(0.0, 3.0, 8)
+        freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+        sparse_indices = np.array([[0, 0], [1, 2], [2, 4]], dtype=int)
+
+        stft_entries = np.ones((1, 2, 1, 1, len(sparse_indices)))
+        stft_data = construct_stftdata(
+            frequencies=freqs,
+            times=times,
+            entries=stft_entries,
+            channels=("X", "Y"),
+            sparse_indices=sparse_indices,
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            stft_data.save(handle.name)
+            loaded_stft = load_data(
+                handle.name,
+                domain="time-frequency",
+                kind="stft",
+                sparse=True,
+            )
+
+        self.assertIsInstance(loaded_stft, STFTData)
+        npt.assert_allclose(
+            np.asarray(loaded_stft.get_kernel()),
+            np.asarray(stft_data.get_kernel()),
+        )
+
+        wdm_entries = np.ones((1, 2, 1, 1, len(freqs), len(times)))
+        wdm_data = construct_wdmdata(
+            frequencies=freqs,
+            times=times,
+            entries=wdm_entries,
+            channels=("X", "Y"),
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
+            wdm_data.save(handle.name)
+            loaded_wdm = load_data(
+                handle.name,
+                domain="time-frequency",
+                kind="wdm",
+                sparse=False,
+            )
+
+        self.assertIsInstance(loaded_wdm, WDMData)
+        npt.assert_allclose(
+            np.asarray(loaded_wdm.get_kernel()),
+            np.asarray(wdm_data.get_kernel()),
+        )
+
+    def test_timedfsdata_to_tsdata_ignores_explicit_times_argument(self):
+        times, _, _, tsdata = _build_tsdata_numpy()
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+        ):
+            timed = tsdata.to_fsdata(keep_times=True)
+        alt_times = np.linspace(100.0, 103.5, len(times))
+
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"The 'to_tsdata' method is deprecated"
+        ):
+            recovered = timed.to_tsdata(alt_times)
+
+        self.assertIsInstance(recovered, TSData)
+        self.assertEqual(np.asarray(recovered.times).shape[0], len(times))

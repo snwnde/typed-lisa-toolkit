@@ -18,6 +18,8 @@ Representation Types
    FrequencySeries
    UniformFrequencySeries
    Phasor
+   ShortTimeFourierTransform
+   WilsonDaubechiesMeyer
    STFT
    WDM
 
@@ -133,6 +135,8 @@ Miscellaneous
    Interpolator
    Axis
    Grid1D
+   Grid2DCartesian
+   Grid2DSparse
    Grid2D
    UniformGrid2D
    AnyGrid
@@ -177,6 +181,8 @@ from .misc import (
     Domain,
     Grid1D,
     Grid2D,
+    Grid2DCartesian,
+    Grid2DSparse,
     Interpolator,
     Linspace,
     UniformGrid2D,
@@ -193,13 +199,13 @@ from .noisemodel import (
     TFNoiseModel,
 )
 from .representations import (
-    STFT,
-    WDM,
     FrequencySeries,
     Phasor,
+    ShortTimeFourierTransform,
     TimeSeries,
     UniformFrequencySeries,
     UniformTimeSeries,
+    WilsonDaubechiesMeyer,
 )
 from .waveforms import (
     HarmonicProjectedWaveform,
@@ -211,6 +217,12 @@ from .waveforms import (
 
 QNM = QuasiNormalMode
 """Alias for :class:`.QuasiNormalMode`."""
+
+STFT = ShortTimeFourierTransform
+"""Alias for :class:`.ShortTimeFourierTransform`."""
+
+WDM = WilsonDaubechiesMeyer
+"""Alias for :class:`.WilsonDaubechiesMeyer`."""
 
 IntegrationMethod = IntegrationMethod
 """Name of the numerical integration method."""
@@ -230,6 +242,8 @@ __all__ = [
     "Interpolator",
     "Axis",
     "Grid1D",
+    "Grid2DCartesian",
+    "Grid2DSparse",
     "Grid2D",
     "UniformGrid2D",
     "AnyGrid",

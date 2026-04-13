@@ -10,7 +10,7 @@ from .types.data import (
     tsdata,
     wdmdata,
 )
-from .types.misc import linspace
+from .types.misc import build_grid2d, linspace, linspace_from_array
 from .types.modes import cast_mode
 from .types.representations import (
     densify_phasor,
@@ -78,4 +78,6 @@ __all__ = [
     "construct_stftdata",
     "construct_wdmdata",
     "linspace",
+    "linspace_from_array",
+    "build_grid2d",
 ]

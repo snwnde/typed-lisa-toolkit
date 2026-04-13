@@ -239,6 +239,14 @@ class NDArrayMixin(abc.ABC):
         return self._unary_op(self.xp.unwrap, **kwargs)
 
 
+class _GridProperty:
+    def __get__[GridT: AnyGrid](
+        self,
+        instance: "ChannelMapping[reps.Representation[GridT]]",
+        owner: Any,
+    ) -> GridT: ...
+
+
 class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
     @property
     def channel_names(self) -> tuple[str, ...]:
@@ -420,20 +428,12 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
             return f"{self.__class__.__name__}(name={self.name!r}, items={items!r})"
         return f"{self.__class__.__name__}({items!r})"
 
-    def get_grid[GridT: AnyGrid](
-        self: "ChannelMapping[reps.Representation[GridT]]",
-    ) -> GridT:
+    @property
+    def grid(self):  # pyright: ignore[reportRedeclaration]
         """Return the grid."""
         return self._representation.grid
 
-    @property
-    def grid(self):
-        """Return the grid.
-
-        .. note::
-            This is the property version of :meth:`get_grid`.
-        """
-        return self.get_grid()
+    grid: _GridProperty  # For correct type hinting
 
     @property
     def domain(self) -> Domain:

@@ -8,6 +8,8 @@ from ..types import (
     Array,
     Axis,
     EvolutionarySpectralDensity,
+    Grid2D,
+    Linspace,
     SpectralDensity,
     TimedFSData,
 )
@@ -19,8 +21,8 @@ from ..types._mixins import ChannelMapping
 ConvertibleReps = (
     reps.FrequencySeries[Axis]
     | reps.TimeSeries[Axis]
-    | reps.WDM
-    | reps.STFT[Axis, Axis]
+    | reps.WDM[Grid2D[Linspace, Linspace]]
+    | reps.STFT[Grid2D[Axis, Axis]]
 )
 
 

@@ -24,6 +24,7 @@ Loaders
 .. autosummary::
    :toctree: _generated
    :template: base.rst
+   :nosignatures:
 
    load_data
    load_sangria
@@ -42,6 +43,7 @@ Modes
 .. autosummary::
    :toctree: _generated
    :template: base.rst
+   :nosignatures:
 
    cast_mode
 
@@ -52,6 +54,7 @@ Representations
 .. autosummary::
    :toctree: _generated
    :template: base.rst
+   :nosignatures:
 
    frequency_series
    time_series
@@ -64,6 +67,7 @@ The following functions construct new representations by processing existing rep
 .. autosummary::
    :toctree: _generated
    :template: base.rst
+   :nosignatures:
 
    densify_phasor
 
@@ -74,6 +78,7 @@ Data
 .. autosummary::
    :toctree: _generated
    :template: base.rst
+   :nosignatures:
 
    tsdata
    fsdata
@@ -112,6 +117,7 @@ The following functions construct new waveforms by processing existing waveforms
 .. autosummary::
    :toctree: _generated
    :template: base.rst
+   :nosignatures:
 
    sum_harmonics
    densify_phasor_hw
@@ -128,13 +134,17 @@ Misc
 .. autosummary::
    :toctree: _generated
    :template: base.rst
+   :nosignatures:
 
    linspace
+   linspace_from_array
+   build_grid2d
 
 """
 
 from . import shop, types, utils, viz
 from ._constructors import (
+    build_grid2d,
     cast_mode,
     construct_fsdata,
     construct_stftdata,
@@ -157,6 +167,7 @@ from ._constructors import (
     hpw,
     hw,
     linspace,
+    linspace_from_array,
     phasor,
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
@@ -213,10 +224,12 @@ __all__ = [
     "stftdata",
     "wdmdata",
     "timed_fsdata",
-   "construct_tsdata",
-   "construct_fsdata",
-   "construct_timed_fsdata",
-   "construct_stftdata",
-   "construct_wdmdata",
+    "construct_tsdata",
+    "construct_fsdata",
+    "construct_timed_fsdata",
+    "construct_stftdata",
+    "construct_wdmdata",
     "linspace",
+    "linspace_from_array",
+    "build_grid2d",
 ]

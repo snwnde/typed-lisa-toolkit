@@ -5,6 +5,11 @@ import unittest
 import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
     cast_mode,
+    construct_fsdata,
+    construct_stftdata,
+    construct_timed_fsdata,
+    construct_tsdata,
+    construct_wdmdata,
     densify_phasor,
     densify_phasor_hpw,
     densify_phasor_hw,
@@ -37,11 +42,6 @@ from typed_lisa_toolkit import (
     tsdata,
     wdm,
     wdmdata,
-    construct_fsdata,
-    construct_stftdata,
-    construct_timed_fsdata,
-    construct_tsdata,
-    construct_wdmdata,
 )
 from typed_lisa_toolkit.types import FrequencySeries, TSData
 
