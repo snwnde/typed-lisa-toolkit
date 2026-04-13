@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from types import ModuleType
-from typing import Any, Literal, overload
+from typing import Any, Literal, overload, cast
 
 import array_api_compat as xpc
 
@@ -50,15 +50,22 @@ def _matrix_mult[VT: Array | ConvertibleReps](matrix: Any, *vectors: VT) -> list
     ]
 
 
-def _xyz2aet[VT: ConvertibleReps](X: VT, Y: VT, Z: VT) -> tuple[VT, VT, VT]:
-    xp = xpc.get_namespace(X.entries, Y.entries, Z.entries)
+def _get_xp(*args: ConvertibleReps | Array):
+    try:
+        return xpc.get_namespace(*args)
+    except TypeError:
+        return xpc.get_namespace(*[cast(ConvertibleReps, arg).entries for arg in args])
+
+
+def _xyz2aet[VT: Array | ConvertibleReps](X: VT, Y: VT, Z: VT) -> tuple[VT, VT, VT]:
+    xp = _get_xp(X, Y, Z)
     xyz2aet_matrix = get_xyz2aet_matrix(xp)
     A, E, T = _matrix_mult(xyz2aet_matrix, X, Y, Z)
     return A, E, T
 
 
-def _aet2xyz[VT: ConvertibleReps](A: VT, E: VT, T: VT) -> tuple[VT, VT, VT]:
-    xp = xpc.get_namespace(A.entries, E.entries, T.entries)
+def _aet2xyz[VT: Array | ConvertibleReps](A: VT, E: VT, T: VT) -> tuple[VT, VT, VT]:
+    xp = _get_xp(A, E, T)
     aet2xyz_matrix = get_aet2xyz_matrix(xp)
     X, Y, Z = _matrix_mult(aet2xyz_matrix, A, E, T)
     return X, Y, Z
@@ -70,7 +77,6 @@ def _get_type_error_msg(original: Mapping[str, ConvertibleReps], /) -> str:
         + " :class:`~typed_lisa_toolkit.types.TimeSeries`,"
         + ":class:`~typed_lisa_toolkit.types.WDM`, or :class:`~typed_lisa_toolkit.types.STFT`,"
         + f" got {type(original).__name__}. "
-        + "This function is only intended for use with representations, not raw arrays."
     )
 
 
@@ -146,8 +152,35 @@ def _convert_spectral_density[SDT: SpectralDensity | EvolutionarySpectralDensity
         )
 
 
+def _convert_array(xyz: Array, /, *, direction: Literal["xyz2aet", "aet2xyz"]) -> Array:
+    xp = xpc.get_namespace(xyz)
+    if direction == "xyz2aet":
+        convert_matrix = get_xyz2aet_matrix(xp)
+        assert xyz.shape[-1] == 3, (
+            f"Expected last dimension of input array to be 3, got {xyz.shape[-1]}."
+        )
+    else:
+        convert_matrix = get_aet2xyz_matrix(xp)
+        assert xyz.shape[-1] == 3, (
+            f"Expected last dimension of input array to be 3, got {xyz.shape[-1]}."
+        )
+    return xp.einsum("ij,...j->...i", convert_matrix, xyz)
+
+
+_ConvertibleTypes = (
+    Mapping[str, ConvertibleReps]
+    | Array
+    | SpectralDensity
+    | EvolutionarySpectralDensity
+)
+
+
 @overload
 def xyz2aet[MapT: Mapping[str, ConvertibleReps]](xyz: MapT, /) -> MapT: ...
+
+
+@overload
+def xyz2aet(xyz: Array, /) -> Array: ...
 
 
 @overload
@@ -158,19 +191,47 @@ def xyz2aet(xyz: SpectralDensity, /) -> SpectralDensity: ...
 def xyz2aet(xyz: EvolutionarySpectralDensity, /) -> EvolutionarySpectralDensity: ...
 
 
-def xyz2aet(xyz: Any, /):
+@overload
+def xyz2aet(
+    *,
+    X: Array,
+    Y: Array,
+    Z: Array,
+) -> tuple[Array, Array, Array]: ...
+
+
+def xyz2aet(
+    xyz: _ConvertibleTypes | None = None,
+    /,
+    *,
+    X: Array | None = None,
+    Y: Array | None = None,
+    Z: Array | None = None,
+):
     """Convert :ref:`data <data_types>`, :ref:`waveforms <waveform_types>` or :ref:`spectral density matrices <spectral_density_matrices>` in XYZ channels to AET channels.
 
     The conversion is performed according to the DDPC Rosetta stone convention.
     """
-    if isinstance(xyz, (SpectralDensity, EvolutionarySpectralDensity)):
-        return _convert_spectral_density(xyz, direction="xyz2aet")
-    else:
-        return _convert_mapping(xyz, direction="xyz2aet")
+    if xyz is not None:
+        if any(arg is not None for arg in (X, Y, Z)):
+            raise ValueError("Cannot specify both xyz and X, Y, Z.")
+        if isinstance(xyz, (SpectralDensity, EvolutionarySpectralDensity)):
+            return _convert_spectral_density(xyz, direction="xyz2aet")
+        if isinstance(xyz, Mapping):
+            return _convert_mapping(xyz, direction="xyz2aet")
+        return _convert_array(xyz, direction="xyz2aet")
+
+    if X is not None and Y is not None and Z is not None:
+        return _xyz2aet(X, Y, Z)
+    raise ValueError("Must specify either xyz or all of X, Y, Z.")
 
 
 @overload
 def aet2xyz[MapT: Mapping[str, ConvertibleReps]](aet: MapT, /) -> MapT: ...
+
+
+@overload
+def aet2xyz(aet: Array, /) -> Array: ...
 
 
 @overload
@@ -181,12 +242,36 @@ def aet2xyz(aet: SpectralDensity, /) -> SpectralDensity: ...
 def aet2xyz(aet: EvolutionarySpectralDensity, /) -> EvolutionarySpectralDensity: ...
 
 
-def aet2xyz(aet: Any, /):
+@overload
+def aet2xyz(
+    *,
+    A: Array,
+    E: Array,
+    T: Array,
+) -> tuple[Array, Array, Array]: ...
+
+
+def aet2xyz(
+    aet: _ConvertibleTypes | None = None,
+    /,
+    *,
+    A: Array | None = None,
+    E: Array | None = None,
+    T: Array | None = None,
+):
     """Convert :ref:`data <data_types>`, :ref:`waveforms <waveform_types>` or :ref:`spectral density matrices <spectral_density_matrices>` in AET channels to XYZ channels.
 
     The conversion is performed according to the DDPC Rosetta stone convention.
     """
-    if isinstance(aet, (SpectralDensity, EvolutionarySpectralDensity)):
-        return _convert_spectral_density(aet, direction="aet2xyz")
-    else:
-        return _convert_mapping(aet, direction="aet2xyz")
+    if aet is not None:
+        if any(arg is not None for arg in (A, E, T)):
+            raise ValueError("Cannot specify both aet and A, E, T.")
+        if isinstance(aet, (SpectralDensity, EvolutionarySpectralDensity)):
+            return _convert_spectral_density(aet, direction="aet2xyz")
+        if isinstance(aet, Mapping):
+            return _convert_mapping(aet, direction="aet2xyz")
+        return _convert_array(aet, direction="aet2xyz")
+
+    if A is not None and E is not None and T is not None:
+        return _aet2xyz(A, E, T)
+    raise ValueError("Must specify either aet or all of A, E, T.")
