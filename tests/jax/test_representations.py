@@ -57,7 +57,7 @@ class TestCanonicalShapeJAX(unittest.TestCase):
     def setUp(self):
         """Create test fixtures with JAX arrays."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 3, 2, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_time, self.len_freq = 100, 50
         case = build_canonical_representations(
             jnp,
@@ -247,11 +247,11 @@ class TestCanonicalShapeJAX(unittest.TestCase):
     def test_shape_enables_semantic_slicing(self):
         """Test semantic slicing patterns enabled by canonical shape with JAX."""
         # Test semantic slicing on FrequencySeries
-        semantic_slice_fs = self.fs.entries[0:2, 1:2, 1, :, 10:30]
+        semantic_slice_fs = self.fs.entries[0:2, 0:1, 0, :, 10:30]
         self.assertEqual(semantic_slice_fs.shape, (2, 1, self.n_features, 20))
 
         # Test semantic slicing on STFT with both grid dimensions
-        semantic_slice_tf = self.tf.entries[0:2, 1:2, 1, :, 10:20, 5:15]
+        semantic_slice_tf = self.tf.entries[0:2, 0:1, 0, :, 10:20, 5:15]
         self.assertEqual(
             semantic_slice_tf.shape,
             (2, 1, self.n_features, 10, 10),
@@ -268,7 +268,7 @@ class TestSubsetOperationsJAX(unittest.TestCase):
     def setUp(self):
         """Create test fixtures for subset operation tests with JAX arrays."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 3, 1, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_grid_small, self.len_grid_large = 101, 1000
 
         # Frequency series fixture (larger grid) with JAX
@@ -607,7 +607,7 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
     def setUp(self):
         """Create test fixtures for arithmetic operation tests with JAX arrays."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 3, 2, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_freq, self.len_time = 50, 100
 
         # Frequency grids
@@ -931,7 +931,7 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
     def setUp(self):
         """Create test fixtures for property access tests with JAX."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 2, 1, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_freq_long = 1000
         self.len_freq_short = 100
         self.len_time = 500
@@ -1037,7 +1037,7 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
     def setUp(self):
         """Create test fixtures for grid tuple handling tests with JAX."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 2, 1, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_grid_small = 50
         self.len_grid_large = 100
 
@@ -1111,7 +1111,7 @@ class TestEdgeCasesJAX(unittest.TestCase):
     def setUp(self):
         """Create test fixtures for edge case tests with JAX."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 2, 1, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_grid_large = 100
         self.len_grid_small = 5
 
@@ -1272,7 +1272,7 @@ class TestComplexPropertiesJAX(unittest.TestCase):
     def setUp(self):
         """Create test fixtures for complex property tests with JAX."""
         # Canonical shape dimensions
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 2, 1, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_freq = 50
 
         # Frequency grid
@@ -1384,7 +1384,7 @@ class TestErrorHandlingJAX(unittest.TestCase):
 
     def setUp(self):
         """Create test fixtures for error handling tests."""
-        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 2, 1, 1
+        self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.freqs_short = jnp.linspace(0, 1, 50)
         self.freqs_long = jnp.linspace(0, 1, 100)
 

@@ -460,7 +460,7 @@ def frequency_series[AxisT: "Axis"](
         Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
         :class:`array <typed_lisa_toolkit.types.misc.Array>` of positive frequencies.
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf)`` where ``Nf`` is the size of ``frequencies``.
+        An array of shape ``(n_batch, 1, 1, 1, Nf)`` where ``Nf`` is the size of ``frequencies``.
 
     Note
     ----
@@ -469,7 +469,7 @@ def frequency_series[AxisT: "Axis"](
     """
     _validate_shape(
         entries,
-        (entries.shape[0], entries.shape[1], entries.shape[2], 1, len(frequencies)),
+        (entries.shape[0], 1, 1, 1, len(frequencies)),
     )
     try:
         _frequencies = Linspace.make(frequencies)
@@ -506,7 +506,7 @@ def time_series[AxisT: "Axis"](
         :class:`array <typed_lisa_toolkit.types.misc.Array>` of time points.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, 1, Nt)`` where ``Nt`` is the size of ``times``.
+        An array of shape ``(n_batch, 1, 1, 1, Nt)`` where ``Nt`` is the size of ``times``.
 
     Note
     ----
@@ -514,7 +514,7 @@ def time_series[AxisT: "Axis"](
     :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
     _validate_shape(
-        entries, (entries.shape[0], entries.shape[1], entries.shape[2], 1, len(times))
+        entries, (entries.shape[0], 1, 1, 1, len(times))
     )
     try:
         _times = Linspace.make(times)
@@ -612,9 +612,9 @@ def stft[FreqAxisT: "Axis", TimeAxisT: "Axis"](
         :class:`array <typed_lisa_toolkit.types.misc.Array>` of time points.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
-        For dense grid: an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf, Nt)``
+        For dense grid: an array of shape ``(n_batch, 1, 1, 1, Nf, Nt)``
         where ``Nf`` and ``Nt`` are the sizes of ``frequencies`` and ``times`` respectively.
-        For sparse grid: an array of shape ``(n_batch, n_channels, n_harmonics, 1, num_sparse_points)``
+        For sparse grid: an array of shape ``(n_batch, 1, 1, 1, num_sparse_points)``
         where ``num_sparse_points`` is the number of rows in ``sparse_indices``.
 
     Note
@@ -627,8 +627,8 @@ def stft[FreqAxisT: "Axis", TimeAxisT: "Axis"](
             entries,
             (
                 entries.shape[0],
-                entries.shape[1],
-                entries.shape[2],
+                1,
+                1,
                 1,
                 len(frequencies),
                 len(times),
@@ -639,8 +639,8 @@ def stft[FreqAxisT: "Axis", TimeAxisT: "Axis"](
             entries,
             (
                 entries.shape[0],
-                entries.shape[1],
-                entries.shape[2],
+                1,
+                1,
                 1,
                 len(sparse_indices),
             ),
@@ -689,8 +689,8 @@ def wdm(
         Evenly-spaced times with separation ΔT and size ``Nt``.
 
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
-        For dense grid: an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf+1, Nt)``.
-        For sparse grid: an array of shape ``(n_batch, n_channels, n_harmonics, 1, num_sparse_points)``
+        For dense grid: an array of shape ``(n_batch, 1, 1, 1, Nf+1, Nt)``.
+        For sparse grid: an array of shape ``(n_batch, 1, 1, 1, num_sparse_points)``
         where ``num_sparse_points`` is the number of rows in ``sparse_indices``.
 
     Note
@@ -703,8 +703,8 @@ def wdm(
             entries,
             (
                 entries.shape[0],
-                entries.shape[1],
-                entries.shape[2],
+                1,
+                1,
                 1,
                 len(frequencies),
                 len(times),
@@ -715,8 +715,8 @@ def wdm(
             entries,
             (
                 entries.shape[0],
-                entries.shape[1],
-                entries.shape[2],
+                1,
+                1,
                 1,
                 len(sparse_indices),
             ),
