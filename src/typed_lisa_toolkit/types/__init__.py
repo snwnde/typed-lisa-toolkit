@@ -1,10 +1,22 @@
 """
-Types provided by the package.
+Types provided by TLT.
+
+When possible, prefer to construct all objects with top-level functions (such as
+:func:`~typed_lisa_toolkit.time_series`) instead of directly instantiating the classes
+here (such as :class:`UniformTimeSeries`). The top-level functions tend to have a nicer
+API. Ideally, use the classes here only for adding type hints to your code.
+
+Not all types have top-level factory functions available. For example, you still need to
+instantiate :class:`SpectralDensity` and :class:`FDNoiseModel` directly.
 
 .. _representation_types:
 
 Representation Types
 ^^^^^^^^^^^^^^^^^^^^
+
+Representations are the building blocks of all other TLT types. They behave like arrays,
+but carry time and frequency grids and other metadata. They are all ultimately different
+ways to represent a time series.
 
 .. currentmodule:: typed_lisa_toolkit.types
 
@@ -27,6 +39,8 @@ Representation Types
 
 Data Types
 ^^^^^^^^^^
+
+Data objects carry multiple TDI channels of LISA data, all in the same representation.
 
 .. currentmodule:: typed_lisa_toolkit.types
 
@@ -64,6 +78,12 @@ Mode Types
 Waveform Types
 ^^^^^^^^^^^^^^
 
+Similarly to data objects, waveform objects group multiple series together in the same
+sort of representation. Unlike data objects, they can carry metadata such as harmonic
+content.
+
+Waveforms are h+, hx, while "projected" waveforms are TDI channels.
+
 .. currentmodule:: typed_lisa_toolkit.types
 
 .. autosummary::
@@ -81,6 +101,11 @@ Waveform Types
 
 Spectral Density Matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Matrices of Power Spectral Densities (PSDs) and Cross Spectral Densities (CSDs) carry
+two TDI channel indices, unlike data and projected waveforms which only carry one.
+
+The utility of these matrices is in constructing noise models and likelihoods.
 
 .. currentmodule:: typed_lisa_toolkit.types
 
