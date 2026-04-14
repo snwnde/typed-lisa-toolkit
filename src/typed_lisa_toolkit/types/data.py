@@ -778,11 +778,6 @@ def construct_tsdata(
 
     name: str | None
         Name of the data. Default is ``None``.
-
-    Note
-    ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
     times = _enforce_uniform(times)
     return TSData.from_entries(
@@ -815,11 +810,6 @@ def construct_fsdata(
 
     name: str | None
         Name of the data. Default is ``None``.
-
-    Note
-    ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
     frequencies = _enforce_uniform(frequencies)
     return FSData.from_entries(
@@ -1020,11 +1010,6 @@ def construct_wdmdata(
 
     name: str | None
         Name of the data. Default is ``None``.
-
-    Note
-    ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
     frequencies = _enforce_uniform(frequencies)
     times = _enforce_uniform(times)

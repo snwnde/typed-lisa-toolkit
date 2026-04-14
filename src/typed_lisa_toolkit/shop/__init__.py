@@ -1,5 +1,10 @@
 """
-Toolkits available in the shop.
+Utility functions manipulating the core objects.
+
+Not all use cases are handled by these utilities. You are encouraged to
+write your own functions for your specific use case. Feel free to share them 
+with the community by opening an issue and/or a merge request if you think 
+your function is general enough to be useful for others.
 
 .. currentmodule:: typed_lisa_toolkit.shop
 
