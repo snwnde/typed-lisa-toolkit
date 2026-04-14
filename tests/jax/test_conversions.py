@@ -97,6 +97,80 @@ class TestConversionsJax(unittest.TestCase):
             atol=1e-12,
         )
 
+    def test_xyz2aet_with_xyz_and_xyz_components_raises(self):
+        xyz = _build_xyz_tsdata_jax()
+        with self.assertRaisesRegex(ValueError, "Cannot specify both xyz and X, Y, Z"):
+            shop.xyz2aet(
+                xyz,
+                X=jnp.array([1.0], dtype=jnp.float64),
+                Y=jnp.array([2.0], dtype=jnp.float64),
+                Z=jnp.array([3.0], dtype=jnp.float64),
+            )
+
+    def test_aet2xyz_with_aet_and_aet_components_raises(self):
+        aet = shop.xyz2aet(_build_xyz_tsdata_jax())
+        with self.assertRaisesRegex(ValueError, "Cannot specify both aet and A, E, T"):
+            shop.aet2xyz(
+                aet,
+                A=jnp.array([1.0], dtype=jnp.float64),
+                E=jnp.array([2.0], dtype=jnp.float64),
+                T=jnp.array([3.0], dtype=jnp.float64),
+            )
+
+    def test_xyz2aet_without_inputs_raises(self):
+        with self.assertRaisesRegex(ValueError, "Must specify either xyz or all of X, Y, Z"):
+            shop.xyz2aet()
+
+    def test_aet2xyz_without_inputs_raises(self):
+        with self.assertRaisesRegex(ValueError, "Must specify either aet or all of A, E, T"):
+            shop.aet2xyz()
+
+    def test_xyz2aet_keyword_components_path(self):
+        x = jnp.array([0.0, 1.0, 2.0], dtype=jnp.float64)
+        y = jnp.array([1.0, 0.5, -1.0], dtype=jnp.float64)
+        z = jnp.array([-0.5, 0.0, 1.5], dtype=jnp.float64)
+
+        a, e, t = shop.xyz2aet(X=x, Y=y, Z=z)
+        recovered_x, recovered_y, recovered_z = shop.aet2xyz(A=a, E=e, T=t)
+
+        npt.assert_allclose(np.asarray(recovered_x), np.asarray(x), atol=1e-12)
+        npt.assert_allclose(np.asarray(recovered_y), np.asarray(y), atol=1e-12)
+        npt.assert_allclose(np.asarray(recovered_z), np.asarray(z), atol=1e-12)
+
+    def test_mapping_not_channel_mapping_raises_type_error(self):
+        bad_mapping = {
+            "X": jnp.array([1.0, 2.0], dtype=jnp.float64),
+            "Y": jnp.array([0.0, 3.0], dtype=jnp.float64),
+            "Z": jnp.array([-1.0, 4.0], dtype=jnp.float64),
+        }
+        with self.assertRaisesRegex(TypeError, "got dict"):
+            shop.xyz2aet(bad_mapping)
+
+    def test_spectral_density_channel_order_assertions(self):
+        freqs = jnp.array([0.25, 0.5], dtype=jnp.float64)
+        kernel = jnp.broadcast_to(jnp.eye(3, dtype=jnp.float64), (2, 3, 3))
+
+        wrong_xyz_input = SpectralDensity(freqs, kernel, ["A", "E", "T"])
+        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+            shop.xyz2aet(wrong_xyz_input)
+
+        wrong_aet_input = SpectralDensity(freqs, kernel, ["X", "Y", "Z"])
+        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+            shop.aet2xyz(wrong_aet_input)
+
+    def test_array_last_dimension_assertions(self):
+        wrong_shape = jnp.ones((4, 2), dtype=jnp.float64)
+
+        with self.assertRaisesRegex(
+            AssertionError, "Expected last dimension of input array to be 3"
+        ):
+            shop.xyz2aet(wrong_shape)
+
+        with self.assertRaisesRegex(
+            AssertionError, "Expected last dimension of input array to be 3"
+        ):
+            shop.aet2xyz(wrong_shape)
+
 
 if __name__ == "__main__":
     unittest.main()

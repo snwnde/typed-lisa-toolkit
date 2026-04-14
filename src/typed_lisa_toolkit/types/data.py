@@ -1227,41 +1227,16 @@ def load_sangria(
     channels: Literal["AE", "AET", "XYZ"] = "AE",
 ) -> TSData:
     """Load Sangria dataset or Sangria HM dataset."""
-
-    def XYZ2AET(
-        X: reps.UniformTimeSeries,
-        Y: reps.UniformTimeSeries,
-        Z: reps.UniformTimeSeries,
-    ) -> tuple[reps.UniformTimeSeries, reps.UniformTimeSeries, reps.UniformTimeSeries]:
-        A, E, T = (
-            (Z - X) / np.sqrt(2.0),
-            (X - 2.0 * Y + Z) / np.sqrt(6.0),
-            (X + Y + Z) / np.sqrt(3.0),
-        )
-        return A, E, T
-
-    def AET2XYZ(
-        A: reps.UniformTimeSeries,
-        E: reps.UniformTimeSeries,
-        T: reps.UniformTimeSeries,
-    ) -> tuple[reps.UniformTimeSeries, reps.UniformTimeSeries, reps.UniformTimeSeries]:
-        X, Y, Z = [
-            -1 / np.sqrt(2.0) * A + 1 / np.sqrt(6.0) * E + 1 / np.sqrt(3.0) * T,
-            -np.sqrt(2.0 / 3.0) * E + 1 / np.sqrt(3.0) * T,
-            1 / np.sqrt(2.0) * A + 1 / np.sqrt(6.0) * E + 1 / np.sqrt(3.0) * T,
-        ]
-        return X, Y, Z
+    from ..shop import aet2xyz, xyz2aet
 
     def transform_channels(data: TSData) -> TSData:
         channel_names = tuple(name for name in channels)
         if set(channel_names).issubset(data.channel_names):
             return data.pick(channel_names)
         if set(channel_names).issubset(("X", "Y", "Z")):
-            X, Y, Z = AET2XYZ(data["A"], data["E"], data["T"])
-            return type(data).from_dict({"X": X, "Y": Y, "Z": Z}).pick(channel_names)
+            return aet2xyz(data).pick(channel_names)
         if set(channel_names).issubset(("A", "E", "T")):
-            A, E, T = XYZ2AET(data["X"], data["Y"], data["Z"])
-            return type(data).from_dict({"A": A, "E": E, "T": T}).pick(channel_names)
+            return xyz2aet(data).pick(channel_names)
         raise ValueError(
             f"The data does not have the expected channels. The data has {data.channel_names}."
         )
