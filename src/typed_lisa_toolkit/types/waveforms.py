@@ -10,7 +10,6 @@ from typing import (
     Callable,
     Iterator,
     Protocol,
-    Self,
     cast,
     overload,
 )
@@ -40,63 +39,11 @@ def _validate_maps_to_pws(mapping: Mapping[Any, ProjectedWaveform[AnyReps]]):
             raise ValueError(f"Invalid projected waveform for key {key!r}.") from error
 
 
-class _ModeMapping[ModeT: Mode, VT: Any](Mapping[ModeT, VT]):
-    """Mixin for picking a single mode from a waveform."""
-
-    def __init__(self, mapping: Mapping[ModeT, Any]):
-        self._mapping: Mapping[ModeT, Any] = mapping
-
-    # Implement Mapping protocol
-    def __getitem__(self, key: ModeT) -> VT:
-        """Get a channel by name as a view with preserved channel dimension (size 1)."""
-        return self._mapping[key]
-
-    def __iter__(self) -> Iterator[ModeT]:
-        """Iterate over harmonic modes."""
-        return iter(self._mapping)
-
-    def __len__(self) -> int:
-        """Return the number of harmonic modes."""
-        return len(self._mapping)
-
-    def __repr__(self):
-        items = {key: self[key] for key in self}
-        return f"{self.__class__.__name__}({items!r})"
-
-    def pick(self, modes: ModeT | tuple[ModeT, ...]) -> Self:
-        """Return a new instance containing only the specified modes."""
-        try:
-            return self._pick(modes)  # type: ignore[arg-type]
-        except KeyError:
-            return self._pick((modes,))  # type: ignore[arg-type]
-
-    def _pick(self, modes: tuple[ModeT, ...]) -> Self:
-        new_mapping = {mode: self[mode] for mode in modes}
-        return type(self)(new_mapping)
-
-    @property
-    def harmonics(self):
-        """All harmonic modes and their order."""
-        return tuple(self._mapping.keys())
-
-
-class HarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](_ModeMapping[ModeT, RepT]):
+class HarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](_mixins.ModeMapping[ModeT, RepT]):
     """Waveform in different modes.
 
     This class is a mapping from modes to representations.
     """
-
-    def __xp__(self, api_version: str | None = None):
-        """Get the array API namespace of the entries."""
-        return xpc.get_namespace(
-            next(iter(self.values())).entries,
-            api_version=api_version,
-        )
-
-    @property
-    def domain(self):
-        """Physical domain shared by all harmonics."""
-        return self[next(iter(self))].domain
 
 
 class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](
@@ -123,27 +70,27 @@ class ProjectedWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
     channels.
     """
 
+    def __getitem__(self, key: str) -> RepT:
+        """Get a channel by name as a view with preserved channel dimension (size 1)."""
+        return self._mapping[key]
+
+    @property
+    def kind(self) -> str | None:
+        """Semantic kind."""
+        return self[next(iter(self))].kind
+
 
 class HarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
-    _ModeMapping[ModeT, ProjectedWaveform[RepT]]
+    _mixins.ModeMapping[ModeT, ProjectedWaveform[RepT]]
 ):
     """Projected waveform in different modes.
 
     This class is a mapping from modes to :class:`.ProjectedWaveform` instances.
     """
 
-    def __xp__(self, api_version: str | None = None):
-        """Get the array API namespace of the entries."""
-        return self._first.__xp__(api_version=api_version)
-
     @property
     def _first(self):
         return self[next(iter(self))]
-
-    @property
-    def domain(self):
-        """Physical domain shared by all harmonics."""
-        return self._first.domain
 
     @property
     def channel_names(self) -> tuple[str, ...]:
@@ -261,7 +208,13 @@ def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
 ) -> ProjectedWaveform[reps.FrequencySeries[AxisT]]:
     """Sum over modes."""
     entries = wf.get_kernel().sum(axis=2, keepdims=True)  # c.f. shape convention
-    return wf._first.create_like(entries, wf.channel_names)  # pyright: ignore[reportPrivateUsage]
+    _first = wf._first  # pyright: ignore[reportPrivateUsage]
+    return type(_first)(
+        _first.grid,
+        entries,
+        wf.channel_names,
+        _rep_type=_first._rep_type,  # pyright: ignore[reportPrivateUsage]
+    )
 
 
 def densify_phasor_hw[ModeT: Mode, AxisT: "Axis"](
@@ -451,7 +404,7 @@ def get_dense_maker(
     ]:
 
         def do_phasor(wf: reps.Phasor["Axis"]):
-            _frequencies = reps.to_array(frequencies, xpc.get_namespace(wf.entries))
+            _frequencies = _mixins.to_array(frequencies, xpc.get_namespace(wf.entries))
 
             _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
             freqs = cast(

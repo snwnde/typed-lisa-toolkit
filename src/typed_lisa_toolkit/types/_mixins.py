@@ -11,15 +11,24 @@ Classes
 """
 
 import abc
+from types import ModuleType
 import logging
 import operator
 from collections.abc import Callable, Iterator, Mapping
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast, Protocol
 
 import array_api_compat as xpc
 import l2d_interface.validators as l2dv
+from l2d_interface.contract import LinspaceLike
 
-from .misc import AnyGrid, Array, Domain
+import numpy as np
+
+from .misc import AnyGrid, Array, Domain, Linspace, Axis
+from . import modes
+from .. import utils
+
+
+Mode = modes.Harmonic | modes.QNM
 
 
 if TYPE_CHECKING:
@@ -239,6 +248,61 @@ class NDArrayMixin(abc.ABC):
         return self._unary_op(self.xp.unwrap, **kwargs)
 
 
+class BinaryUnaryOpMixin(NDArrayMixin, abc.ABC):
+    entries: "Array"
+
+    @abc.abstractmethod
+    def create_like(self, entries: "Array") -> Self: ...
+
+    @abc.abstractmethod
+    def _unwrap(self, other: object) -> object: ...
+
+    def _binary_op(
+        self,
+        other: object,
+        op: Callable[[Any, Any], Any],
+        /,
+        reflected: bool = False,
+        inplace: bool = False,
+        **kwargs: Any,
+    ):
+        del kwargs  # Unused
+
+        if not reflected:
+            entries = op(self.entries, self._unwrap(other))
+        else:
+            entries = op(self._unwrap(other), self.entries)
+
+        if inplace:
+            # del entries # This works for Numpy but fails for JAX
+            # The following works for both
+            self.entries = entries
+            return self
+
+        return self.create_like(entries)
+
+    def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
+        out_arg = kwargs.get("out", None)
+        if out_arg is not None:
+            kwargs["out"] = self._unwrap(out_arg)
+        entries = op(self.entries, **kwargs)
+        return self.create_like(entries)
+
+
+def check_grid_compatibility(grid1: "AnyGrid", grid2: "AnyGrid") -> bool:
+    if len(grid1) != len(grid2):
+        return False
+    for g1, g2 in zip(grid1, grid2):
+        if isinstance(g1, Linspace) and isinstance(g2, Linspace):
+            if g1 != g2:
+                return False
+        else:
+            xp = xpc.get_namespace(g1)
+            if not xp.array_equal(g1, g2):
+                return False
+    return True
+
+
 class _GridProperty:
     def __get__[GridT: AnyGrid](
         self,
@@ -247,7 +311,9 @@ class _GridProperty:
     ) -> GridT: ...
 
 
-class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
+class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, abc.ABC):
+    _REP_TYPE: type[RepT]
+
     @property
     def channel_names(self) -> tuple[str, ...]:
         """Return the channel names."""
@@ -255,118 +321,98 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
 
     def __init__(
         self,
-        _input_repr: "AnyReps",
-        channels: tuple[str, ...],
-        name: str | None = None,
+        grid: "AnyGrid|None" = None,
+        entries: "Array|None" = None,
+        channels: tuple[str, ...] | None = None,
         *,
-        _unsafe_internal: bool = False,
+        name: str | None = None,
+        _mapping: Mapping[str, "AnyReps"] | None = None,
+        _rep_type: type["AnyReps"] | None = None,
     ):
-        if not _unsafe_internal:
-            raise TypeError(
-                f"Direct `{type(self).__name__}` construction is disabled. "
-                + "Use factory functions in the top-level API instead."
+        if _mapping is None:
+            assert grid is not None and entries is not None and channels is not None, (
+                "Must provide grid, entries, and channels when not initializing from an existing mapping."
             )
-        self._channel_names: tuple[str, ...] = tuple(channels)
-        self._init_repr(_input_repr)
-        entries = self._representation.entries
-        if entries.shape[1] != len(self.channel_names):
-            raise ValueError(
-                "Channel count mismatch between _representation entries and channel names."
+            self._grid: "AnyGrid" = grid
+            self.entries: "Array" = entries
+            self._channel_names: tuple[str, ...] = tuple(channels)
+            try:
+                self._rep_type: type[RepT] = self._REP_TYPE
+            except AttributeError:
+                if _rep_type is None:
+                    raise ValueError(
+                        "Must provide _rep_type when not initializing from an existing mapping and _REP_TYPE is not defined."
+                    )
+                self._rep_type = cast(type[RepT], _rep_type)
+        else:
+            assert grid is None and entries is None and channels is None, (
+                "Must not provide grid, entries, or channels when initializing from an existing mapping."
             )
-        if entries.shape[2] != 1:
-            raise ValueError(
-                "Data containers require n_harmonics=1 in the _representation entries."
+            if len(_mapping) == 0:
+                raise ValueError("Cannot initialize from an empty mapping.")
+            self._grid = next(iter(_mapping.values())).grid
+            self._channel_names = tuple(_mapping.keys())
+            xp = xpc.get_namespace(
+                *(_mapping[chn].entries for chn in self._channel_names)
+            )
+            # Concatenate entries along the channel dimension (canonical shape: n_batches, n_channels, ...)
+            self.entries = xp.concatenate(
+                [_mapping[chn].entries for chn in self._channel_names], axis=1
+            )
+            self._rep_type = type(
+                next(iter(cast(Mapping[str, RepT], _mapping).values()))
             )
         self._channel_to_idx: dict[str, int] = {
-            chn: i for i, chn in enumerate(channels)
+            chn: i for i, chn in enumerate(self._channel_names)
         }
-        self.name: str | None = name
+        self._refresh_mapping()
+        self.set_name(name)
 
-    @property
-    def _representation(self) -> RepT:
-        """Return the underlying _representation."""
-        return cast(RepT, self._input_repr)
+    def _refresh_mapping(self) -> None:
+        self._mapping: Mapping[str, RepT] = {
+            chn: self.__get_repr_by_channel(chn) for chn in self._channel_names
+        }
 
-    def _init_repr(self, _input_repr: "AnyReps"):
-        self._input_repr: AnyReps = _input_repr
-
-    def _create_new(
-        self, _representation: "AnyReps", channels: tuple[str, ...]
-    ) -> Self:
-        """Create a new instance with a _representation and channels."""
-        return type(self).from_representation(
-            _representation,
-            channels,
-            self.name,
-        )
-
-    @classmethod
-    def from_representation(
-        cls,
-        representation: "AnyReps",
-        channels: tuple[str, ...],
-        name: str | None = None,
-        **additions: Any,
-    ) -> Self:
-        """Construct from an existing representation and explicit channel names."""
-        if additions:
-            unexpected = ", ".join(additions.keys())
-            raise ValueError(f"Unexpected keyword arguments: {unexpected}")
-        return cls(
-            representation,
-            channels,
-            name,
-            _unsafe_internal=True,
-        )
-
-    def create_like(self, entries: "Array", channels: tuple[str, ...]) -> Self:
-        """Create a new instance with different entries but the same grid and type."""
-        return type(self).from_representation(
-            self._representation.create_like(entries),
-            channels,
-            self.name,
+    def create_like(self, entries: "Array") -> Self:
+        return type(self)(
+            self.grid,
+            entries,
+            self.channel_names,
+            name=self.name,
+            _rep_type=self._rep_type,
         )
 
     def __xp__(self, api_version: str | None = None) -> Any:
         """Get the array namespace from the _representation entries."""
-        return xpc.get_namespace(self._representation.entries, api_version=api_version)
+        return xpc.get_namespace(self.entries, api_version=api_version)
+
+    def _unwrap(self, other: object):
+        if hasattr(other, "grid") and hasattr(other, "entries"):
+            other = cast(ChannelMapping["AnyReps"], other)
+            if check_grid_compatibility(self.grid, other.grid):
+                return other.entries
+            raise ValueError(f"Grid mismatch: expected {self.grid}, got {other.grid}.")
+        return other
 
     def _binary_op(
         self,
         other: object,
-        op: Callable[[object, object], object],
+        op: Callable[[Any, Any], Any],
         /,
         reflected: bool = False,
         inplace: bool = False,
         **kwargs: Any,
-    ) -> Any:
-        """Apply binary operation using native array ops on representations."""
-        del kwargs  # Unused
-
-        if isinstance(other, ChannelMapping):
-            if self.channel_names != other.channel_names:
-                raise ValueError("Cannot operate on data with different channel sets.")
-            if reflected:
-                new_repr = op(other._representation, self._representation)
-            else:
-                new_repr = op(self._representation, other._representation)
-        else:
-            # Scalar or array-like broadcast
-            if reflected:
-                new_repr = op(other, self._representation)
-            else:
-                new_repr = op(self._representation, other)
-
+    ) -> Self:
+        result = super()._binary_op(
+            other,
+            op,
+            reflected=reflected,
+            inplace=inplace,
+            **kwargs,
+        )
         if inplace:
-            self._input_repr = cast("AnyReps", new_repr)
-            return self
-
-        return self._create_new(cast(RepT, new_repr), self.channel_names)
-
-    def _unary_op(self, op: Callable[[object], object], /, **kwargs: Any) -> Self:
-        """Apply unary operation using native array ops."""
-        new_repr = op(self._representation, **kwargs)
-        return self._create_new(cast(RepT, new_repr), self.channel_names)
+            self._refresh_mapping()
+        return result
 
     def pick(self, channels: str | tuple[str, ...]) -> Self:
         """Return a new instance containing only the specified channels."""
@@ -375,27 +421,13 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
 
         indices = tuple([self._channel_to_idx[chn] for chn in channels])
         # Slice entries to pick only these channels (canonical shape: n_batches, n_channels, ...)
-        xp = xpc.get_namespace(self._representation.entries)
-        picked_entries = xp.asarray(self._representation.entries)[:, indices, ...]
-        picked_repr = self._representation.create_like(picked_entries)
-        return type(self).from_representation(picked_repr, channels, self.name)
+        picked_entries = self.xp.asarray(self.entries)[:, indices, ...]
+        return type(self)(self.grid, picked_entries, channels, name=self.name)
 
     @classmethod
-    def from_dict[RT: "AnyReps"](
-        cls, data_dict: Mapping[str, RT], **additions: Any
-    ) -> Self:
+    def from_dict(cls, data_dict: Mapping[str, "AnyReps"], **kwargs: Any) -> Self:
         """Create a new instance from a dictionary of channel names to representations."""
-        if len(data_dict) == 0:
-            raise ValueError("Cannot build data container from an empty mapping.")
-        channels = tuple(data_dict.keys())
-        xp = xpc.get_namespace(*(cast(Any, data_dict[chn]).entries for chn in channels))
-        # Concatenate entries along the channel dimension (canonical shape: n_batches, n_channels, ...)
-        entries = xp.concatenate([data_dict[chn].entries for chn in channels], axis=1)
-        # Assume all representations have the same grid and type
-        first = next(iter(data_dict.values()))
-        return cls.from_representation(
-            first.create_like(entries), channels, **additions
-        )
+        return cls(_mapping=data_dict, **kwargs)
 
     def set_name(self, name: str | None) -> Self:
         """Set the name of the data container.
@@ -404,15 +436,19 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
 
         .. note:: This method returns ``self`` to allow for fluent method chaining.
         """
-        self.name = name
+        self.name: str | None = name
         return self
+
+    def __get_repr_by_channel(self, channel: str) -> RepT:
+        """Get the representation for a given channel."""
+        idx = self._channel_to_idx[channel]
+        entries_view = self.entries[:, idx : idx + 1, 0:1, ...]
+        return self._rep_type(self._grid, entries_view)
 
     # Implement Mapping protocol
     def __getitem__(self, key: str) -> RepT:
         """Get a channel by name as a view with preserved channel dimension (size 1)."""
-        idx = self._channel_to_idx[key]
-        entries_view = self._representation.entries[:, idx : idx + 1, 0:1, ...]
-        return self._representation.create_like(entries_view)
+        return self._mapping[key]
 
     def __iter__(self) -> Iterator[str]:
         """Iterate over channel names."""
@@ -431,23 +467,23 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], NDArrayMixin):
     @property
     def grid(self):  # pyright: ignore[reportRedeclaration]
         """Return the grid."""
-        return self._representation.grid
+        return self._grid
 
     grid: _GridProperty  # For correct type hinting
 
     @property
     def domain(self) -> Domain:
         """Physical domain shared by all channels."""
-        return self._representation.domain
+        return self[self.channel_names[0]].domain
 
     @property
-    def kind(self):
-        """Semantic kind shared by all channels."""
-        return self._representation.kind
+    @abc.abstractmethod
+    def kind(self) -> str | None:
+        """Semantic kind."""
 
     def get_kernel(self) -> Array:
         """Return kernel entries in conventional shape."""
-        return self._representation.entries
+        return self.entries
 
 
 def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"]):
@@ -457,3 +493,126 @@ def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"]):
             l2dv.validate_representation(rep)
         except ValueError as error:
             raise ValueError(f"Invalid representation for key {key!r}.") from error
+
+
+def to_array(ary: "Axis", xp: ModuleType = np) -> "Array":
+    """Convert an axis to an array if it is a Linspace, otherwise return it as is."""
+    if isinstance(ary, LinspaceLike):
+        return Linspace.make(ary).asarray(xp)
+    return ary
+
+
+def embed_entries_to_grid[GT: "AnyGrid"](
+    source_grid: "AnyGrid",
+    source_entries: "Array",
+    embedding_grid: GT,
+    *,
+    known_slices: tuple[slice, ...] | None = None,
+) -> tuple[GT, "Array"]:
+    """Embed entries from source grid into a target grid."""
+    _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
+    _source_grid = tuple(to_array(sg) for sg in source_grid)
+    entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
+        _source_grid, source_entries
+    )
+    return embedding_grid, entries
+
+
+class HasDomain(Protocol):
+    @property
+    def domain(self) -> Domain: ...
+
+
+class HasXP(Protocol):
+    def __xp__(self, api_version: str | None = None) -> ModuleType: ...
+
+
+class _HasXPAndDomain(HasXP, HasDomain, Protocol): ...
+
+
+class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayMixin):
+    def __init__(self, mapping: Mapping[ModeT, Any]):
+        self._mapping: Mapping[ModeT, Any] = mapping
+
+    # Implement Mapping protocol
+    def __getitem__(self, key: ModeT) -> VT:
+        """Get a channel by name as a view with preserved channel dimension (size 1)."""
+        return self._mapping[key]
+
+    def __iter__(self) -> Iterator[ModeT]:
+        """Iterate over harmonic modes."""
+        return iter(self._mapping)
+
+    def __len__(self) -> int:
+        """Return the number of harmonic modes."""
+        return len(self._mapping)
+
+    def __repr__(self):
+        items = {key: self[key] for key in self}
+        return f"{self.__class__.__name__}({items!r})"
+
+    def pick(self, modes: ModeT | tuple[ModeT, ...]) -> Self:
+        """Return a new instance containing only the specified modes."""
+        try:
+            return self._pick(modes)  # type: ignore[arg-type]
+        except KeyError:
+            return self._pick((modes,))  # type: ignore[arg-type]
+
+    def _pick(self, modes: tuple[ModeT, ...]) -> Self:
+        new_mapping = {mode: self[mode] for mode in modes}
+        return type(self)(new_mapping)
+
+    @property
+    def harmonics(self):
+        """All harmonic modes and their order."""
+        return tuple(self._mapping.keys())
+
+    @property
+    def domain(self):
+        """Physical domain shared by all harmonics."""
+        return self[next(iter(self))].domain
+
+    def __xp__(self, api_version: str | None = None) -> ModuleType:
+        """Array namespace from the first harmonic."""
+        return self[next(iter(self))].__xp__(api_version=api_version)
+
+    def _binary_op(
+        self,
+        other: object,
+        op: Callable[[Any, Any], Any],
+        /,
+        reflected: bool = False,
+        inplace: bool = False,
+        **kwargs: Any,
+    ):
+        del kwargs  # Unused
+
+        if isinstance(other, ModeMapping):
+            _other_harmonics = cast(ModeMapping[ModeT, Any], other).harmonics
+            if set(self.harmonics) != set(_other_harmonics):
+                raise ValueError(
+                    f"Harmonic mode mismatch: expected {self.harmonics}, got {_other_harmonics}."
+                )
+            if not reflected:
+                _mapping = {
+                    mode: op(self[mode], other[mode]) for mode in self.harmonics
+                }
+            else:
+                _mapping = {
+                    mode: op(other[mode], self[mode]) for mode in self.harmonics
+                }
+        else:
+            if not reflected:
+                _mapping = {mode: op(self[mode], other) for mode in self.harmonics}
+            else:
+                _mapping = {mode: op(other, self[mode]) for mode in self.harmonics}
+
+        if inplace:
+            self.__init__(_mapping)
+            return self
+
+        return type(self)(_mapping)
+
+    def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
+        _mapping = {mode: op(rep, **kwargs) for mode, rep in self._mapping.items()}
+        return type(self)(_mapping)

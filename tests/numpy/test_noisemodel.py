@@ -23,6 +23,7 @@ from typed_lisa_toolkit.types import (
     SpectralDensity,
     TFNoiseModel,
 )
+from typed_lisa_toolkit import frequency_series, linspace_from_array, fsdata
 from typed_lisa_toolkit.types.noisemodel import _make_integration_policy
 
 
@@ -208,15 +209,16 @@ class TestFDNoiseModel(unittest.TestCase):
 
     def test_cross_correlation_currently_raises_for_linspace_grid(self):
         times = np.linspace(0.0, 7.0, 8)
-        frequencies = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+        frequencies = linspace_from_array(
+            np.fft.rfftfreq(len(times), d=times[1] - times[0])
+        )
         x = np.array([1.0 + 0.0j, 0.5 + 0.25j, -0.25 + 0.5j, 0.1 - 0.2j, 0.05 + 0.0j])
         y = np.array([0.5 + 0.0j, -0.2 + 0.1j, 0.3 - 0.4j, -0.1 + 0.2j, 0.01 + 0.0j])
-        from typed_lisa_toolkit.types import FrequencySeries, FSData
 
-        fs = FSData.from_dict(
+        fs = fsdata(
             {
-                "X": FrequencySeries((frequencies,), x[None, None, None, None, :]),
-                "Y": FrequencySeries((frequencies,), y[None, None, None, None, :]),
+                "X": frequency_series(frequencies, x[None, None, None, None, :]),
+                "Y": frequency_series(frequencies, y[None, None, None, None, :]),
             }
         ).set_times(times)
         freqs = np.asarray(fs.frequencies)
@@ -343,12 +345,16 @@ class TestTFNoiseModel(unittest.TestCase):
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
         left = np.asarray(case["left"].get_kernel())
         right = np.asarray(case["right"].get_kernel())
-        expected = np.einsum(
-            "...fti,ftij,...ftj->...ft",
-            np.moveaxis(left.conj(), 1, -1),
-            invevsdm,
-            np.moveaxis(right, 1, -1),
-        ).sum().real
+        expected = (
+            np.einsum(
+                "...fti,ftij,...ftj->...ft",
+                np.moveaxis(left.conj(), 1, -1),
+                invevsdm,
+                np.moveaxis(right, 1, -1),
+            )
+            .sum()
+            .real
+        )
 
         self.assertEqual(got.shape, ())
         npt.assert_allclose(got, expected)

@@ -6,7 +6,13 @@ from unittest.mock import MagicMock
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit import frequency_series, stft, time_series, wdm
+from typed_lisa_toolkit import (
+    frequency_series,
+    stft,
+    time_series,
+    wdm,
+    linspace_from_array,
+)
 from typed_lisa_toolkit.types import (
     STFT,
     WDM,
@@ -172,9 +178,7 @@ def build_freq_series(xp, uniform=True):
 def build_fdata(xp):
     frequencies = _build_uniform_frequencies(xp)
     x_entries = _build_complex_entries(xp, [1.0 + 0.5j, -1.0j, 2.0 + 0.0j])
-    y_entries = _build_complex_entries(
-        xp, [0.5 - 0.25j, -1.0 + 0.25j, 2.0 + 0.5j]
-    )
+    y_entries = _build_complex_entries(xp, [0.5 - 0.25j, -1.0 + 0.25j, 2.0 + 0.5j])
     return _build_fsdata(frequencies, {"X": x_entries, "Y": y_entries})
 
 
@@ -230,7 +234,6 @@ def build_wdm_pair(xp):
     }
 
 
-
 def build_fd_pair_batched_2x2(xp):
     base = build_fd_pair(xp)
     frequencies = base["frequencies"]
@@ -264,15 +267,11 @@ def build_fd_pair_batched_2x2(xp):
 
     left = _build_fsdata(
         frequencies,
-        {
-            name: entries for name, entries in left_entries.items()
-        },
+        {name: entries for name, entries in left_entries.items()},
     )
     right = _build_fsdata(
         frequencies,
-        {
-            name: entries for name, entries in right_entries.items()
-        },
+        {name: entries for name, entries in right_entries.items()},
     )
 
     return {
@@ -309,16 +308,12 @@ def build_wdm_pair_batched_2x2(xp):
     left = _build_wdmdata(
         times,
         frequencies,
-        {
-            name: entries for name, entries in left_entries.items()
-        },
+        {name: entries for name, entries in left_entries.items()},
     )
     right = _build_wdmdata(
         times,
         frequencies,
-        {
-            name: entries for name, entries in right_entries.items()
-        },
+        {name: entries for name, entries in right_entries.items()},
     )
 
     return {
@@ -579,19 +574,24 @@ class DataAbstractBranchesMixin:
 
     def test_data_base_get_plotter_notimplemented(self):
         class Dummy(data.Data[TimeSeries["Axis"]]):
-            _reps_type = TimeSeries["Axis"]
+            _REP_TYPE = TimeSeries["Axis"]
+
+            @property
+            def kind(self):
+                return None
 
         times = np.linspace(0.0, 1.0, 4)
         representation = TimeSeries["Axis"]((times,), np.ones((1, 1, 1, 1, 4)))
-        dummy = Dummy.from_representation(representation, ("X",))
+        dummy = Dummy.from_dict({"X": representation})
 
-        with self.assertRaises(NotImplementedError):  # type: ignore[attr-defined]
+        with self.assertRaises(AttributeError):  # type: ignore[attr-defined]
             dummy._get_plotter()
 
 
 # ============================================================================
 # Waveform Helper Classes and Functions (from waveforms_helpers.py)
 # ============================================================================
+
 
 class FakeResponse(dict[str, Any]):
     @property
@@ -723,22 +723,22 @@ def build_harmonic_waveform_frequency_series(xp):
 
 def build_harmonic_projected_frequency_waveform(xp):
     frequencies = xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64)
+    _freqs = linspace_from_array(frequencies)
 
     mode_22 = modes.Harmonic(2, 2)
     mode_33 = modes.Harmonic(3, 3)
 
-    resp_22 = ProjectedWaveform.from_dict(
-        {
-            "X": _make_fs(xp, frequencies, [1.0 + 0.0j, 2.0 - 1.0j, 3.0 + 0.5j]),
-            "Y": _make_fs(xp, frequencies, [0.5 + 0.25j, -1.0 + 0.0j, 0.25 - 0.25j]),
-        }
-    )
-    resp_33 = ProjectedWaveform.from_dict(
-        {
-            "X": _make_fs(xp, frequencies, [0.2 + 0.0j, -0.5 + 1.0j, 0.1 - 0.2j]),
-            "Y": _make_fs(xp, frequencies, [1.0 + 0.0j, 1.5 + 0.0j, 2.0 + 0.0j]),
-        }
-    )
+    resp_22_map = {
+        "X": _make_fs(xp, _freqs, [1.0 + 0.0j, 2.0 - 1.0j, 3.0 + 0.5j]),
+        "Y": _make_fs(xp, _freqs, [0.5 + 0.25j, -1.0 + 0.0j, 0.25 - 0.25j]),
+    }
+    resp_33_map = {
+        "X": _make_fs(xp, _freqs, [0.2 + 0.0j, -0.5 + 1.0j, 0.1 - 0.2j]),
+        "Y": _make_fs(xp, _freqs, [1.0 + 0.0j, 1.5 + 0.0j, 2.0 + 0.0j]),
+    }
+
+    resp_22 = ProjectedWaveform.from_dict(resp_22_map)
+    resp_33 = ProjectedWaveform.from_dict(resp_33_map)
 
     wf = HomogeneousHarmonicProjectedWaveform({mode_22: resp_22, mode_33: resp_33})
 
@@ -749,4 +749,6 @@ def build_harmonic_projected_frequency_waveform(xp):
         "wf": wf,
         "resp_22": resp_22,
         "resp_33": resp_33,
+        "resp_22_map": resp_22_map,
+        "resp_33_map": resp_33_map,
     }

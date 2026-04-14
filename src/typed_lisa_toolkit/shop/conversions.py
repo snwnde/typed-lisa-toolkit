@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from types import ModuleType
-from typing import Any, Literal, overload, cast
+from typing import Any, Literal, cast, overload
 
 import array_api_compat as xpc
 

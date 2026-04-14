@@ -13,9 +13,9 @@ from typing import (
 )
 
 from .. import utils
+from . import _mixins, waveforms
 from . import data as dm
 from . import representations as reps
-from . import waveforms
 from .misc import Array, Axis, Grid2D, Linspace
 
 
@@ -363,7 +363,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         frequencies = _first_frequencies(left)
         xp = _first_entries(left).__array_namespace__()
         return self._ip.integrate(
-            self.get_integrand(left, right), x=reps.to_array(frequencies, xp=xp)
+            self.get_integrand(left, right), x=_mixins.to_array(frequencies, xp=xp)
         )
 
     def get_cumulative_complex_scalar_product(
@@ -385,7 +385,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         xp = _first_entries(left).__array_namespace__()
         return self._ip.cumulative(
             self.get_integrand(left, right),
-            x=reps.to_array(frequencies, xp=xp),
+            x=_mixins.to_array(frequencies, xp=xp),
             initial=0,
         )
 
@@ -461,7 +461,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
             xp.fft.fftfreq(len(left.times), left.times.step)
         )
         _first = next(iter(left.values()))
-        frequencies, df = reps.to_array(_first.frequencies, xp), _first.df
+        frequencies, df = _mixins.to_array(_first.frequencies, xp), _first.df
         two_sided_integrand_entries = utils.extend_to(two_sided_freq)(
             frequencies, self.get_integrand(left, right)
         )
@@ -471,8 +471,9 @@ class FDNoiseModel[DensityT: SpectralDensity]:
             norm="forward",
             axis=-1,
         )
-        return dm.TSData.from_representation(
-            reps.UniformTimeSeries((left.times,), cross_correlation),
+        return dm.construct_tsdata(
+            times=left.times,
+            entries=cross_correlation,
             channels=left.channel_names,
         )
 
@@ -487,8 +488,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         d_e = xp.moveaxis(d_k[:, :, 0, 0, :], 1, -1)  # (n_batches, n_freqs, n_ch)
         whitened_e = xp.einsum("fij,...fj->...fi", W, d_e)  # (n_batches, n_freqs, n_ch)
         whitened_k = xp.moveaxis(whitened_e, -1, 1)[:, :, None, None, :]
-        # whitened_repr = _data.representation.create_like(whitened_k)
-        return _data.create_like(whitened_k, _data.channel_names)
+        return _data.create_like(whitened_k)
 
     def get_overlap(self, left: FDEntry, right: FDEntry) -> "Array":
         r"""Return the overlap.
@@ -643,4 +643,4 @@ class TFNoiseModel:
     def whiten(self, _data: TFEntry) -> TFEntry:
         """Whiten the data according to the noise model."""
         whitened_array = self._get_whitened_entries(_data)
-        return _data.create_like(whitened_array, _data.channel_names)
+        return _data.create_like(whitened_array)
