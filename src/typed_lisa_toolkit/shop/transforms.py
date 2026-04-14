@@ -77,17 +77,14 @@ def time2freq(
     _freqs = fft.rfftfreq(len(td.times), d=td.times.step)
     freqs = _constructors.linspace(_freqs[0], _freqs[1] - _freqs[0], len(_freqs))
     signal = fft.rfft(td.get_kernel() * td.times.step, axis=-1)
-    fs = _constructors.frequency_series(
-        frequencies=freqs,
-        entries=signal,
-    )
     if isinstance(td, reps.TimeSeries):
-        return fs
+        return _constructors.frequency_series(
+            frequencies=freqs,
+            entries=signal,
+        )
     else:
-        fsd = data.FSData.from_representation(
-            fs,
-            channels=td.channel_names,
-            name=td.name,
+        fsd = _constructors.construct_fsdata(
+            frequencies=freqs, entries=signal, channels=td.channel_names, name=td.name
         )
         if keep_time:
             fsd = fsd.set_times(td.times)
@@ -130,16 +127,12 @@ def freq2time(
         warnings.warn("The time grid is denser than the Nyquist limit.")
 
     signal = fft.irfft(fd.get_kernel() / _times.step, n=len(_times), axis=-1)
-    ts = _constructors.time_series(times=_times, entries=signal)
     if isinstance(fd, reps.FrequencySeries):
-        return ts
+        return _constructors.time_series(times=_times, entries=signal)
     else:
-        tsd = data.TSData.from_representation(
-            ts,
-            channels=fd.channel_names,
-            name=fd.name,
+        return _constructors.construct_tsdata(
+            times=_times, entries=signal, channels=fd.channel_names, name=fd.name
         )
-        return tsd
 
 
 @overload

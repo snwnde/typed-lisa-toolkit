@@ -1555,7 +1555,7 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
         entries = jnp.ones((1, 1, 1, 1, 10), dtype=jnp.float64)
         fs = frequency_series(freqs, entries=entries)
         fs += 1.0
-        npt.assert_allclose(np.asarray(fs.entries), 1.0)
+        npt.assert_allclose(np.asarray(fs.entries), 2.0)
 
     def test_iadd_operator_with_array_grid_type(self):
         large_freqs_arr = jnp.linspace(0.0, 0.99, 10, dtype=jnp.float64)

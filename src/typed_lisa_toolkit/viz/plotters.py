@@ -49,7 +49,7 @@ import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..types import AnyGrid, Axis, Grid2D, Linspace, data, representations
+from ..types import AnyGrid, Axis, Grid2D, Linspace, _mixins, data, representations
 
 if TYPE_CHECKING:
     AnyReps = representations.Representation[AnyGrid]
@@ -204,7 +204,7 @@ class TSPlotter(_1DPlotter[representations.TimeSeries["Axis"]]):
         **kwargs: Any,
     ) -> matplotlib.axes.Axes:
         """Plot the series on the provided Axes."""
-        times = representations.to_array(self.series.times)
+        times = _mixins.to_array(self.series.times)
         if not np.issubdtype(times.dtype, np.datetime64):
             if time_unit == "hrs":
                 times /= 3600
@@ -245,7 +245,7 @@ class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
     ) -> matplotlib.axes.Axes:
         """Plot the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
-        frequencies = representations.to_array(self.series.frequencies)
+        frequencies = _mixins.to_array(self.series.frequencies)
         if freq_unit == "Hz":
             grid_label = "Frequency [Hz]"
         elif freq_unit == "mHz":
@@ -279,7 +279,7 @@ class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
         """Plot the angle of the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
         angle = self.series.angle().entries.squeeze()
-        frequencies = representations.to_array(self.series.frequencies)
+        frequencies = _mixins.to_array(self.series.frequencies)
         ax.semilogx(frequencies, angle, **_kwargs)  # pyright: ignore[reportUnknownMemberType]
         if set_xlabel:
             ax.set_xlabel("Frequency [Hz]")  # pyright: ignore[reportUnknownMemberType]
@@ -315,7 +315,7 @@ class PhasorPlotter[AxisT: "Axis"](_1DPlotter[representations.Phasor[AxisT]]):
     ) -> matplotlib.axes.Axes:
         """Plot the series on the provided Axes."""
         _kwargs = sieve_kwargs(plot_kwargs, **kwargs)
-        frequencies = representations.to_array(self.series.frequencies)
+        frequencies = _mixins.to_array(self.series.frequencies)
         if freq_unit == "Hz":
             grid_label = "Frequency [Hz]"
         elif freq_unit == "mHz":

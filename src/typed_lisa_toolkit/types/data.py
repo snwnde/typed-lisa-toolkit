@@ -26,6 +26,7 @@ from .misc import (
     Grid2DCartesian,
     Grid2DSparse,
     Linspace,
+    build_grid2d,
 )
 
 if TYPE_CHECKING:
@@ -36,12 +37,22 @@ if TYPE_CHECKING:
 
     AnyReps = Representation[AnyGrid]
 
-    class _SubsettableRep(AnyReps, Protocol):
+    class _1DSubsettableRep(AnyReps, Protocol):
         def get_subset(
             self,
             *,
             interval: tuple[float, float] | None = None,
             slice: slice | None = None,
+        ) -> Self: ...
+
+    class _2DSubsettableRep(AnyReps, Protocol):
+        def get_subset(
+            self,
+            *,
+            time_interval: tuple[float, float] | None = None,
+            freq_interval: tuple[float, float] | None = None,
+            slices: tuple[slice, slice] | None = None,
+            copy: bool = True,
         ) -> Self: ...
 
 
@@ -137,34 +148,33 @@ def _load_grid(node: h5py.Group | h5py.Dataset) -> "AnyGrid":
     raise ValueError(f"Unknown grid serialization format with attributes: {node.attrs}")
 
 
-class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
-    """Mixin class to provide get_subset method for data containers."""
+def _load_data[DataT: "Data[AnyReps]"](
+    cls: type[DataT], file_path: str | pathlib.Path, legacy: bool = False
+) -> DataT:
+    """Load data from an HDF5 file."""
+    if legacy:
+        return cls._load_legacy(file_path)  # pyright: ignore[reportPrivateUsage]
+    with h5py.File(str(file_path), "r") as f:
+        channels_attr = cast(Iterable[object], f.attrs["channels"])
+        channels = tuple(str(ch) for ch in channels_attr)
+        additions = cls._additional_load(f)  # pyright: ignore[reportPrivateUsage]
+        data_group = cast(h5py.Group, f["data"])
+        grid_node = cast(h5py.Group | h5py.Dataset, data_group["grid"])
+        grid_data = _load_grid(grid_node)
+        entries_data = cast(h5py.Dataset, data_group["entries"])[()]
+        return cls(grid_data, entries_data, channels=channels, **additions)
 
-    @property
-    @abc.abstractmethod
-    def channel_names(self) -> tuple[str, ...]:
-        """Return the channel names."""
 
-    @property
-    @abc.abstractmethod
-    def _representation(self) -> RepT:
-        """Return the underlying _representation."""
-
-    @abc.abstractmethod
-    def _create_new(self, _representation: RepT, channels: tuple[str, ...]) -> Self: ...
-
+class _1DSubsetMixin[RepT: _1DSubsettableRep](_mixins.ChannelMapping[RepT], abc.ABC):
     def get_subset(
         self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
     ) -> Self:
         """Return the subset as a new instance."""
-        subset = self._representation.get_subset(interval=interval, slice=slice)
-        return self._create_new(
-            subset,
-            self.channel_names,
-        )
-
-    def _get_plotter(self) -> type[Any]:
-        raise NotImplementedError("This method must be implemented by subclass.")
+        subset_dict = {
+            chnname: chn.get_subset(interval=interval, slice=slice)
+            for chnname, chn in self.items()
+        }
+        return type(self).from_dict(subset_dict).set_name(self.name)
 
     def draw(
         self,
@@ -185,42 +195,76 @@ class _GetSubsetMixin[RepT: "_SubsettableRep"](Mapping[str, RepT], abc.ABC):
             plotter(compare_to.get_subset(interval=interval)), **kwargs
         )
 
-
-def _load_data[DataT: "Data[AnyReps]"](
-    cls: type[DataT], file_path: str | pathlib.Path, legacy: bool = False
-) -> DataT:
-    """Load data from an HDF5 file."""
-    if legacy:
-        return cls._load_legacy(file_path)  # pyright: ignore[reportPrivateUsage]
-    with h5py.File(str(file_path), "r") as f:
-        channels_attr = cast(Iterable[object], f.attrs["channels"])
-        channels = tuple(str(ch) for ch in channels_attr)
-        additions = cls._additional_load(f)  # pyright: ignore[reportPrivateUsage]
-        data_group = cast(h5py.Group, f["data"])
-        grid_node = cast(h5py.Group | h5py.Dataset, data_group["grid"])
-        grid_data = _load_grid(grid_node)
-        entries_data = cast(h5py.Dataset, data_group["entries"])[()]
-        repr_obj = cls._reps_type(grid_data, entries_data)  # pyright: ignore[reportPrivateUsage]
-    return cls.from_representation(repr_obj, channels, **additions)
+    def _get_plotter(self) -> type[Any]:
+        """Return the plotter class."""
+        raise NotImplementedError("The method must be implemented in the subclass.")
 
 
-class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
+class _2DSubsetMixin[RepT: _2DSubsettableRep](_mixins.ChannelMapping[RepT], abc.ABC):
+    def get_subset(
+        self,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+        slices: tuple[slice, slice] | None = None,
+        copy: bool = True,
+    ) -> Self:
+        """Return the subset as a new instance."""
+        subset_dict = {
+            chnname: chn.get_subset(
+                time_interval=time_interval,
+                freq_interval=freq_interval,
+                slices=slices,
+                copy=copy,
+            )
+            for chnname, chn in self.items()
+        }
+        return type(self).from_dict(subset_dict).set_name(self.name)
+
+    def draw(
+        self,
+        compare_to: Self | None = None,
+        *,
+        time_interval: tuple[float, float] | None = None,
+        freq_interval: tuple[float, float] | None = None,
+        **kwargs: Any,
+    ):
+        """Plot the data.
+
+        If `compare_to` is not `None`, the method draws both the data and the data in `compare_to`.
+        """
+        plotter = self._get_plotter()
+
+        if compare_to is None:
+            return plotter(
+                self.get_subset(
+                    time_interval=time_interval, freq_interval=freq_interval
+                )
+            ).draw(**kwargs)
+        return plotter(
+            self.get_subset(time_interval=time_interval, freq_interval=freq_interval)
+        ).compare(
+            plotter(
+                compare_to.get_subset(
+                    time_interval=time_interval, freq_interval=freq_interval
+                )
+            ),
+            **kwargs,
+        )
+
+    def _get_plotter(self) -> type[Any]:
+        """Return the plotter class."""
+        raise NotImplementedError("The method must be implemented in the subclass.")
+
+
+class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
     """Channel-indexed data containers.
 
     Stores a single homogeneous _representation with channels as the first dimension,
     providing per-channel access via views and the Mapping protocol.
     """
 
-    _reps_type: type[RepT]
-
-    def _init_repr(self, _input_repr: "AnyReps"):
-        self._input_repr: "AnyReps" = self._reps_type(
-            _input_repr.grid, _input_repr.entries
-        )
-
-    def _get_plotter(self) -> type[Any]:
-        """Return the plotter class."""
-        raise NotImplementedError("The method must be implemented in the subclass.")
+    _REP_TYPE: type[RepT]
 
     def _additional_save(self, f: h5py.File):
         del f
@@ -260,7 +304,7 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
         with h5py.File(str(file_path), "r") as f:
             additions = cls._additional_load(f)
             dict_ = {
-                chnname: cls._reps_type(
+                chnname: cls._REP_TYPE(
                     grid=(f[chnname]["grid"][...],),  # type: ignore
                     entries=f[chnname]["entries"][...][None, None, None, None, ...],  # type: ignore
                 )
@@ -285,9 +329,25 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
         return _load_data(cls, file_path, legacy=legacy)
 
 
-class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](
-    Data[RepT], _GetSubsetMixin[RepT]
-): ...
+class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](  # pyright: ignore[reportUnsafeMultipleInheritance]
+    Data[RepT], _1DSubsetMixin[RepT], abc.ABC
+):
+    def get_embedded(
+        self,
+        embedding_grid: "Grid1D[Axis]",
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ):
+        """Return data embedded on a new 1D grid."""
+        grid, entries = _mixins.embed_entries_to_grid(
+            self.grid,
+            self.entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+        return type(self)(
+            grid=grid, entries=entries, channels=self.channel_names, name=self.name
+        )
 
 
 class TSData(_SeriesData[reps.UniformTimeSeries]):
@@ -300,7 +360,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
 
     """
 
-    _reps_type: type[reps.UniformTimeSeries] = reps.UniformTimeSeries
+    _REP_TYPE: type[reps.UniformTimeSeries] = reps.UniformTimeSeries
 
     @classmethod
     def from_entries(
@@ -312,41 +372,36 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         name: str | None = None,
     ) -> Self:
         """Construct from raw time-domain entries and explicit channel names."""
-        rep = reps.time_series(Linspace.make(times), entries)
-        return cls.from_representation(rep, channels, name=name)
+        return cls((times,), entries, channels=channels, name=name)
+
+    @property
+    def kind(self) -> None:
+        """Semantic kind of the data."""
+        return None
 
     @property
     def times(self):
         """Return the times."""
-        return self._representation.times
+        return self.grid[0]
 
     @property
     def dt(self) -> float:
         """Return the time step."""
-        return self._representation.dt
+        return self.times.step
 
     @property
     def t_start(self) -> float:
         """Return the start time."""
-        return self._representation.t_start
+        return self.times.start
 
     @property
     def t_end(self) -> float:
         """Return the end time."""
-        return self._representation.t_end
+        return self.times.stop
 
     def get_frequencies(self):
         """Return the frequencies grid matching the time grid."""
         return self.xp.fft.rfftfreq(len(self.times), d=self.dt)
-
-    def get_embedded(self, embedding_grid: "Grid1D[Axis]"):
-        """Return data embedded on a new 1D grid."""
-        embedded = self._representation.get_embedded(embedding_grid)
-        return type(self).from_representation(
-            embedded,
-            channels=self.channel_names,
-            name=self.name,
-        )
 
     @overload
     def to_fsdata(
@@ -390,19 +445,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             stacklevel=2,
         )
         _window = tapering(self.xp.asarray(self.times)) if tapering is not None else 1
-        fsrepr = time2freq(self._representation * _window)
-        if keep_times:
-            return TimedFSData.from_representation(
-                fsrepr,
-                channels=self.channel_names,
-                times=self.times,
-                name=self.name,
-            )
-        return FSData.from_representation(
-            fsrepr,
-            channels=self.channel_names,
-            name=self.name,
-        )
+        return time2freq(self * _window, keep_time=keep_times)
 
     def get_zero_padded(
         self,
@@ -431,9 +474,12 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             ((0, 0), (0, 0), (0, 0), (0, 0), pad_width),
             mode="constant",
         )
-
-        padded_repr = reps.time_series(Linspace.make(padded_time), padded_signal)
-        return self._create_new(padded_repr, self.channel_names)
+        return type(self).from_entries(
+            times=padded_time,
+            entries=padded_signal,
+            channels=self.channel_names,
+            name=self.name,
+        )
 
     def _get_plotter(self):
         from ..viz import plotters
@@ -451,7 +497,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
 
     """
 
-    _reps_type: type[reps.UniformFrequencySeries] = reps.UniformFrequencySeries
+    _REP_TYPE: type[reps.UniformFrequencySeries] = reps.UniformFrequencySeries
 
     @classmethod
     def from_entries(
@@ -463,46 +509,38 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         name: str | None = None,
     ) -> Self:
         """Construct from raw frequency-domain entries and explicit channel names."""
-        rep = reps.UniformFrequencySeries((Linspace.make(frequencies),), entries)
-        return cls.from_representation(rep, channels, name=name)
+        return cls((frequencies,), entries, channels=channels, name=name)
+
+    @property
+    def kind(self) -> None | str:
+        """Semantic kind of the data."""
+        return None
 
     @property
     def frequencies(self):
         """Return the frequencies."""
-        return self._representation.frequencies
+        return self.grid[0]
 
     @property
     def df(self):
         """Return the frequency step."""
-        return self._representation.df
+        return self.frequencies.step
 
     @property
     def f_min(self):
         """Return the minimum frequency."""
-        return self._representation.f_min
+        return self.frequencies.start
 
     @property
     def f_max(self):
         """Return the maximum frequency."""
-        return self._representation.f_max
+        return self.frequencies.stop
 
     def set_times(self, times: "Axis") -> TimedFSData:
         """Return a :class:`.TimedFSData` with the time grid set."""
-        return TimedFSData.from_representation(
-            self._representation,
-            channels=self.channel_names,
-            times=times,
-            name=self.name,
-        )
-
-    def get_embedded(self, embedding_grid: "Grid1D[Axis]"):
-        """Return data embedded on a new 1D grid."""
-        embedded = self._representation.get_embedded(embedding_grid)
-        return type(self).from_representation(
-            embedded,
-            channels=self.channel_names,
-            name=self.name,
-        )
+        return TimedFSData(
+            self.grid, self.entries, channels=self.channel_names, name=self.name
+        ).set_times(times)
 
     def to_tsdata(
         self,
@@ -524,12 +562,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
             stacklevel=2,
         )
         _window = tapering(self.xp.asarray(times)) if tapering is not None else 1
-        tsrepr = freq2time(self._representation * _window, times=times)
-        return TSData.from_representation(
-            tsrepr,
-            channels=self.channel_names,
-            name=self.name,
-        )
+        return freq2time(self * _window, times=times)
 
     def _get_plotter(self):
         from ..viz import plotters
@@ -551,27 +584,6 @@ class TimedFSData(FSData):
         """Semantic kind of the data."""
         return "timed"
 
-    @classmethod
-    def from_representation(
-        cls,
-        representation: "AnyReps",
-        channels: tuple[str, ...],
-        name: str | None = None,
-        **kwargs: Any,
-    ) -> Self:
-        """Construct from an existing representation and explicit channel names."""
-        times = cast(Axis | None, kwargs.pop("times", None))
-        if times is None:
-            raise ValueError(
-                f"{cls.__name__}.from_representation requires keyword argument `times`."
-            )
-        obj = super().from_representation(
-            representation,
-            channels=channels,
-            name=name,
-        )
-        return obj.set_times(times)
-
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=np.asarray(self.times))
 
@@ -586,24 +598,25 @@ class TimedFSData(FSData):
         .. note::
             This method returns ``self`` to allow for fluent method chaining.
         """
-        self.times: Linspace = Linspace.make(times)
-        self.dt: float = self.times.step
+        self._times: Linspace = Linspace.make(times)
+        self._dt: float = self._times.step
         return self
 
-    def _create_new(self, _representation: "AnyReps", channels: tuple[str, ...]):
-        """Create a new instance preserving times."""
-        new = type(self).from_representation(
-            _representation,
-            channels=channels,
-            times=self.times,
-            name=self.name,
-        )
-        return new
+    @property
+    def times(self):
+        """Associated time grid."""
+        return self._times
+
+    @property
+    def dt(self) -> float:
+        """Step size of the associated time grid."""
+        return self._dt
 
     def drop_times(self):
         """Drop the time grid."""
-        return FSData.from_representation(
-            self._representation,
+        return FSData(
+            self.grid,
+            self.get_kernel(),
             channels=self.channel_names,
             name=self.name,
         )
@@ -624,17 +637,13 @@ class TimedFSData(FSData):
         return super().to_tsdata(times=self.times, tapering=tapering)
 
 
-class STFTData[GridT: Grid2D[Linspace, Linspace]](Data[reps.STFT[GridT]]):
-    """Multi-channel short-time Fourier transform data container.
-
-    .. note::
-        To construct a :class:`.STFTData`, use factory
-        functions: :func:`~typed_lisa_toolkit.stftdata`
-        or :func:`~typed_lisa_toolkit.construct_stftdata`.
-    """
-
-    _reps_type: type[reps.STFT[GridT]] = reps.STFT[GridT]
-
+class _2DGridData[  # pyright: ignore[reportUnsafeMultipleInheritance]
+    RepT: reps.STFT[Grid2D[Linspace, Linspace]] | reps.WDM[Grid2D[Linspace, Linspace]]
+](
+    Data[RepT],
+    _2DSubsetMixin[RepT],
+    abc.ABC,
+):
     @classmethod
     def from_entries(
         cls,
@@ -647,44 +656,33 @@ class STFTData[GridT: Grid2D[Linspace, Linspace]](Data[reps.STFT[GridT]]):
         name: str | None = None,
     ) -> Self:
         """Construct from raw time-frequency entries and explicit channel names."""
-        rep = reps.stft(frequencies, times, entries, sparse_indices=sparse_indices)
-        return cls.from_representation(rep, channels=channels, name=name)
+        grid2d = build_grid2d(frequencies, times, sparse_indices=sparse_indices)
+        return cls(grid2d, entries, channels=channels, name=name)
 
-    def get_subset(
-        self,
-        *,
-        time_interval: tuple[float, float] | None = None,
-        freq_interval: tuple[float, float] | None = None,
-    ):
-        """Return the subset as a new instance."""
-        tfdict = {
-            chnname: chn.get_subset(
-                time_interval=time_interval, freq_interval=freq_interval
-            )
-            for chnname, chn in self.items()
-        }
-        return type(self).from_dict(tfdict).set_name(self.name)
-
-    def draw(
-        self,
-        *,
-        time_interval: tuple[float, float] | None = None,
-        freq_interval: tuple[float, float] | None = None,
-        **kwargs: Any,
-    ):
-        """Plot the data."""
+    def _get_plotter(self):
         from ..viz import plotters
 
-        plotter = plotters.TFDataPlotter(
-            self.get_subset(
-                time_interval=time_interval,
-                freq_interval=freq_interval,
-            )
-        )
-        return plotter.draw(**kwargs)
+        return plotters.TFDataPlotter
 
 
-class WDMData[GridT: Grid2D[Linspace, Linspace]](Data[reps.WDM[GridT]]):
+class STFTData[GridT: Grid2D[Linspace, Linspace]](_2DGridData[reps.STFT[GridT]]):
+    """Multi-channel short-time Fourier transform data container.
+
+    .. note::
+        To construct a :class:`.STFTData`, use factory
+        functions: :func:`~typed_lisa_toolkit.stftdata`
+        or :func:`~typed_lisa_toolkit.construct_stftdata`.
+    """
+
+    _REP_TYPE: type[reps.STFT[GridT]] = reps.STFT[GridT]
+
+    @property
+    def kind(self) -> str:
+        """Semantic kind of the data."""
+        return "stft"
+
+
+class WDMData[GridT: Grid2D[Linspace, Linspace]](_2DGridData[reps.WDM[GridT]]):
     """Multi-channel wavelet domain model data container.
 
     .. note::
@@ -693,55 +691,22 @@ class WDMData[GridT: Grid2D[Linspace, Linspace]](Data[reps.WDM[GridT]]):
         or :func:`~typed_lisa_toolkit.construct_wdmdata`.
     """
 
-    _reps_type: type[reps.WDM[GridT]] = reps.WDM[GridT]
+    _REP_TYPE: type[reps.WDM[GridT]] = reps.WDM[GridT]
 
-    @classmethod
-    def from_entries(
-        cls,
-        *,
-        frequencies: Axis,
-        times: Axis,
-        entries: Array,
-        channels: tuple[str, ...],
-        sparse_indices: Array | None = None,
-        name: str | None = None,
-    ) -> Self:
-        """Construct from raw WDM entries and explicit channel names."""
-        rep = reps.wdm(frequencies, times, entries, sparse_indices=sparse_indices)
-        return cls.from_representation(rep, channels=channels, name=name)
+    @property
+    def kind(self) -> str:
+        """Semantic kind of the data."""
+        return "wdm"
 
-    def get_subset(
-        self,
-        *,
-        time_interval: tuple[float, float] | None = None,
-        freq_interval: tuple[float, float] | None = None,
-    ):
-        """Return the subset as a new instance."""
-        tfdict = {
-            chnname: chn.get_subset(
-                time_interval=time_interval, freq_interval=freq_interval
-            )
-            for chnname, chn in self.items()
-        }
-        return type(self).from_dict(tfdict).set_name(self.name)
 
-    def draw(
-        self,
-        *,
-        time_interval: tuple[float, float] | None = None,
-        freq_interval: tuple[float, float] | None = None,
-        **kwargs: Any,
-    ):
-        """Plot the data."""
-        from ..viz import plotters
-
-        plotter = plotters.TFDataPlotter(
-            self.get_subset(
-                time_interval=time_interval,
-                freq_interval=freq_interval,
-            )
-        )
-        return plotter.draw(**kwargs)
+def _enforce_uniform(ary: Axis) -> Linspace:
+    """Enforce that the given array is uniform and return it as a Linspace."""
+    try:
+        return Linspace.make(ary)
+    except ValueError as e:
+        raise ValueError(
+            "To construct data objects, the grid axes must be uniform"
+        ) from e
 
 
 def tsdata(
@@ -819,6 +784,7 @@ def construct_tsdata(
     See the general description of the shape convention for
     :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
+    times = _enforce_uniform(times)
     return TSData.from_entries(
         times=times, entries=entries, channels=channels, name=name
     )
@@ -855,6 +821,7 @@ def construct_fsdata(
     See the general description of the shape convention for
     :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
+    frequencies = _enforce_uniform(frequencies)
     return FSData.from_entries(
         frequencies=frequencies,
         entries=entries,
@@ -900,10 +867,13 @@ def construct_timed_fsdata(
     hence the shape of `entries` does include the time dimension.
 
     """
-    rep = reps.frequency_series(Linspace.make(frequencies), entries)
-    return TimedFSData.from_representation(
-        rep, channels=channels, times=times, name=name
-    )
+    frequencies = _enforce_uniform(frequencies)
+    return TimedFSData.from_entries(
+        frequencies=frequencies,
+        entries=entries,
+        channels=channels,
+        name=name,
+    ).set_times(times)
 
 
 @overload
@@ -968,6 +938,8 @@ def construct_stftdata(
     name: str | None
         Name of the data. Default is ``None``.
     """
+    frequencies = _enforce_uniform(frequencies)
+    times = _enforce_uniform(times)
     if sparse_indices is None:
         return STFTData[Grid2DCartesian[Linspace, Linspace]].from_entries(
             frequencies=frequencies,
@@ -1054,6 +1026,8 @@ def construct_wdmdata(
     See the general description of the shape convention for
     :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
+    frequencies = _enforce_uniform(frequencies)
+    times = _enforce_uniform(times)
     if sparse_indices is None:
         return WDMData[Grid2DCartesian[Linspace, Linspace]].from_entries(
             frequencies=frequencies,

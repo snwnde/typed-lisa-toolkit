@@ -5,7 +5,6 @@ from __future__ import annotations
 import abc
 import logging
 import warnings
-from collections.abc import Callable
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -23,6 +22,7 @@ import numpy as np
 from l2d_interface import contract
 from l2d_interface.contract import LinspaceLike
 
+from ._mixins import to_array
 from .misc import (
     AnyGrid,
     Array,
@@ -57,6 +57,10 @@ if TYPE_CHECKING:
 
         def create_like(self, entries: Any) -> Self:
             """Create a new instance with the same grid and type but different entries."""
+            ...
+
+        def __xp__(self, api_version: str | None = None) -> ModuleType:
+            """Return the array API namespace of the representation."""
             ...
 
 
@@ -132,18 +136,11 @@ def _set_value(entries: "Array", slice: _slice, value: Any) -> None:
         entries = cast("Array", entries.at[slice].set(value))  # type: ignore[assignment, union-attr]
 
 
-def to_array(ary: "Axis", xp: ModuleType = np) -> "Array":
-    """Convert an axis to an array if it is a Linspace, otherwise return it as is."""
-    if isinstance(ary, LinspaceLike):
-        return Linspace.make(ary).asarray(xp)
-    return ary
-
-
-def _to_linspace_if_possible(ary: Union["Array", LinspaceLike]):
-    try:
-        return Linspace.make(ary)
-    except ValueError:
-        return cast("Array", ary)
+# def _to_linspace(ary: Union["Array", LinspaceLike]):
+#     try:
+#         return Linspace.make(ary)
+#     except ValueError:
+#         return cast("Array", ary)
 
 
 def _get_axis_onset(axis: "Axis") -> float:
@@ -160,59 +157,20 @@ def _get_axis_end(axis: "Axis") -> float:
         return float(axis[-1])  # type: ignore[union-index, arg-type]
 
 
-def _make_grid(grid: AnyGrid):
-    if isinstance(grid, Grid2DSparse):
-        return build_grid2d(
-            _to_linspace_if_possible(grid.axis0),
-            _to_linspace_if_possible(grid.axis1),
-            sparse_indices=grid.indices,
-        )
-    if len(grid) == 2:
-        return build_grid2d(
-            _to_linspace_if_possible(grid[0]),
-            _to_linspace_if_possible(grid[1]),
-        )
-    if len(grid) == 1:
-        return (_to_linspace_if_possible(grid[0]),)
-
-
-class _BinaryUnaryOpMixin(_mixins.NDArrayMixin, abc.ABC):
-    entries: "Array"
-
-    @abc.abstractmethod
-    def create_like(self, entries: Any) -> Self: ...
-
-    @abc.abstractmethod
-    def _unwrap(self, other: object) -> object: ...
-
-    def _binary_op(
-        self,
-        other: object,
-        op: Callable[[Any, Any], Any],
-        /,
-        reflected: bool = False,
-        inplace: bool = False,
-        **kwargs: Any,
-    ):
-        del kwargs  # Unused
-
-        if not reflected:
-            entries = op(self.entries, self._unwrap(other))
-        else:
-            entries = op(self._unwrap(other), self.entries)
-
-        if inplace:
-            del entries
-            return self
-
-        return self.create_like(entries)
-
-    def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
-        out_arg = kwargs.get("out", None)
-        if out_arg is not None:
-            kwargs["out"] = self._unwrap(out_arg)
-        entries = op(self.entries, **kwargs)
-        return self.create_like(entries)
+# def _make_grid(grid: AnyGrid):
+#     if isinstance(grid, Grid2DSparse):
+#         return build_grid2d(
+#             _to_linspace_if_possible(grid.axis0),
+#             _to_linspace_if_possible(grid.axis1),
+#             sparse_indices=grid.indices,
+#         )
+#     if len(grid) == 2:
+#         return build_grid2d(
+#             _to_linspace_if_possible(grid[0]),
+#             _to_linspace_if_possible(grid[1]),
+#         )
+#     if len(grid) == 1:
+#         return (_to_linspace_if_possible(grid[0]),)
 
 
 class _InitMixin[GridT: AnyGrid](abc.ABC):
@@ -220,12 +178,19 @@ class _InitMixin[GridT: AnyGrid](abc.ABC):
     def grid(self) -> GridT:
         return cast(GridT, self._grid)
 
+    def __xp__(self, api_version: str | None = None):
+        return xpc.get_namespace(self.entries, api_version=api_version)
+
+    @property
+    def xp(self):
+        return self.__xp__()
+
     def __init__(
         self,
         grid: AnyGrid,  # on purpose not GridT to allow more flexible input types
         entries: "Array",
     ):
-        self._grid: AnyGrid = _make_grid(grid)
+        self._grid: AnyGrid = grid
         self.entries: "Array" = entries
 
     def __repr__(self) -> str:
@@ -311,7 +276,9 @@ def _embed_entries_to_grid_2d_sparse[Axis0: "Axis", Axis1: "Axis"](
     else:
         support_slices = tuple(
             utils.get_subset_slice(
-                to_array(eg), min=float(to_array(sg)[0]), max=float(to_array(sg)[-1])
+                to_array(eg),
+                min=float(to_array(sg)[0]),
+                max=float(to_array(sg)[-1]),
             )
             for sg, eg in zip(source_grid, embedding_grid)
         )
@@ -353,24 +320,8 @@ def _subset_grid_2d_sparse[Axis0: "Axis", Axis1: "Axis"](
     return new_grid, new_entries
 
 
-def _embed_entries_to_grid[GT: "AnyGrid"](
-    source_grid: "AnyGrid",
-    source_entries: "Array",
-    embedding_grid: GT,
-    *,
-    known_slices: tuple[slice, ...] | None = None,
-) -> tuple[GT, "Array"]:
-    """Embed entries from source grid into a target grid."""
-    _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
-    _source_grid = tuple(to_array(sg) for sg in source_grid)
-    entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
-        _source_grid, source_entries
-    )
-    return embedding_grid, cast(Any, entries)
-
-
 class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
-    _BinaryUnaryOpMixin, _InitMixin[GridT], abc.ABC
+    _mixins.BinaryUnaryOpMixin, _InitMixin[GridT], abc.ABC
 ):
     # Provides implementations for arithmetic operations
 
@@ -385,31 +336,12 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
     def xp(self):
         return self.__xp__()
 
-    def _check_grid_compatibility(self, other: object) -> bool:
-        if not hasattr(other, "grid"):
-            return False
-        other = cast(_ArithmeticReprOnGrid[GridT], other)
-        other_grid = other.grid
-        if len(self.grid) != len(other_grid):
-            return False
-        for g1, g2 in zip(self.grid, other_grid):
-            if isinstance(g1, Linspace) and isinstance(g2, Linspace):
-                if g1 != g2:
-                    return False
-            else:
-                xp = xpc.get_namespace(g1)
-                if not xp.array_equal(g1, g2):
-                    return False
-        return True
-
     def _unwrap(self, other: object):
         if hasattr(other, "grid") and hasattr(other, "entries"):
             other = cast(_ArithmeticReprOnGrid[GridT], other)
-            if self._check_grid_compatibility(other):
+            if _mixins.check_grid_compatibility(self.grid, other.grid):
                 return other.entries
-            raise ValueError(
-                f"AnyGrid mismatch: expected {self.grid}, got {other.grid}."
-            )
+            raise ValueError(f"Grid mismatch: expected {self.grid}, got {other.grid}.")
         return other
 
     def add(self, other: Self, slice: _slice, inplace: bool = False) -> Self:
@@ -789,6 +721,13 @@ def wdm(
                 len(sparse_indices),
             ),
         )
+    try:
+        frequencies = Linspace.make(frequencies)
+        times = Linspace.make(times)
+    except ValueError:
+        raise ValueError(
+            "Frequencies and times must be convertible to Linspace for WDM representation."
+        )
     grid = build_grid2d(frequencies, times, sparse_indices=sparse_indices)
     if sparse_indices is None:
         return WDM[Grid2DCartesian[Linspace, Linspace]](grid, entries)
@@ -859,7 +798,7 @@ class FrequencySeries[AxisT: "Axis"](_1DSeries[AxisT]):
         known_slices: tuple[slice, ...] | None = None,
     ):
         """Return the series embedded in a new 1D grid."""
-        grid, entries = _embed_entries_to_grid(
+        grid, entries = _mixins.embed_entries_to_grid(
             self.grid,
             self.entries,
             embedding_grid,
@@ -973,7 +912,7 @@ class TimeSeries[AxisT: "Axis"](_1DSeries[AxisT]):
         known_slices: tuple[slice, ...] | None = None,
     ):
         """Return the series embedded in a new 1D grid."""
-        grid, entries = _embed_entries_to_grid(
+        grid, entries = _mixins.embed_entries_to_grid(
             self.grid,
             self.entries,
             embedding_grid,
@@ -1148,7 +1087,7 @@ class Phasor[AxisT: "Axis"](
         known_slices: tuple[slice, ...] | None = None,
     ) -> Phasor[AT]:
         """Return the phasor embedded in a new 1D grid."""
-        grid, entries = _embed_entries_to_grid(
+        grid, entries = _mixins.embed_entries_to_grid(
             self.grid,
             self.entries,
             embedding_grid,
@@ -1386,7 +1325,7 @@ class ShortTimeFourierTransform[GridT: Grid2D[Axis, Axis]](
                 known_slices=known_slices,
             )
             return stft(grid[0], grid[1], entries, sparse_indices=grid.indices)
-        grid, entries = _embed_entries_to_grid(
+        grid, entries = _mixins.embed_entries_to_grid(
             self.grid,
             self.entries,
             embedding_grid,
@@ -1541,7 +1480,7 @@ class WilsonDaubechiesMeyer[GridT: Grid2D[Linspace, Linspace]](_TFRep[GridT]):
                 known_slices=known_slices,
             )
             return wdm(grid[0], grid[1], entries, sparse_indices=grid.indices)
-        grid, entries = _embed_entries_to_grid(
+        grid, entries = _mixins.embed_entries_to_grid(
             self.grid,
             self.entries,
             embedding_grid,

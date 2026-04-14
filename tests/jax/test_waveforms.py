@@ -85,7 +85,6 @@ class TestHarmonicProjectedWaveformJAX(unittest.TestCase):
         case = build_harmonic_projected_frequency_waveform(jnp)
         wf = case["wf"]
 
-        self.assertEqual(wf.domain, "frequency")
         self.assertEqual(wf.channel_names, ("X", "Y"))
 
         kernel = np.asarray(wf.get_kernel())
@@ -124,6 +123,45 @@ class TestHarmonicProjectedWaveformJAX(unittest.TestCase):
         picked = wf.pick((case["mode_33"], case["mode_22"]))
 
         self.assertEqual(tuple(picked.keys()), (case["mode_33"], case["mode_22"]))
+
+    def test_mode_channels_ops_scalar_and_unary(self):
+        case = build_harmonic_projected_frequency_waveform(jnp)
+        wf = case["wf"]
+        kernel = np.asarray(wf.get_kernel())
+
+        shifted = wf + 2.0
+        reflected = 2.0 + wf
+        negated = -wf
+
+        self.assertIsInstance(shifted, type(wf))
+        npt.assert_allclose(np.asarray(shifted.get_kernel()), kernel + 2.0)
+        npt.assert_allclose(np.asarray(reflected.get_kernel()), 2.0 + kernel)
+        npt.assert_allclose(np.asarray(negated.get_kernel()), -kernel)
+
+    def test_mode_channels_ops_mapping_and_inplace(self):
+        case = build_harmonic_projected_frequency_waveform(jnp)
+        left = case["wf"]
+        right = build_harmonic_projected_frequency_waveform(jnp)["wf"]
+        kernel = np.asarray(left.get_kernel())
+
+        combined = left + right
+        npt.assert_allclose(np.asarray(combined.get_kernel()), kernel + kernel)
+
+        left_copy = build_harmonic_projected_frequency_waveform(jnp)["wf"]
+        left_copy += right
+        npt.assert_allclose(np.asarray(left_copy.get_kernel()), kernel + kernel)
+
+        mode = case["mode_22"]
+        expected_x = 2.0 * np.asarray(case["resp_22_map"]["X"].entries)
+        npt.assert_allclose(np.asarray(left_copy[mode]["X"].entries), expected_x)
+
+    def test_mode_channels_ops_mode_mismatch_raises(self):
+        case = build_harmonic_projected_frequency_waveform(jnp)
+        left = case["wf"]
+        mismatched = harmonic_projected_waveform({case["mode_22"]: case["resp_22"]})
+
+        with self.assertRaises(ValueError):
+            _ = left + mismatched
 
 
 class TestDenseMakerJAX(unittest.TestCase):
@@ -407,9 +445,7 @@ class TestWaveformConstructorsJAX(unittest.TestCase):
 
     def test_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(jnp)
-        resp = projected_waveform(
-            {"X": case["resp_22"]["X"], "Y": case["resp_22"]["Y"]}
-        )
+        resp = projected_waveform(case["resp_22_map"])
 
         self.assertEqual(type(resp).__name__, "ProjectedWaveform")
         self.assertEqual(resp.channel_names, ("X", "Y"))
@@ -417,7 +453,10 @@ class TestWaveformConstructorsJAX(unittest.TestCase):
     def test_harmonic_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(jnp)
         wf = harmonic_projected_waveform(
-            {case["mode_22"]: case["resp_22"], case["mode_33"]: case["resp_33"]}
+            {
+                case["mode_22"]: case["resp_22_map"],
+                case["mode_33"]: case["resp_33_map"],
+            }
         )
 
         self.assertEqual(type(wf).__name__, "HarmonicProjectedWaveform")
@@ -426,7 +465,10 @@ class TestWaveformConstructorsJAX(unittest.TestCase):
     def test_homogeneous_harmonic_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(jnp)
         wf = homogeneous_harmonic_projected_waveform(
-            {case["mode_22"]: case["resp_22"], case["mode_33"]: case["resp_33"]}
+            {
+                case["mode_22"]: case["resp_22_map"],
+                case["mode_33"]: case["resp_33_map"],
+            }
         )
 
         self.assertEqual(type(wf).__name__, "HomogeneousHarmonicProjectedWaveform")

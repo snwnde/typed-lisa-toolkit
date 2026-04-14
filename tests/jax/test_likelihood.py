@@ -15,7 +15,7 @@ from tests._helpers import (
     build_harmonic_projected_frequency_waveform,
     dense_kernel_2ch,
 )
-from typed_lisa_toolkit import fsdata, sum_harmonics
+from typed_lisa_toolkit import fsdata, sum_harmonics, linspace_from_array
 from typed_lisa_toolkit.types import (
     FDNoiseModel,
     FDWhittleLikelihood,
@@ -95,9 +95,9 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
         npt.assert_allclose(got, expected)
 
     def test_template_is_restricted_to_its_frequency_band(self):
-        freqs = jnp.array([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        freqs = jnp.array([0.0, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
         left = _build_fsdata(
-            freqs,
+            linspace_from_array(freqs),
             jnp.array(
                 [1.0 + 0.0j, 0.5 + 0.1j, 2.0 - 0.2j, 1.0 + 0.5j, 0.1 + 0.0j],
                 dtype=jnp.complex128,
@@ -115,7 +115,9 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
         got = np.asarray(likelihood.get_cross_product(template))
         expected = np.asarray(
             FDNoiseModel(
-                SpectralDensity(template.frequencies, kernel[1:4], ["X", "Y"])
+                SpectralDensity(
+                    template.frequencies.asarray(jnp), kernel[1:4], ["X", "Y"]
+                )
             ).get_scalar_product(left.get_subset(interval=(1.0, 3.0)), template)
         )
 
