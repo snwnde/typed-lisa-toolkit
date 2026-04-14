@@ -2,6 +2,33 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.0 - 2026-04-14
+#### Features
+- more branches for xyz aet conversions - (a35b83c) - Senwen Deng
+- Grid2DSparse - (5b606e1) - Senwen Deng
+- new constructors - (5164637) - Senwen Deng
+- load mojito - (cb5836a) - Senwen Deng
+- conversion XYZ <-> AET - (f08bfcc) - Senwen Deng
+#### Bug Fixes
+- limit reps shape - (3ca5679) - Senwen Deng
+- consistent API - (e6b9391) - Senwen Deng
+- py 3.12 compatibility - (97d649d) - Senwen Deng
+- stft convention - (d0bbaa3) - Senwen Deng
+#### Documentation
+- clarify intended usage, meaning of terms - (94deef5) - Solano Sousa Felicio
+- constructor docs - (4bef5c7) - Senwen Deng
+- better API documentation - (3505b09) - Senwen Deng
+#### Tests
+- WDM transforms - (76df2e1) - Senwen Deng
+- minxins and modes - (c2978fc) - Senwen Deng
+#### Refactoring
+- mapping objects - (1e1accb) - Senwen Deng
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>change WDM to (Nf+1, Nt) grid and make transforms optional - (e774c33) - Solano Sousa Felicio
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>public API - (018fe4e) - Senwen Deng
+- kwarg only make - (92f5d6c) - Senwen Deng
+
+- - -
+
 ## 0.5.5 - 2026-03-27
 #### Features
 - STFT viz - (3d03d69) - Senwen Deng
