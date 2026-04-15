@@ -161,6 +161,10 @@ class SpectralDensity:
         The SDM is a real-valued, symmetric, positive-definite matrix, hence it is invertible.
         It is the inverse SDM that is used in the inner product and whitening operations,
         and we store the inverse SDM in this representation.
+
+    Note
+    ----
+    To construct a :class:`.SpectralDensity`, use the :func:`~typed_lisa_toolkit.make_sdm` factory function.
     """
 
     def __init__(
@@ -214,7 +218,16 @@ class SpectralDensity:
 
 
 class DiagonalSpectralDensity(SpectralDensity):
-    """Represent a SDM for a frequency domain stationary noise model with no inter-channel correlations."""
+    """Represent a SDM for a frequency domain stationary noise model with no inter-channel correlations.
+
+    See Also
+    --------
+    :class:`.SpectralDensity`
+    
+    Note
+    ----
+    To construct a :class:`.DiagonalSpectralDensity`, use the :func:`~typed_lisa_toolkit.make_sdm` factory function.
+    """
 
     @property
     def is_diagonal(self) -> Literal[True]:
@@ -295,6 +308,15 @@ class FDNoiseModel(
     noise power spectral density (PSD) in the frequency domain. This
     class might not be suitable for non-stationary noise.
 
+    Note
+    ----
+    To construct a :class:`.FDNoiseModel`, use the :func:`~typed_lisa_toolkit.noise_model` factory function.
+
+
+    Attention
+    ---------
+    This class is considered experimental. If you are interested in using it, please reach out to the 
+    developers to discuss your use case and how we can best support it.
     """
 
     def __init__(
@@ -308,7 +330,7 @@ class FDNoiseModel(
         self._ip: IntegrationPolicy = _make_integration_policy(xp, integration_method)
 
     def reset(self) -> Self:
-        """Reset the noise model to its original state."""
+        """Reset the noise model to its original state, typically after subband restriction."""
         self.sdm = self._sdm_orig_
         return self
 
@@ -609,6 +631,15 @@ class TFNoiseModel:
     The covariance matrix is diagonal in the chosen time-frequency representation.
     The model allows correlations between TDI channels. In other words, we have a 3x3
     symmetric matrix at each location in the time-frequency plane.
+
+    Note
+    ----
+    To construct a :class:`.TFNoiseModel`, use the :func:`~typed_lisa_toolkit.noise_model` factory function.
+
+    Attention
+    ---------
+    This class is considered experimental. If you are interested in using it, please reach out to the 
+    developers to discuss your use case and how we can best support it.
     """
 
     def __init__(

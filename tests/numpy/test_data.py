@@ -599,13 +599,15 @@ class TestDataContainersNumpy(unittest.TestCase):
             channels=("X", "Y"),
             name="fs",
         )
-        tfs = construct_timed_fsdata(
-            frequencies=freqs,
-            entries=fs_entries,
-            channels=("X", "Y"),
-            times=times,
-            name="tfs",
-        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            tfs = construct_timed_fsdata(
+                frequencies=freqs,
+                entries=fs_entries,
+                channels=("X", "Y"),
+                times=times,
+                name="tfs",
+            )
         stft_data = construct_stftdata(
             frequencies=freqs,
             times=times,

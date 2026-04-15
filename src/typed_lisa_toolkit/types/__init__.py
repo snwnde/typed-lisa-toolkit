@@ -1,10 +1,12 @@
 r"""
 Types provided by TLT.
 
-The instantiation of these types via classes is considered an expert-level API.
-For most users, prefer to construct these objects with the top-level factory functions provided in
-:mod:`typed_lisa_toolkit`. For example, use :func:`~typed_lisa_toolkit.time_series`
-to construct a :class:`TimeSeries` object.
+.. note::
+    To create instances of these types, use the factory functions provided at the :mod:`top level <typed_lisa_toolkit>`.
+    For example, use :func:`~typed_lisa_toolkit.time_series` to construct a :class:`TimeSeries` object.
+
+.. warning::
+    The `__init__` methods of these classes are **not** part of the public API, and may change without deprecation.
 
 .. _representation_types:
 

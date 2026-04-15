@@ -105,6 +105,11 @@ class FDWhittleLikelihood(WhittleLikelihood[nm.FDNoiseModel]):
         \left( d \middle| h \right) -\frac{1}{2} \left( h \middle| h \right).
 
     The term :math:`\left( d \middle| d \right)` is computed upon initialization and is constant.
+
+    Attention
+    ---------
+    This class is considered experimental. If you are interested in using it, please reach out to the 
+    developers to discuss your use case and how we can best support it.
     """
 
     def get_log_likelihood(

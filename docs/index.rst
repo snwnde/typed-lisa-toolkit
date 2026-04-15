@@ -9,7 +9,7 @@ use in CU L2D. It is currently used in the `Gee-Moo`_ global fit prototype.
 TLT is more than a data abstraction layer.
 By basing your code on TLT objects, you get:
 
-- A unified interface across different data array libraries
+- A unified interface across different data array backends
    Numpy, JAX, ...
 - Semantically rich building blocks
    Get a TLT object and you are ready to work with it.

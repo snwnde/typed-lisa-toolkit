@@ -371,7 +371,13 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         channels: tuple[str, ...],
         name: str | None = None,
     ) -> Self:
-        """Construct from raw time-domain entries and explicit channel names."""
+        """Construct from raw time-domain entries and explicit channel names.
+
+        Warning
+        -------
+        This method is considered an expert-level API; for most users, prefer to construct a :class:`.TSData` with factory functions:
+        :func:`~typed_lisa_toolkit.tsdata` or :func:`~typed_lisa_toolkit.construct_tsdata`.
+        """
         return cls((times,), entries, channels=channels, name=name)
 
     @property
@@ -508,7 +514,13 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         channels: tuple[str, ...],
         name: str | None = None,
     ) -> Self:
-        """Construct from raw frequency-domain entries and explicit channel names."""
+        """Construct from raw frequency-domain entries and explicit channel names.
+
+        Warning
+        -------
+        This method is considered an expert-level API; for most users, prefer to construct a :class:`.FSData` with factory functions:
+        :func:`~typed_lisa_toolkit.fsdata` or :func:`~typed_lisa_toolkit.construct_fsdata`.
+        """
         return cls((frequencies,), entries, channels=channels, name=name)
 
     @property
@@ -710,18 +722,39 @@ def _enforce_uniform(ary: Axis) -> Linspace:
 
 
 def tsdata(
-    mapping: Mapping[str, reps.TimeSeries[Linspace]], name: str | None = None
+    mapping: Mapping[str, reps.TimeSeries[Linspace]], *, name: str | None = None
 ) -> TSData:
     """Construct :class:`~types.data.TSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.TimeSeries`."""
     _ = _mixins.validate_maps_to_reps(mapping)
     return TSData.from_dict(mapping, name=name)
 
 
+@overload
 def fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]], name: str | None = None
-) -> FSData:
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
+    *,
+    times: Axis,
+    name: str | None = None,
+) -> TimedFSData: ...
+
+
+@overload
+def fsdata(
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]], *, name: str | None = None
+) -> FSData: ...
+
+
+def fsdata(
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
+    *,
+    name: str | None = None,
+    times: Axis | None = None,
+):
     """Construct :class:`~types.data.FSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.FrequencySeries`."""
     _ = _mixins.validate_maps_to_reps(mapping)
+    if times is not None:
+        times = _enforce_uniform(times)
+        return TimedFSData.from_dict(mapping, times=times, name=name)
     return FSData.from_dict(mapping, name=name)
 
 
@@ -730,13 +763,18 @@ def timed_fsdata(
     times: Linspace | npt.NDArray[np.floating[Any]],
     name: str | None = None,
 ) -> TimedFSData:
-    """Construct :class:`~types.data.TimedFSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.FrequencySeries` and a time grid."""
-    _ = _mixins.validate_maps_to_reps(mapping)
-    return TimedFSData.from_dict(mapping, times=times, name=name)
+    """Construct :class:`~types.data.TimedFSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.FrequencySeries` and a time grid. (*Deprecated*)."""
+    warnings.warn(
+        "The 'timed_fsdata' function is deprecated and will be removed in 0.8.0; use the `fsdata` function with the `times` argument instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return fsdata(mapping, times=times, name=name)
 
 
 def stftdata[GridT: Grid2D[Linspace, Linspace]](
     mapping: Mapping[str, reps.STFT[GridT]],
+    *,
     name: str | None = None,
 ) -> STFTData[GridT]:
     """Construct :class:`~types.data.STFTData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.ShortTimeFourierTransform`."""
@@ -746,6 +784,7 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
 
 def wdmdata[GridT: Grid2D[Linspace, Linspace]](
     mapping: Mapping[str, reps.WDM[GridT]],
+    *,
     name: str | None = None,
 ) -> WDMData[GridT]:
     """Construct :class:`~types.WDMData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.WilsonDaubechiesMeyer`."""
@@ -785,12 +824,34 @@ def construct_tsdata(
     )
 
 
+@overload
+def construct_fsdata(
+    *,
+    frequencies: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    times: Axis,
+    name: str | None = None,
+) -> TimedFSData: ...
+
+
+@overload
 def construct_fsdata(
     *,
     frequencies: Axis,
     entries: Array,
     channels: tuple[str, ...],
     name: str | None = None,
+) -> FSData: ...
+
+
+def construct_fsdata(
+    *,
+    frequencies: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    name: str | None = None,
+    times: Axis | None = None,
 ) -> FSData:
     """Construct an :class:`~types.data.FSData`.
 
@@ -812,12 +873,20 @@ def construct_fsdata(
         Name of the data. Default is ``None``.
     """
     frequencies = _enforce_uniform(frequencies)
-    return FSData.from_entries(
+    if times is None:
+        return FSData.from_entries(
+            frequencies=frequencies,
+            entries=entries,
+            channels=channels,
+            name=name,
+        )
+    times = _enforce_uniform(times)
+    return TimedFSData.from_entries(
         frequencies=frequencies,
         entries=entries,
         channels=channels,
         name=name,
-    )
+    ).set_times(times)
 
 
 def construct_timed_fsdata(
@@ -828,7 +897,7 @@ def construct_timed_fsdata(
     times: Linspace | npt.NDArray[np.floating[Any]],
     name: str | None = None,
 ) -> TimedFSData:
-    """Construct a :class:`~types.data.TimedFSData`.
+    """Construct a :class:`~types.data.TimedFSData` (*Deprecated*).
 
     Parameters
     ----------
@@ -857,13 +926,18 @@ def construct_timed_fsdata(
     hence the shape of `entries` does include the time dimension.
 
     """
-    frequencies = _enforce_uniform(frequencies)
-    return TimedFSData.from_entries(
+    warnings.warn(
+        "The 'construct_timed_fsdata' function is deprecated and will be removed in 0.8.0; use `construct_fsdata` with the `times` argument instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return construct_fsdata(
         frequencies=frequencies,
         entries=entries,
         channels=channels,
         name=name,
-    ).set_times(times)
+        times=times,
+    )
 
 
 @overload

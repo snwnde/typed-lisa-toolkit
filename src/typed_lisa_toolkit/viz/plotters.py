@@ -191,7 +191,7 @@ class _1DPlotter[RepT: AnyReps](abc.ABC):
 
 
 class TSPlotter(_1DPlotter[representations.TimeSeries["Axis"]]):
-    """Plotter for :class:`.containers.representations.TimeSeries`."""
+    """Plotter for :class:`~types.TimeSeries`."""
 
     def plot(
         self,
@@ -230,7 +230,7 @@ class TSPlotter(_1DPlotter[representations.TimeSeries["Axis"]]):
 
 
 class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
-    """Plotter for :class:`.containers.representations.FrequencySeries`."""
+    """Plotter for :class:`~types.FrequencySeries`."""
 
     def plot(
         self,
@@ -300,7 +300,7 @@ class FSPlotter(_1DPlotter[representations.FrequencySeries["Axis"]]):
 
 
 class PhasorPlotter[AxisT: "Axis"](_1DPlotter[representations.Phasor[AxisT]]):
-    """Plotter for :class:`.containers.representations.Phasor`."""
+    """Plotter for :class:`~types.Phasor`."""
 
     def plot(
         self,
@@ -369,7 +369,7 @@ class PhasorPlotter[AxisT: "Axis"](_1DPlotter[representations.Phasor[AxisT]]):
 
 
 class STFTPlotter[GridT: Grid2D[Axis, Axis]]:
-    """Plotter for :class:`.containers.representations.STFT`."""
+    """Plotter for :class:`~types.STFT`."""
 
     def __init__(self, representation: representations.STFT[GridT]) -> None:
         self.representation: representations.STFT[GridT] = representation
@@ -412,7 +412,7 @@ class STFTPlotter[GridT: Grid2D[Axis, Axis]]:
 
 
 class WDMPlotter[GridT: Grid2D[Linspace, Linspace]]:
-    """Plotter for :class:`.containers.representations.WDM`."""
+    """Plotter for :class:`~types.WDM`."""
 
     def __init__(self, representation: representations.WDM[GridT]) -> None:
         self.representation: representations.WDM[GridT] = representation
