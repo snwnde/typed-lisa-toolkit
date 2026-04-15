@@ -95,9 +95,7 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
 
         got = np.asarray(likelihood.get_cross_product(case["wf"]))
         expected = np.asarray(
-            model.reset().get_scalar_product(
-                data, fsdata(sum_harmonics(case["wf"]))
-            )
+            model.reset().get_scalar_product(data, fsdata(sum_harmonics(case["wf"])))
         )
 
         npt.assert_allclose(got, expected)
@@ -111,7 +109,9 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
         )
         template = left.get_subset(interval=(1.0, 3.0))
         kernel = np.broadcast_to(np.eye(2), (len(freqs), 2, 2)).copy()
-        model = noise_model(make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y")))
+        model = noise_model(
+            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y"))
+        )
         likelihood = whittle(left, model)
 
         got = np.asarray(likelihood.get_cross_product(template))

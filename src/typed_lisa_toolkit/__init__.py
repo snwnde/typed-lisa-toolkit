@@ -191,6 +191,8 @@ from ._constructors import (
     hw,
     linspace,
     linspace_from_array,
+    make_sdm,
+    noise_model,
     phasor,
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
@@ -205,8 +207,6 @@ from ._constructors import (
     tsdata,
     wdm,
     wdmdata,
-    noise_model,
-    make_sdm,
     whittle,
 )
 from ._loaders import load_data, load_ldc_data, load_mojito, load_sangria

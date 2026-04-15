@@ -4,6 +4,7 @@ import unittest
 
 import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
+    build_grid2d,
     cast_mode,
     construct_fsdata,
     construct_stftdata,
@@ -28,6 +29,8 @@ from typed_lisa_toolkit import (
     linspace,
     load_data,
     load_ldc_data,
+    make_sdm,
+    noise_model,
     phasor,
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
@@ -42,9 +45,6 @@ from typed_lisa_toolkit import (
     tsdata,
     wdm,
     wdmdata,
-    build_grid2d,
-    make_sdm,
-    noise_model,
     whittle,
 )
 from typed_lisa_toolkit.types import FrequencySeries, TSData

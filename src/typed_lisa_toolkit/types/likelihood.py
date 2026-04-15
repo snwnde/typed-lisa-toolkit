@@ -9,7 +9,7 @@ from . import modes
 from . import noisemodel as nm
 from . import representations as reps
 from . import waveforms as wf
-from .misc import Array, Linspace, AnyGrid
+from .misc import AnyGrid, Array, Linspace
 
 if TYPE_CHECKING:
     AnyReps = reps.Representation[AnyGrid]
@@ -108,7 +108,7 @@ class FDWhittleLikelihood(WhittleLikelihood[nm.FDNoiseModel]):
 
     Attention
     ---------
-    This class is considered experimental. If you are interested in using it, please reach out to the 
+    This class is considered experimental. If you are interested in using it, please reach out to the
     developers to discuss your use case and how we can best support it.
     """
 

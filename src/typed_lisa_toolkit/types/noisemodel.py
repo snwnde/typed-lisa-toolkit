@@ -12,12 +12,14 @@ from typing import (
     Union,
     overload,
 )
+
 import array_api_compat as xpc
+
 from .. import utils
 from . import _mixins, waveforms
 from . import data as dm
 from . import representations as reps
-from .misc import Array, Axis, Grid2D, Linspace, Domain
+from .misc import Array, Axis, Domain, Grid2D, Linspace
 
 
 def _import_quadax() -> ModuleType:
@@ -223,7 +225,7 @@ class DiagonalSpectralDensity(SpectralDensity):
     See Also
     --------
     :class:`.SpectralDensity`
-    
+
     Note
     ----
     To construct a :class:`.DiagonalSpectralDensity`, use the :func:`~typed_lisa_toolkit.make_sdm` factory function.
@@ -315,7 +317,7 @@ class FDNoiseModel(
 
     Attention
     ---------
-    This class is considered experimental. If you are interested in using it, please reach out to the 
+    This class is considered experimental. If you are interested in using it, please reach out to the
     developers to discuss your use case and how we can best support it.
     """
 
@@ -638,7 +640,7 @@ class TFNoiseModel:
 
     Attention
     ---------
-    This class is considered experimental. If you are interested in using it, please reach out to the 
+    This class is considered experimental. If you are interested in using it, please reach out to the
     developers to discuss your use case and how we can best support it.
     """
 

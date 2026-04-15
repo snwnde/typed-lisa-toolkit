@@ -341,9 +341,7 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
     def test_densify_phasor_hpw_returns_homogeneous_container(self):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
-        wf, handles = build_harmonic_projected_phasor_waveform(
-            frequencies=frequencies
-        )
+        wf, handles = build_harmonic_projected_phasor_waveform(frequencies=frequencies)
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",

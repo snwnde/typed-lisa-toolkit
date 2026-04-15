@@ -122,7 +122,9 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
         )
         template = left.get_subset(interval=(1.0, 3.0))
         kernel = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(freqs), 2, 2))
-        model = noise_model(make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y")))
+        model = noise_model(
+            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y"))
+        )
         likelihood = whittle(left, model)
 
         got = np.asarray(likelihood.get_cross_product(template))

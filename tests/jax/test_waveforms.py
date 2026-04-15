@@ -344,9 +344,7 @@ class TestDensifyHelpersJAX(unittest.TestCase):
     def test_densify_phasor_hpw_returns_homogeneous_container(self):
         frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
-        wf, handles = build_harmonic_projected_phasor_waveform(
-            frequencies=frequencies
-        )
+        wf, handles = build_harmonic_projected_phasor_waveform(frequencies=frequencies)
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",

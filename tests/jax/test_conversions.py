@@ -52,7 +52,9 @@ def _build_xyz_evolutionary_spectral_density_jax() -> EvolutionarySpectralDensit
     )
     scales = jnp.array([[1.0, 1.05], [1.1, 1.15]], dtype=jnp.float64)
     inverse_esdm = scales[:, :, None, None] * base[None, None, :, :]
-    return EvolutionarySpectralDensity(frequencies, times, inverse_esdm, ["X", "Y", "Z"])
+    return EvolutionarySpectralDensity(
+        frequencies, times, inverse_esdm, ["X", "Y", "Z"]
+    )
 
 
 class TestConversionsJax(unittest.TestCase):
@@ -118,11 +120,15 @@ class TestConversionsJax(unittest.TestCase):
             )
 
     def test_xyz2aet_without_inputs_raises(self):
-        with self.assertRaisesRegex(ValueError, "Must specify either xyz or all of X, Y, Z"):
+        with self.assertRaisesRegex(
+            ValueError, "Must specify either xyz or all of X, Y, Z"
+        ):
             shop.xyz2aet()
 
     def test_aet2xyz_without_inputs_raises(self):
-        with self.assertRaisesRegex(ValueError, "Must specify either aet or all of A, E, T"):
+        with self.assertRaisesRegex(
+            ValueError, "Must specify either aet or all of A, E, T"
+        ):
             shop.aet2xyz()
 
     def test_xyz2aet_keyword_components_path(self):

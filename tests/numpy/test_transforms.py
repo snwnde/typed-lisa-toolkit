@@ -46,7 +46,6 @@ def _build_tsdata_numpy(n: int = 8) -> tuple[NDArray[float64], TSData]:
 
 
 class TestTransformsNumpy(unittest.TestCase):
-
     def test_time2freq_timeseries_returns_representation(self):
         _, entries, ts = _build_timeseries_numpy()
 

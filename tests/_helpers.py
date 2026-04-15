@@ -9,11 +9,11 @@ import numpy.testing as npt
 from typed_lisa_toolkit import (
     frequency_series,
     fsdata,
-    wdmdata,
+    linspace_from_array,
     stft,
     time_series,
     wdm,
-    linspace_from_array,
+    wdmdata,
 )
 from typed_lisa_toolkit.types import (
     STFT,

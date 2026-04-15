@@ -16,19 +16,19 @@ from tests._helpers import (
     dense_kernel_2ch,
     diagonal_kernel_2ch,
 )
-from typed_lisa_toolkit.types import (
-    DiagonalSpectralDensity,
-    EvolutionarySpectralDensity,
-    FDNoiseModel,
-    SpectralDensity,
-    TFNoiseModel,
-)
 from typed_lisa_toolkit import (
     frequency_series,
     fsdata,
     linspace_from_array,
     make_sdm,
     noise_model,
+)
+from typed_lisa_toolkit.types import (
+    DiagonalSpectralDensity,
+    EvolutionarySpectralDensity,
+    FDNoiseModel,
+    SpectralDensity,
+    TFNoiseModel,
 )
 from typed_lisa_toolkit.types.noisemodel import _make_integration_policy
 

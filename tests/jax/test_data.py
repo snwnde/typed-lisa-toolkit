@@ -182,9 +182,7 @@ class TestDataContainersJAX(unittest.TestCase):
         )
         npt.assert_allclose(
             np.asarray(ts_from_fs_pos.entries),
-            np.asarray(
-                shop.freq2time(fs_rep, times=np.asarray(times)).entries
-            ),
+            np.asarray(shop.freq2time(fs_rep, times=np.asarray(times)).entries),
         )
 
     def test_from_waveform_preserves_entries_and_channels(self):
@@ -752,7 +750,9 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
 
     def test_load_data_kind_mismatch_raises(self):
         _, tsdata = _build_tsdata_jax()
-        with self.assertWarnsRegex(DeprecationWarning, r"The 'to_fsdata' method is deprecated"):
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+        ):
             fsd = tsdata.to_fsdata(keep_times=False)
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
@@ -822,11 +822,15 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
 
     def test_timedfsdata_to_tsdata_ignores_explicit_times_argument(self):
         times, tsdata = _build_tsdata_jax()
-        with self.assertWarnsRegex(DeprecationWarning, r"The 'to_fsdata' method is deprecated"):
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+        ):
             timed = tsdata.to_fsdata(keep_times=True)
         alt_times = np.linspace(100.0, 103.5, len(times))
 
-        with self.assertWarnsRegex(DeprecationWarning, r"The 'to_tsdata' method is deprecated"):
+        with self.assertWarnsRegex(
+            DeprecationWarning, r"The 'to_tsdata' method is deprecated"
+        ):
             recovered = timed.to_tsdata(alt_times)
 
         self.assertIsInstance(recovered, TSData)

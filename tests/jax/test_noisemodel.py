@@ -469,7 +469,9 @@ class TestNoiseModelFactoriesJAX(unittest.TestCase):
         frequencies = jnp.array([0.5, 1.0, 1.5], dtype=jnp.float64)
         times = jnp.array([0.0, 1.0], dtype=jnp.float64)
 
-        dense_kernel = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(frequencies), 2, 2))
+        dense_kernel = jnp.broadcast_to(
+            jnp.eye(2, dtype=jnp.float64), (len(frequencies), 2, 2)
+        )
         diag_kernel = jnp.ones((len(frequencies), 2), dtype=jnp.float64)
         evo_kernel = jnp.broadcast_to(
             jnp.eye(2, dtype=jnp.float64), (len(frequencies), len(times), 2, 2)
@@ -503,7 +505,9 @@ class TestNoiseModelFactoriesJAX(unittest.TestCase):
 
         fd_model = noise_model(
             make_sdm(
-                jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(frequencies), 2, 2)),
+                jnp.broadcast_to(
+                    jnp.eye(2, dtype=jnp.float64), (len(frequencies), 2, 2)
+                ),
                 frequencies=frequencies,
                 channel_names=("X", "Y"),
             )

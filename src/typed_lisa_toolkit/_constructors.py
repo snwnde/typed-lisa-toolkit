@@ -10,8 +10,10 @@ from .types.data import (
     tsdata,
     wdmdata,
 )
+from .types.likelihood import whittle
 from .types.misc import build_grid2d, linspace, linspace_from_array
 from .types.modes import cast_mode
+from .types.noisemodel import make_sdm, noise_model
 from .types.representations import (
     densify_phasor,
     frequency_series,
@@ -40,8 +42,6 @@ from .types.waveforms import (
     pw,
     sum_harmonics,
 )
-from .types.noisemodel import noise_model, make_sdm
-from .types.likelihood import whittle
 
 __all__ = [
     "frequency_series",

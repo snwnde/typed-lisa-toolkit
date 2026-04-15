@@ -155,9 +155,7 @@ class TestDataContainersNumpy(unittest.TestCase):
         )
         npt.assert_allclose(
             np.asarray(ts_from_fs_pos.entries),
-            np.asarray(
-                shop.freq2time(fs_rep, times=np.asarray(times)).entries
-            ),
+            np.asarray(shop.freq2time(fs_rep, times=np.asarray(times)).entries),
         )
 
     def test_fsdata_frequencies_and_df(self):

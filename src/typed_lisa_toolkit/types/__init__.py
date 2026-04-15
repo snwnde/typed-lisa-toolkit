@@ -202,7 +202,7 @@ from .data import (
     TSData,
     WDMData,
 )
-from .likelihood import FDWhittleLikelihood, WhittleLikelihood, Likelihood
+from .likelihood import FDWhittleLikelihood, Likelihood, WhittleLikelihood
 from .misc import (
     AnyGrid,
     Array,

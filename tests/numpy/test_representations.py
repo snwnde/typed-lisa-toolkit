@@ -1639,7 +1639,9 @@ class TestSparse2DGridRepresentations(unittest.TestCase):
         source_freqs = np.array([20.0, 30.0, 40.0])
         source_times = np.array([5.0, 6.0, 7.0])
         source_indices = np.array([[0, 0], [1, 2], [2, 1]], dtype=int)
-        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_grid = build_grid2d(
+            source_freqs, source_times, sparse_indices=source_indices
+        )
         # For sparse grids, entries is 5D: (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
         source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
 
@@ -1681,7 +1683,9 @@ class TestSparse2DGridRepresentations(unittest.TestCase):
         source_freqs = np.array([10.0, 20.0, 30.0, 40.0])
         source_times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         source_indices = np.array([[0, 0], [1, 2], [2, 3], [3, 4]], dtype=int)
-        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_grid = build_grid2d(
+            source_freqs, source_times, sparse_indices=source_indices
+        )
         source_entries = np.array([[[[[11.0, 22.0, 33.0, 44.0]]]]])
 
         subset_slices = (slice(1, 4), slice(2, 5))
@@ -1704,7 +1708,9 @@ class TestSparse2DGridRepresentations(unittest.TestCase):
         source_freqs = np.array([20.0, 30.0, 40.0])
         source_times = np.array([5.0, 6.0, 7.0])
         source_indices = np.array([[0, 0], [1, 1], [2, 2]], dtype=int)
-        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_grid = build_grid2d(
+            source_freqs, source_times, sparse_indices=source_indices
+        )
         source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
 
         embedding_grid = (

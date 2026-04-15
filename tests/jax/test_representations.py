@@ -1683,7 +1683,9 @@ class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
         source_freqs = jnp.array([20.0, 30.0, 40.0])
         source_times = jnp.array([5.0, 6.0, 7.0])
         source_indices = np.array([[0, 0], [1, 2], [2, 1]], dtype=int)
-        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_grid = build_grid2d(
+            source_freqs, source_times, sparse_indices=source_indices
+        )
         # For sparse grids, entries is 5D: (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
         source_entries = jnp.array([[[[1.0, 2.0, 3.0]]]])
 
@@ -1704,7 +1706,7 @@ class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
         expected_indices = np.array([[1, 2], [2, 4], [3, 3]], dtype=int)
         self.assertIsInstance(new_grid, Grid2DSparse)
         npt.assert_array_equal(np.asarray(new_grid.indices), expected_indices)
-        npt.assert_array_equal(np.asarray(new_entries), np.array([[[[1.0, 2.0, 3.0]]]]))  
+        npt.assert_array_equal(np.asarray(new_entries), np.array([[[[1.0, 2.0, 3.0]]]]))
 
     def test_sparse_stft_factory_with_sparse_indices(self):
         """Test that stft factory returns sparse-grid representation when indices are provided (JAX)."""
@@ -1725,7 +1727,9 @@ class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
         source_freqs = jnp.array([10.0, 20.0, 30.0, 40.0])
         source_times = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
         source_indices = np.array([[0, 0], [1, 2], [2, 3], [3, 4]], dtype=int)
-        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_grid = build_grid2d(
+            source_freqs, source_times, sparse_indices=source_indices
+        )
         source_entries = jnp.array([[[[[11.0, 22.0, 33.0, 44.0]]]]])
 
         new_grid, new_entries = _subset_grid_2d_sparse(
@@ -1747,7 +1751,9 @@ class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
         source_freqs = jnp.array([20.0, 30.0, 40.0])
         source_times = jnp.array([5.0, 6.0, 7.0])
         source_indices = np.array([[0, 0], [1, 1], [2, 2]], dtype=int)
-        source_grid = build_grid2d(source_freqs, source_times, sparse_indices=source_indices)
+        source_grid = build_grid2d(
+            source_freqs, source_times, sparse_indices=source_indices
+        )
         source_entries = jnp.array([[[[1.0, 2.0, 3.0]]]])
 
         embedding_grid = (

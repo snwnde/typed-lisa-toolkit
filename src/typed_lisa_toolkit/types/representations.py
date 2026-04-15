@@ -513,9 +513,7 @@ def time_series[AxisT: "Axis"](
     See the general description of the shape convention for
     :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
     """
-    _validate_shape(
-        entries, (entries.shape[0], 1, 1, 1, len(times))
-    )
+    _validate_shape(entries, (entries.shape[0], 1, 1, 1, len(times)))
     try:
         _times = Linspace.make(times)
     except ValueError:
