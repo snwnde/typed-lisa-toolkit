@@ -40,16 +40,26 @@ def _validate_maps_to_pws(mapping: Mapping[Any, ProjectedWaveform[AnyReps]]):
 
 
 class HarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](_mixins.ModeMapping[ModeT, RepT]):
-    """Waveform in different modes.
+    """Multi-mode waveform.
 
-    This class is a mapping from modes to representations.
+    Note
+    ----
+    To build a :class:`~types.HarmonicWaveform`, use the factory functions:
+    :func:`~typed_lisa_toolkit.harmonic_waveform` or :func:`~typed_lisa_toolkit.hw`.
     """
 
 
 class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](
     HarmonicWaveform[ModeT, RepT]
 ):
-    """Harmonic waveform where all harmonics have the same grid."""
+    """Multi-mode waveform where all modes share the same grid.
+
+    Note
+    ----
+    To build a :class:`~types.HomogeneousHarmonicWaveform`, use the factory functions:
+    :func:`~typed_lisa_toolkit.homogeneous_harmonic_waveform`
+    or :func:`~typed_lisa_toolkit.hhw`.
+    """
 
     def get_kernel(self):
         """Return an array of the conventional shape.
@@ -62,16 +72,48 @@ class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](
         )
 
 
-class ProjectedWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
-    """Projected waveform in a single mode or all modes summed together.
+class PlusCrossWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
+    """Waveform in plus and cross polarizations.
 
-    This class is a mapping from channel names to representations. It is
-    used to represent the detector response of a single harmonic waveform in different
-    channels.
+    Note
+    ----
+    To build a :class:`~types.PlusCrossWaveform`, use the factory function
+    :func:`~typed_lisa_toolkit.plus_cross_waveform`
+    or :func:`~typed_lisa_toolkit.pcw`.
+    """
+
+    @property
+    def plus(self) -> RepT:
+        """Plus channel as a view with the channel dimension."""
+        return self["plus"]
+
+    @property
+    def cross(self) -> RepT:
+        """Cross channel as a view with the channel dimension."""
+        return self["cross"]
+
+    def __getitem__(self, key: str) -> RepT:
+        """Get the plus or cross channel as a view with the chosen channel dimension."""
+        return self._mapping[key]
+
+    @property
+    def kind(self) -> str | None:
+        """Semantic kind."""
+        return self[next(iter(self))].kind
+
+
+class ProjectedWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
+    """Single-mode or mode-summed waveform projected onto the detector response in different channels.
+
+    Note
+    ----
+    To build a :class:`~types.ProjectedWaveform`, use the factory function:
+    :func:`~typed_lisa_toolkit.projected_waveform`
+    or :func:`~typed_lisa_toolkit.pw`.
     """
 
     def __getitem__(self, key: str) -> RepT:
-        """Get a channel by name as a view with preserved channel dimension (size 1)."""
+        """Get a channel by name as a view with the chosen channel dimension."""
         return self._mapping[key]
 
     @property
@@ -83,9 +125,13 @@ class ProjectedWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
 class HarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
     _mixins.ModeMapping[ModeT, ProjectedWaveform[RepT]]
 ):
-    """Projected waveform in different modes.
+    """Multi-mode waveform projected onto the detector response in different channels.
 
-    This class is a mapping from modes to :class:`.ProjectedWaveform` instances.
+    Note
+    ----
+    To build a :class:`~types.HarmonicProjectedWaveform`, use the factory function:
+    :func:`~typed_lisa_toolkit.harmonic_projected_waveform`
+    or :func:`~typed_lisa_toolkit.hpw`.
     """
 
     @property
@@ -101,7 +147,14 @@ class HarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
 class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
     HarmonicProjectedWaveform[ModeT, RepT]
 ):
-    """Harmonic projected waveform where all harmonics have the same grid."""
+    """Multi-mode waveform where all modes share the same grid, projected onto the detector response in different channels.
+
+    Note
+    ----
+    To build a :class:`~types.HomogeneousHarmonicProjectedWaveform`, use the factory function:
+    :func:`~typed_lisa_toolkit.homogeneous_harmonic_projected_waveform`
+    or :func:`~typed_lisa_toolkit.hhpw`.
+    """
 
     def get_kernel(self):
         """Return an array of the conventional shape.
@@ -133,7 +186,7 @@ def harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
 def homogeneous_harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
     modes_to_reps: Mapping[ModeT, RepT],
 ) -> HomogeneousHarmonicWaveform[ModeT, RepT]:
-    """Build a :class:`~types.waveforms.HomogeneousHarmonicWaveform`.
+    """Build a :class:`~types.HomogeneousHarmonicWaveform`.
 
     Parameters
     ----------
@@ -143,6 +196,21 @@ def homogeneous_harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
     """
     _ = _mixins.validate_maps_to_reps(modes_to_reps)
     return HomogeneousHarmonicWaveform(modes_to_reps)
+
+
+def plus_cross_waveform[RepT: "AnyReps"](
+    pol_to_reps: Mapping[str, RepT],
+) -> PlusCrossWaveform[RepT]:
+    """Build a :class:`~types.PlusCrossWaveform`.
+
+    Parameters
+    ----------
+    pol_to_reps :
+        A mapping from polarization names (:py:class:`str`) to
+        :ref:`representations <representation_types>`.
+    """
+    _ = _mixins.validate_maps_to_reps(pol_to_reps)
+    return PlusCrossWaveform[RepT].from_dict(pol_to_reps)
 
 
 def projected_waveform[RepT: "AnyReps"](
@@ -178,7 +246,7 @@ def harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
 def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
     modes_to_pws: Mapping[ModeT, ProjectedWaveform[RepT]],
 ) -> HomogeneousHarmonicProjectedWaveform[ModeT, RepT]:
-    """Build a :class:`~types.waveforms.HomogeneousHarmonicProjectedWaveform`.
+    """Build a :class:`~types.HomogeneousHarmonicProjectedWaveform`.
 
     Parameters
     ----------
@@ -195,6 +263,8 @@ hw = harmonic_waveform
 """Alias for :func:`~harmonic_waveform`."""
 hhw = homogeneous_harmonic_waveform
 """Alias for :func:`~homogeneous_harmonic_waveform`."""
+pcw = plus_cross_waveform
+"""Alias for :func:`~plus_cross_waveform`."""
 pw = projected_waveform
 """Alias for :func:`~projected_waveform`."""
 hpw = harmonic_projected_waveform

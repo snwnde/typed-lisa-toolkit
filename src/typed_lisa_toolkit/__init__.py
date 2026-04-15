@@ -108,11 +108,13 @@ The factory functions are available in long-form and short aliases:
 
    harmonic_waveform
    homogeneous_harmonic_waveform
+   plus_cross_waveform
    projected_waveform
    harmonic_projected_waveform
    homogeneous_harmonic_projected_waveform
    hw
    hhw
+   pcw
    pw
    hpw
    hhpw
@@ -193,10 +195,12 @@ from ._constructors import (
     linspace_from_array,
     make_sdm,
     noise_model,
+    pcw,
     phasor,
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
     phasor_to_fs_pw,
+    plus_cross_waveform,
     projected_waveform,
     pw,
     stft,
@@ -226,6 +230,8 @@ __all__ = [
     "hpw",
     "hw",
     "projected_waveform",
+    "plus_cross_waveform",
+    "pcw",
     "pw",
     "stft",
     "time_series",

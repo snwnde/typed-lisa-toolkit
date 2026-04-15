@@ -101,6 +101,7 @@ and are typically TDI channel signals.
 
     HarmonicWaveform
     HomogeneousHarmonicWaveform
+    PlusCrossWaveform
     ProjectedWaveform
     HarmonicProjectedWaveform
     HomogeneousHarmonicProjectedWaveform
@@ -241,6 +242,7 @@ from .waveforms import (
     HarmonicWaveform,
     HomogeneousHarmonicProjectedWaveform,
     HomogeneousHarmonicWaveform,
+    PlusCrossWaveform,
     ProjectedWaveform,
 )
 
@@ -287,6 +289,7 @@ __all__ = [
     "HarmonicProjectedWaveform",
     "HomogeneousHarmonicProjectedWaveform",
     "ProjectedWaveform",
+    "PlusCrossWaveform",
     "HomogeneousHarmonicWaveform",
     "HarmonicWaveform",
     "TSData",
