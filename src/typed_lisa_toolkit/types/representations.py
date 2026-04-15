@@ -430,7 +430,7 @@ class _Uniform1DMixin(abc.ABC):
 def _validate_shape(entries: "Array", expected_shape: tuple[int, ...]) -> None:
     if entries.shape != expected_shape:
         raise ValueError(
-            f"Invalid entries shape for series. Expected {expected_shape}, got {entries.shape}."
+            f"Invalid shape for `entries`. Expected {expected_shape}, got {entries.shape}."
         )
 
 

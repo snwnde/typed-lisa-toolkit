@@ -15,21 +15,25 @@ from tests._helpers import (
     build_harmonic_projected_frequency_waveform,
     dense_kernel_2ch,
 )
-from typed_lisa_toolkit import fsdata, sum_harmonics, linspace_from_array
+from typed_lisa_toolkit import (
+    frequency_series,
+    fsdata,
+    linspace_from_array,
+    make_sdm,
+    noise_model,
+    sum_harmonics,
+    whittle,
+)
 from typed_lisa_toolkit.types import (
-    FDNoiseModel,
     FDWhittleLikelihood,
-    FrequencySeries,
-    FSData,
-    SpectralDensity,
 )
 
 
 def _build_fsdata(freqs, x_values, y_values):
-    return FSData.from_dict(
+    return fsdata(
         {
-            "X": FrequencySeries((freqs,), x_values[None, None, None, None, :]),
-            "Y": FrequencySeries((freqs,), y_values[None, None, None, None, :]),
+            "X": frequency_series(freqs, x_values[None, None, None, None, :]),
+            "Y": frequency_series(freqs, y_values[None, None, None, None, :]),
         }
     )
 
@@ -41,10 +45,13 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
 
     def test_cross_product_and_template_square_match_noise_model(self):
         case = build_fd_pair(jnp)
-        model = FDNoiseModel(
-            SpectralDensity(case["frequencies"], dense_kernel_2ch(jnp), ["X", "Y"])
+        sdm = make_sdm(
+            dense_kernel_2ch(jnp),
+            frequencies=case["frequencies"],
+            channel_names=("X", "Y"),
         )
-        likelihood = FDWhittleLikelihood(case["left"], model)
+        model = noise_model(sdm)
+        likelihood = whittle(case["left"], model)
 
         cross = np.asarray(likelihood.get_cross_product(case["right"]))
         template_square = np.asarray(likelihood.get_template_square(case["right"]))
@@ -60,10 +67,13 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
 
     def test_log_likelihood_matches_closed_form(self):
         case = build_fd_pair(jnp)
-        model = FDNoiseModel(
-            SpectralDensity(case["frequencies"], dense_kernel_2ch(jnp), ["X", "Y"])
+        sdm = make_sdm(
+            dense_kernel_2ch(jnp),
+            frequencies=case["frequencies"],
+            channel_names=("X", "Y"),
         )
-        likelihood = FDWhittleLikelihood(case["left"], model)
+        model = noise_model(sdm)
+        likelihood = whittle(case["left"], model)
 
         got = np.asarray(likelihood.get_log_likelihood(case["right"]))
         expected = (
@@ -79,10 +89,13 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
     def test_harmonic_projected_template_is_summed_before_evaluation(self):
         case = build_harmonic_projected_frequency_waveform(jnp)
         data = fsdata(sum_harmonics(case["wf"]))
-        model = FDNoiseModel(
-            SpectralDensity(case["frequencies"], dense_kernel_2ch(jnp), ["X", "Y"])
+        sdm = make_sdm(
+            dense_kernel_2ch(jnp),
+            frequencies=case["frequencies"],
+            channel_names=("X", "Y"),
         )
-        likelihood = FDWhittleLikelihood(data, model)
+        model = noise_model(sdm)
+        likelihood = whittle(data, model)
 
         got = np.asarray(likelihood.get_cross_product(case["wf"]))
         expected = np.asarray(
@@ -109,16 +122,32 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
         )
         template = left.get_subset(interval=(1.0, 3.0))
         kernel = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(freqs), 2, 2))
-        model = FDNoiseModel(SpectralDensity(freqs, kernel, ["X", "Y"]))
-        likelihood = FDWhittleLikelihood(left, model)
+        model = noise_model(make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y")))
+        likelihood = whittle(left, model)
 
         got = np.asarray(likelihood.get_cross_product(template))
         expected = np.asarray(
-            FDNoiseModel(
-                SpectralDensity(
-                    template.frequencies.asarray(jnp), kernel[1:4], ["X", "Y"]
+            noise_model(
+                make_sdm(
+                    kernel[1:4],
+                    frequencies=template.frequencies.asarray(jnp),
+                    channel_names=("X", "Y"),
                 )
             ).get_scalar_product(left.get_subset(interval=(1.0, 3.0)), template)
         )
 
         npt.assert_allclose(got, expected)
+
+    def test_whittle_factory_returns_fd_whittle_likelihood(self):
+        case = build_fd_pair(jnp)
+        model = noise_model(
+            make_sdm(
+                dense_kernel_2ch(jnp),
+                frequencies=case["frequencies"],
+                channel_names=("X", "Y"),
+            )
+        )
+
+        likelihood = whittle(case["left"], model)
+
+        self.assertIsInstance(likelihood, FDWhittleLikelihood)

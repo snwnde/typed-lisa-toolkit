@@ -8,6 +8,8 @@ import numpy.testing as npt
 
 from typed_lisa_toolkit import (
     frequency_series,
+    fsdata,
+    wdmdata,
     stft,
     time_series,
     wdm,
@@ -16,7 +18,6 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import (
     STFT,
     WDM,
-    FSData,
     HarmonicProjectedWaveform,
     HarmonicWaveform,
     HomogeneousHarmonicProjectedWaveform,
@@ -26,7 +27,6 @@ from typed_lisa_toolkit.types import (
     TSData,
     UniformFrequencySeries,
     UniformTimeSeries,
-    WDMData,
     data,
     modes,
 )
@@ -84,7 +84,7 @@ def _build_complex_entries(xp, values, *, random_scale=False):
 
 
 def _build_fsdata(frequencies, channel_entries):
-    return FSData.from_dict(
+    return fsdata(
         {
             name: frequency_series(frequencies, entries)
             for name, entries in channel_entries.items()
@@ -93,7 +93,7 @@ def _build_fsdata(frequencies, channel_entries):
 
 
 def _build_wdmdata(times, frequencies, channel_entries):
-    return WDMData.from_dict(
+    return wdmdata(
         {
             name: wdm(frequencies=frequencies, times=times, entries=entries)
             for name, entries in channel_entries.items()

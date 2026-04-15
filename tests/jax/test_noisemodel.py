@@ -20,7 +20,13 @@ from tests._helpers import (
     dense_kernel_2ch,
     diagonal_kernel_2ch,
 )
-from typed_lisa_toolkit import frequency_series, linspace_from_array, fsdata
+from typed_lisa_toolkit import (
+    frequency_series,
+    fsdata,
+    linspace_from_array,
+    make_sdm,
+    noise_model,
+)
 from typed_lisa_toolkit.types import (
     DiagonalSpectralDensity,
     EvolutionarySpectralDensity,
@@ -39,12 +45,12 @@ class _FlatFDNoiseJAX:
 class TestSpectralDensityJAX(unittest.TestCase):
     def test_to_subband_slices_frequency_axis(self):
         case = build_fdata(jnp)
-        psd = SpectralDensity(
+        sdm = SpectralDensity(
             case.frequencies, dense_kernel_2ch(jnp), channel_order=["X", "Y"]
         )
 
         try:
-            sub = psd.to_subband((1.5, 3.0))
+            sub = sdm.to_subband((1.5, 3.0))
         except TypeError:
             # Current Linspace slicing support may raise in some backends.
             return
@@ -55,19 +61,19 @@ class TestSpectralDensityJAX(unittest.TestCase):
 
     def test_get_kernel_backend_argument_is_not_supported(self):
         case = build_fdata(jnp)
-        psd = SpectralDensity(
+        sdm = SpectralDensity(
             case.frequencies, dense_kernel_2ch(jnp), channel_order=["X", "Y"]
         )
 
         with self.assertRaises(NotImplementedError):
-            psd.get_kernel(backend="numpy")
+            sdm.get_kernel(backend="numpy")
 
     def test_whitening_matrix_reconstructs_inverse_sdm(self):
         case = build_fdata(jnp)
         kernel = dense_kernel_2ch(jnp)
-        psd = SpectralDensity(case.frequencies, kernel, channel_order=["X", "Y"])
+        sdm = SpectralDensity(case.frequencies, kernel, channel_order=["X", "Y"])
 
-        w = jnp.asarray(psd.get_whitening_matrix())
+        w = jnp.asarray(sdm.get_whitening_matrix())
         reconstructed = jnp.einsum("fji,fjk->fik", jnp.conj(w), w)
 
         npt.assert_allclose(
@@ -76,21 +82,21 @@ class TestSpectralDensityJAX(unittest.TestCase):
 
     def test_whitening_matrix_invalid_kind_raises(self):
         case = build_fdata(jnp)
-        psd = SpectralDensity(
+        sdm = SpectralDensity(
             case.frequencies, dense_kernel_2ch(jnp), channel_order=["X", "Y"]
         )
 
         with self.assertRaises(NotImplementedError):
-            psd.get_whitening_matrix(kind="qr")
+            sdm.get_whitening_matrix(kind="qr")
 
     def test_diagonal_whitening_default_kind(self):
         case = build_fdata(jnp)
         kernel = diagonal_kernel_2ch(jnp)
-        psd = DiagonalSpectralDensity(
+        sdm = DiagonalSpectralDensity(
             case.frequencies, kernel, channel_order=["X", "Y"]
         )
 
-        w = jnp.asarray(psd.get_whitening_matrix())
+        w = jnp.asarray(sdm.get_whitening_matrix())
 
         npt.assert_allclose(
             np.asarray(w[:, 0, 0]), np.sqrt(np.asarray(kernel[:, 0, 0]))
@@ -101,11 +107,11 @@ class TestSpectralDensityJAX(unittest.TestCase):
 
     def test_diagonal_from_fd_noise(self):
         case = build_fdata(jnp)
-        psd = DiagonalSpectralDensity.from_fd_noise(
+        sdm = DiagonalSpectralDensity.from_fd_noise(
             _FlatFDNoiseJAX(), case.frequencies, ["X", "Y"]
         )
 
-        kernel = np.asarray(psd.get_kernel())
+        kernel = np.asarray(sdm.get_kernel())
         self.assertEqual(kernel.shape, (3, 2, 2))
         npt.assert_allclose(kernel[:, 0, 0], np.ones(3))
         npt.assert_allclose(kernel[:, 1, 1], np.ones(3))
@@ -116,8 +122,13 @@ class TestFDNoiseModelJAX(unittest.TestCase):
         case = build_fd_pair(jnp)
         kernel = diagonal_kernel_2ch(jnp)
 
-        model = FDNoiseModel(
-            DiagonalSpectralDensity(case["frequencies"], kernel, ["X", "Y"])
+        model = noise_model(
+            make_sdm(
+                jnp.diagonal(kernel, axis1=-2, axis2=-1),
+                frequencies=case["frequencies"],
+                channel_names=("X", "Y"),
+                is_diagonal=True,
+            )
         )
 
         got = model.get_scalar_product(case["left"], case["right"])
@@ -128,8 +139,13 @@ class TestFDNoiseModelJAX(unittest.TestCase):
     def test_get_integrand_diagonal_shape_and_value(self):
         case = build_fd_pair(jnp)
         kernel = diagonal_kernel_2ch(jnp)
-        model = FDNoiseModel(
-            DiagonalSpectralDensity(case["frequencies"], kernel, ["X", "Y"])
+        model = noise_model(
+            make_sdm(
+                jnp.diagonal(kernel, axis1=-2, axis2=-1),
+                frequencies=case["frequencies"],
+                channel_names=("X", "Y"),
+                is_diagonal=True,
+            )
         )
 
         integrand = np.asarray(model.get_integrand(case["left"], case["right"]))
@@ -143,7 +159,9 @@ class TestFDNoiseModelJAX(unittest.TestCase):
     def test_get_scalar_product_dense_matches_manual_contraction(self):
         case = build_fd_pair(jnp)
         kernel = dense_kernel_2ch(jnp)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
         left = np.asarray(case["left"].get_kernel())
@@ -161,7 +179,9 @@ class TestFDNoiseModelJAX(unittest.TestCase):
     def test_get_scalar_product_dense_batched_matches_manual_contraction(self):
         case = build_fd_pair_batched_2x2(jnp)
         kernel = dense_kernel_2ch(jnp)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
         left = np.asarray(case["left"].get_kernel())
@@ -184,7 +204,9 @@ class TestFDNoiseModelJAX(unittest.TestCase):
     def test_cumulative_scalar_product_matches_final_scalar_product(self):
         case = build_fd_pair(jnp)
         kernel = dense_kernel_2ch(jnp)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         cumulative = np.asarray(
             model.get_cumulative_scalar_product(case["left"], case["right"])
@@ -196,14 +218,19 @@ class TestFDNoiseModelJAX(unittest.TestCase):
     def test_whiten_diagonal_scales_each_channel(self):
         case = build_fd_pair(jnp)
         kernel = diagonal_kernel_2ch(jnp)
-        model = FDNoiseModel(
-            DiagonalSpectralDensity(case["frequencies"], kernel, ["X", "Y"])
+        model = noise_model(
+            make_sdm(
+                jnp.diagonal(kernel, axis1=-2, axis2=-1),
+                frequencies=case["frequencies"],
+                channel_names=("X", "Y"),
+                is_diagonal=True,
+            )
         )
 
         whitened = model.whiten(case["left"])
         got = np.asarray(whitened.get_kernel())
         left = np.asarray(case["left"].get_kernel())
-        w = np.asarray(model.psd.get_whitening_matrix())
+        w = np.asarray(model.sdm.get_whitening_matrix())
         left_e = np.moveaxis(left[:, :, 0, 0, :], 1, -1)
         expected = np.moveaxis(np.einsum("fij,...fj->...fi", w, left_e), -1, 1)[
             :, :, None, None, :
@@ -214,14 +241,16 @@ class TestFDNoiseModelJAX(unittest.TestCase):
     def test_whiten_dense_batched_matches_manual_channel_mixing(self):
         case = build_fd_pair_batched_2x2(jnp)
         kernel = dense_kernel_2ch(jnp)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         whitened = model.whiten(case["left"])
         got = np.asarray(whitened.get_kernel())
 
         left = np.asarray(case["left"].get_kernel())
         left_e = np.moveaxis(left[:, :, 0, 0, :], 1, -1)
-        w = np.asarray(model.psd.get_whitening_matrix())
+        w = np.asarray(model.sdm.get_whitening_matrix())
         expected = np.moveaxis(np.einsum("fij,...fj->...fi", w, left_e), -1, 1)[
             :, :, None, None, :
         ]
@@ -231,7 +260,9 @@ class TestFDNoiseModelJAX(unittest.TestCase):
     def test_overlap_self_is_unity(self):
         case = build_fd_pair(jnp)
         kernel = dense_kernel_2ch(jnp)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         overlap = np.asarray(model.get_overlap(case["left"], case["left"]))
 
@@ -255,7 +286,14 @@ class TestFDNoiseModelJAX(unittest.TestCase):
         kernel = np.zeros((len(freqs), 2, 2), dtype=float)
         kernel[:, 0, 0] = 1.0
         kernel[:, 1, 1] = 1.0
-        model = FDNoiseModel(DiagonalSpectralDensity(freqs, kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(
+                jnp.diagonal(jnp.asarray(kernel), axis1=-2, axis2=-1),
+                frequencies=freqs,
+                channel_names=("X", "Y"),
+                is_diagonal=True,
+            )
+        )
 
         with self.assertRaises((TypeError, ValueError)):
             model.get_cross_correlation(fs, fs)
@@ -336,9 +374,12 @@ class TestTFNoiseModelJAX(unittest.TestCase):
             jnp.eye(2, dtype=jnp.float64),
             (len(case["frequencies"]), len(case["times"]), 2, 2),
         )
-        model = TFNoiseModel(
-            EvolutionarySpectralDensity(
-                case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        model = noise_model(
+            make_sdm(
+                invevsdm,
+                frequencies=case["frequencies"],
+                times=case["times"],
+                channel_names=("X", "Y"),
             )
         )
 
@@ -355,9 +396,12 @@ class TestTFNoiseModelJAX(unittest.TestCase):
             jnp.eye(2, dtype=jnp.float64),
             (len(case["frequencies"]), len(case["times"]), 2, 2),
         )
-        model = TFNoiseModel(
-            EvolutionarySpectralDensity(
-                case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        model = noise_model(
+            make_sdm(
+                invevsdm,
+                frequencies=case["frequencies"],
+                times=case["times"],
+                channel_names=("X", "Y"),
             )
         )
 
@@ -370,9 +414,12 @@ class TestTFNoiseModelJAX(unittest.TestCase):
     def test_scalar_product_dense_esdm_batched_matches_manual_contraction(self):
         case = build_wdm_pair_batched_2x2(jnp)
         invevsdm = dense_esdm_2ch(jnp)
-        model = TFNoiseModel(
-            EvolutionarySpectralDensity(
-                case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        model = noise_model(
+            make_sdm(
+                invevsdm,
+                frequencies=case["frequencies"],
+                times=case["times"],
+                channel_names=("X", "Y"),
             )
         )
 
@@ -395,10 +442,13 @@ class TestTFNoiseModelJAX(unittest.TestCase):
     def test_whiten_dense_esdm_batched_matches_manual_channel_mixing(self):
         case = build_wdm_pair_batched_2x2(jnp)
         invevsdm = dense_esdm_2ch(jnp)
-        esd = EvolutionarySpectralDensity(
-            case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        esd = make_sdm(
+            invevsdm,
+            frequencies=case["frequencies"],
+            times=case["times"],
+            channel_names=("X", "Y"),
         )
-        model = TFNoiseModel(esd)
+        model = noise_model(esd)
 
         whitened = model.whiten(case["left"])
         got = np.asarray(whitened.get_kernel())
@@ -412,3 +462,72 @@ class TestTFNoiseModelJAX(unittest.TestCase):
         npt.assert_allclose(
             np.asarray(got), np.asarray(expected), rtol=1e-12, atol=1e-12
         )
+
+
+class TestNoiseModelFactoriesJAX(unittest.TestCase):
+    def test_make_sdm_builds_dense_diagonal_and_evolutionary_variants(self):
+        frequencies = jnp.array([0.5, 1.0, 1.5], dtype=jnp.float64)
+        times = jnp.array([0.0, 1.0], dtype=jnp.float64)
+
+        dense_kernel = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(frequencies), 2, 2))
+        diag_kernel = jnp.ones((len(frequencies), 2), dtype=jnp.float64)
+        evo_kernel = jnp.broadcast_to(
+            jnp.eye(2, dtype=jnp.float64), (len(frequencies), len(times), 2, 2)
+        )
+
+        dense_sdm = make_sdm(
+            dense_kernel,
+            frequencies=frequencies,
+            channel_names=("X", "Y"),
+        )
+        diag_sdm = make_sdm(
+            diag_kernel,
+            frequencies=frequencies,
+            channel_names=("X", "Y"),
+            is_diagonal=True,
+        )
+        evo_sdm = make_sdm(
+            evo_kernel,
+            frequencies=frequencies,
+            times=times,
+            channel_names=("X", "Y"),
+        )
+
+        self.assertIsInstance(dense_sdm, SpectralDensity)
+        self.assertIsInstance(diag_sdm, DiagonalSpectralDensity)
+        self.assertIsInstance(evo_sdm, EvolutionarySpectralDensity)
+
+    def test_noise_model_factory_dispatches_by_sdm_type(self):
+        frequencies = jnp.array([0.5, 1.0, 1.5], dtype=jnp.float64)
+        times = jnp.array([0.0, 1.0], dtype=jnp.float64)
+
+        fd_model = noise_model(
+            make_sdm(
+                jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(frequencies), 2, 2)),
+                frequencies=frequencies,
+                channel_names=("X", "Y"),
+            )
+        )
+        tf_model = noise_model(
+            make_sdm(
+                jnp.broadcast_to(
+                    jnp.eye(2, dtype=jnp.float64), (len(frequencies), len(times), 2, 2)
+                ),
+                frequencies=frequencies,
+                times=times,
+                channel_names=("X", "Y"),
+            )
+        )
+
+        self.assertIsInstance(fd_model, FDNoiseModel)
+        self.assertIsInstance(tf_model, TFNoiseModel)
+
+    def test_make_sdm_rejects_invalid_shape(self):
+        frequencies = jnp.array([0.5, 1.0, 1.5], dtype=jnp.float64)
+
+        with self.assertRaisesRegex(ValueError, "Invalid shape"):
+            _ = make_sdm(
+                jnp.eye(2, dtype=jnp.float64),
+                frequencies=frequencies,
+                channel_names=("X", "Y"),
+            )

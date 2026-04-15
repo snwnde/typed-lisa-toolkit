@@ -1,22 +1,23 @@
-"""
+r"""
 Types provided by TLT.
 
-When possible, prefer to construct all objects with top-level functions (such as
-:func:`~typed_lisa_toolkit.time_series`) instead of directly instantiating the classes
-here (such as :class:`UniformTimeSeries`). The top-level functions tend to have a nicer
-API. Ideally, use the classes here only for adding type hints to your code.
-
-Not all types have top-level factory functions available. For example, you still need to
-instantiate :class:`SpectralDensity` and :class:`FDNoiseModel` directly.
+The instantiation of these types via classes is considered an expert-level API.
+For most users, prefer to construct these objects with the top-level factory functions provided in
+:mod:`typed_lisa_toolkit`. For example, use :func:`~typed_lisa_toolkit.time_series`
+to construct a :class:`TimeSeries` object.
 
 .. _representation_types:
 
-Representation Types
-^^^^^^^^^^^^^^^^^^^^
+Representations
+^^^^^^^^^^^^^^^
 
-Representations are the building blocks of all other TLT types. They behave like arrays,
-but carry time and frequency grids and other metadata. They are all ultimately different
-ways to represent a time series.
+Representations are the most fundamental types in TLT, and are components
+of other more involved types.
+
+They house numerical signal arrays, together with time and/or frequency
+grids and other metadata. They not only support basic algebraic operations as
+the underlying arrays do, but also some grid-aware operations such as
+semantic subsetting and embedding.
 
 .. currentmodule:: typed_lisa_toolkit.types
 
@@ -37,10 +38,12 @@ ways to represent a time series.
 
 .. _data_types:
 
-Data Types
-^^^^^^^^^^
+Data
+^^^^
 
-Data objects carry multiple TDI channels of LISA data, all in the same representation.
+Data objects house multi-channel LISA data, where all channels
+are of the same representation type suitable for representing
+recorded data.
 
 .. currentmodule:: typed_lisa_toolkit.types
 
@@ -75,14 +78,17 @@ Mode Types
 
 .. _waveform_types:
 
-Waveform Types
-^^^^^^^^^^^^^^
+Waveforms
+^^^^^^^^^
 
-Similarly to data objects, waveform objects group multiple series together in the same
-sort of representation. Unlike data objects, they can carry metadata such as harmonic
-content.
+Similar to data objects, waveform objects group multiple representations together.
+Waveform objects are meant to represent modeled signals, and as such, they can carry
+theoretical information such as harmonic content, which is not the case for data objects.
 
-Waveforms are h+, hx, while "projected" waveforms are TDI channels.
+In the nomenclature of the project, "raw" waveforms are detector-independent strains,
+such as the two polarizations (:math:`h_+` and :math:`h_\times`) or the spherical harmonic
+decomposition (:math:`h_{lm}`); "projected" waveforms depend on LISA's response,
+and are typically TDI channel signals.
 
 .. currentmodule:: typed_lisa_toolkit.types
 
@@ -102,10 +108,9 @@ Waveforms are h+, hx, while "projected" waveforms are TDI channels.
 Spectral Density Matrices
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Matrices of Power Spectral Densities (PSDs) and Cross Spectral Densities (CSDs) carry
-two TDI channel indices, unlike data and projected waveforms which only carry one.
+Matrices of Cross Spectral Densities (CSDs) and Power Spectral Densities (PSDs).
 
-The utility of these matrices is in constructing noise models and likelihoods.
+These are fundamental objects in the construction of noise models and likelihoods.
 
 .. currentmodule:: typed_lisa_toolkit.types
 
@@ -119,8 +124,8 @@ The utility of these matrices is in constructing noise models and likelihoods.
    EvolutionarySpectralDensity
 
 
-Noise Model Types
-^^^^^^^^^^^^^^^^^
+Noise Models
+^^^^^^^^^^^^
 
 .. currentmodule:: typed_lisa_toolkit.types
 
@@ -129,12 +134,11 @@ Noise Model Types
    :template: type.rst
    :nosignatures:
 
-   FDNoiseModelLike
    FDNoiseModel
    TFNoiseModel
 
-Likelihood Types
-^^^^^^^^^^^^^^^^
+Likelihoods
+^^^^^^^^^^^
 .. currentmodule:: typed_lisa_toolkit.types
 
 .. autosummary::
@@ -142,7 +146,6 @@ Likelihood Types
     :template: type.rst
     :nosignatures:
 
-    Likelihood
     FDWhittleLikelihood
 
 Miscellaneous
@@ -197,7 +200,7 @@ from .data import (
     TSData,
     WDMData,
 )
-from .likelihood import FDWhittleLikelihood, Likelihood
+from .likelihood import FDWhittleLikelihood, WhittleLikelihood, Likelihood
 from .misc import (
     AnyGrid,
     Array,
@@ -217,7 +220,6 @@ from .noisemodel import (
     DiagonalSpectralDensity,
     EvolutionarySpectralDensity,
     FDNoiseModel,
-    FDNoiseModelLike,
     IntegrationMethod,
     IntegrationPolicy,
     SpectralDensity,
@@ -298,9 +300,9 @@ __all__ = [
     "SpectralDensity",
     "DiagonalSpectralDensity",
     "EvolutionarySpectralDensity",
-    "FDNoiseModelLike",
     "FDNoiseModel",
     "TFNoiseModel",
     "Likelihood",
+    "WhittleLikelihood",
     "FDWhittleLikelihood",
 ]

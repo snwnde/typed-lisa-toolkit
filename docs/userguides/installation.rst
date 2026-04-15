@@ -27,9 +27,6 @@ This makes TLT a dependency of your project,
 and when you install your project, it will be installed in the
 same environment as your project.
 
-Using pip
-~~~~~~~~~
-
 You can also install TLT using pip, but note that
 it is your responsibility to choose the correct environment.
 
@@ -39,7 +36,7 @@ it is your responsibility to choose the correct environment.
 
 
 Development setup
-^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~
 
 For development, it is recommended to use uv.
 

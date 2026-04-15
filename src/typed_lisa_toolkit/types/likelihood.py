@@ -1,17 +1,19 @@
 """Likelihood types."""
 
+import abc
 import logging
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from . import data as dm
 from . import modes
 from . import noisemodel as nm
 from . import representations as reps
 from . import waveforms as wf
-from .misc import Array, Linspace
+from .misc import Array, Linspace, AnyGrid
 
 if TYPE_CHECKING:
-    Reps = reps.Representation
+    AnyReps = reps.Representation[AnyGrid]
+    AnyData = dm.Data[AnyReps]
 
 
 ChnName = str
@@ -21,6 +23,7 @@ FDUniformHomogeneous = (
     | wf.ProjectedWaveform[reps.FrequencySeries["Linspace"]]
     | wf.HomogeneousHarmonicProjectedWaveform[Modes, reps.FrequencySeries["Linspace"]]
 )
+
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +46,48 @@ class Likelihood[TemplateT: Any](Protocol):
         ...
 
 
-class FDWhittleLikelihood(Likelihood[FDUniformHomogeneous]):
+class _DataProperty:
+    def __get__[DataT: "AnyData"](
+        self,
+        instance: "WhittleLikelihood[nm.NoiseModelLike[DataT, Any]]",
+        owner: Any,
+    ) -> DataT: ...
+
+
+class WhittleLikelihood[
+    NoiseModelT: nm.NoiseModelLike[Any, Any],
+](abc.ABC):
+    """Abstract Whittle likelihood."""
+
+    def __init__(self, data: "AnyData", noisemodel: nm.NoiseModelLike[Any, Any]):
+        self._data: "AnyData" = data
+        self._noisemodel: nm.NoiseModelLike[Any, Any] = noisemodel
+        self.data_square: "Array" = self.noisemodel.get_scalar_product(data, data)
+
+    @property
+    def data(self):  # pyright: ignore[reportRedeclaration]
+        """Get the data."""
+        return self._data
+
+    data: _DataProperty  # For correct type hinting
+
+    @property
+    def noisemodel(self) -> NoiseModelT:
+        """Get the noise model."""
+        return cast(NoiseModelT, self._noisemodel)
+
+    @classmethod
+    def log_likelihood_ratio(cls, cross_product: "Array", template_square: "Array"):
+        """Compute the log likelihood ratio."""
+        return cross_product - 0.5 * template_square
+
+    @classmethod
+    def log_likelihood(cls, log_likelihood_ratio: "Array", data_square: "Array"):
+        """Compute the log likelihood."""
+        return log_likelihood_ratio - 0.5 * data_square
+
+
+class FDWhittleLikelihood(WhittleLikelihood[nm.FDNoiseModel]):
     r"""Whittle likelihood for frequency-domain data.
 
     Assuming the noise is additive, stationary and Gaussian.
@@ -62,21 +106,6 @@ class FDWhittleLikelihood(Likelihood[FDUniformHomogeneous]):
 
     The term :math:`\left( d \middle| d \right)` is computed upon initialization and is constant.
     """
-
-    def __init__(self, data: dm.FSData, noisemodel: nm.FDNoiseModelLike):
-        self.data: dm.FSData = data
-        self.noisemodel: nm.FDNoiseModelLike = noisemodel  # .reset()
-        self.data_square: "Array" = self.noisemodel.get_scalar_product(data, data)
-
-    @classmethod
-    def log_likelihood_ratio(cls, cross_product: "Array", template_square: "Array"):
-        """Compute the log likelihood ratio."""
-        return cross_product - 0.5 * template_square
-
-    @classmethod
-    def log_likelihood(cls, log_likelihood_ratio: "Array", data_square: "Array"):
-        """Compute the log likelihood."""
-        return log_likelihood_ratio - 0.5 * data_square
 
     def get_log_likelihood(
         self,
@@ -162,3 +191,11 @@ class FDWhittleLikelihood(Likelihood[FDUniformHomogeneous]):
             f_interval = (0, 0)  # An empty interval
         self.noisemodel.to_subband(f_interval)
         return _temp.get_subset(interval=f_interval), f_interval
+
+
+def whittle(
+    data: dm.FSData,
+    noisemodel: nm.FDNoiseModel,
+) -> FDWhittleLikelihood:
+    """Construct a WhittleLikelihood."""
+    return FDWhittleLikelihood(data, noisemodel)

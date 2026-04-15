@@ -42,6 +42,10 @@ from typed_lisa_toolkit import (
     tsdata,
     wdm,
     wdmdata,
+    build_grid2d,
+    make_sdm,
+    noise_model,
+    whittle,
 )
 from typed_lisa_toolkit.types import FrequencySeries, TSData
 
@@ -144,6 +148,10 @@ class TestPublicApi(unittest.TestCase):
             "construct_timed_fsdata",
             "construct_stftdata",
             "construct_wdmdata",
+            "build_grid2d",
+            "make_sdm",
+            "noise_model",
+            "whittle",
         ):
             self.assertIn(name, tlt.__all__)
 

@@ -23,7 +23,13 @@ from typed_lisa_toolkit.types import (
     SpectralDensity,
     TFNoiseModel,
 )
-from typed_lisa_toolkit import frequency_series, linspace_from_array, fsdata
+from typed_lisa_toolkit import (
+    frequency_series,
+    fsdata,
+    linspace_from_array,
+    make_sdm,
+    noise_model,
+)
 from typed_lisa_toolkit.types.noisemodel import _make_integration_policy
 
 
@@ -36,12 +42,12 @@ class _FlatFDNoise:
 class TestSpectralDensity(unittest.TestCase):
     def test_to_subband_slices_frequency_axis(self):
         case = build_fdata(np)
-        psd = SpectralDensity(
+        sdm = SpectralDensity(
             case.frequencies, dense_kernel_2ch(np), channel_order=["X", "Y"]
         )
 
         try:
-            sub = psd.to_subband((1.5, 3.0))
+            sub = sdm.to_subband((1.5, 3.0))
         except TypeError:
             # Current Linspace slicing support may raise in some backends.
             return
@@ -50,39 +56,39 @@ class TestSpectralDensity(unittest.TestCase):
 
     def test_get_kernel_backend_argument_is_not_supported(self):
         case = build_fdata(np)
-        psd = SpectralDensity(
+        sdm = SpectralDensity(
             case.frequencies, dense_kernel_2ch(np), channel_order=["X", "Y"]
         )
 
         with self.assertRaises(NotImplementedError):
-            psd.get_kernel(backend="jax")
+            sdm.get_kernel(backend="jax")
 
     def test_whitening_matrix_reconstructs_inverse_sdm(self):
         case = build_fdata(np)
         kernel = dense_kernel_2ch(np)
-        psd = SpectralDensity(case.frequencies, kernel, channel_order=["X", "Y"])
+        sdm = SpectralDensity(case.frequencies, kernel, channel_order=["X", "Y"])
 
-        w = psd.get_whitening_matrix()
+        w = sdm.get_whitening_matrix()
         reconstructed = np.einsum("fji,fjk->fik", w.conj(), w)
 
         npt.assert_allclose(reconstructed, kernel, rtol=1e-12, atol=1e-12)
 
     def test_whitening_matrix_invalid_kind_raises(self):
         case = build_fdata(np)
-        psd = SpectralDensity(
+        sdm = SpectralDensity(
             case.frequencies, dense_kernel_2ch(np), channel_order=["X", "Y"]
         )
 
         with self.assertRaises(NotImplementedError):
-            psd.get_whitening_matrix(kind="qr")
+            sdm.get_whitening_matrix(kind="qr")
 
     def test_diagonal_from_fd_noise(self):
         case = build_fdata(np)
-        psd = DiagonalSpectralDensity.from_fd_noise(
+        sdm = DiagonalSpectralDensity.from_fd_noise(
             _FlatFDNoise(), case.frequencies, ["X", "Y"]
         )
 
-        kernel = np.asarray(psd.get_kernel())
+        kernel = np.asarray(sdm.get_kernel())
         self.assertEqual(kernel.shape, (3, 2, 2))
         npt.assert_allclose(kernel[:, 0, 0], np.ones(3))
         npt.assert_allclose(kernel[:, 1, 1], np.ones(3))
@@ -98,8 +104,13 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_get_integrand_diagonal_shape_and_value(self):
         case = build_fd_pair(np)
         kernel = diagonal_kernel_2ch(np)
-        model = FDNoiseModel(
-            DiagonalSpectralDensity(case["frequencies"], kernel, ["X", "Y"])
+        model = noise_model(
+            make_sdm(
+                np.diagonal(kernel, axis1=-2, axis2=-1),
+                frequencies=case["frequencies"],
+                channel_names=("X", "Y"),
+                is_diagonal=True,
+            )
         )
 
         integrand = np.asarray(model.get_integrand(case["left"], case["right"]))
@@ -113,7 +124,9 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_get_scalar_product_dense_matches_manual_contraction(self):
         case = build_fd_pair(np)
         kernel = dense_kernel_2ch(np)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
         left = np.asarray(case["left"].get_kernel())
@@ -131,7 +144,9 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_get_scalar_product_dense_batched_matches_manual_contraction(self):
         case = build_fd_pair_batched_2x2(np)
         kernel = dense_kernel_2ch(np)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
         left = np.asarray(case["left"].get_kernel())
@@ -154,7 +169,9 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_cumulative_scalar_product_matches_final_scalar_product(self):
         case = build_fd_pair(np)
         kernel = dense_kernel_2ch(np)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         cumulative = np.asarray(
             model.get_cumulative_scalar_product(case["left"], case["right"])
@@ -166,14 +183,19 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_whiten_diagonal_scales_each_channel(self):
         case = build_fd_pair(np)
         kernel = diagonal_kernel_2ch(np)
-        model = FDNoiseModel(
-            DiagonalSpectralDensity(case["frequencies"], kernel, ["X", "Y"])
+        model = noise_model(
+            make_sdm(
+                np.diagonal(kernel, axis1=-2, axis2=-1),
+                frequencies=case["frequencies"],
+                channel_names=("X", "Y"),
+                is_diagonal=True,
+            )
         )
 
         whitened = model.whiten(case["left"])
         got = np.asarray(whitened.get_kernel())
         left = np.asarray(case["left"].get_kernel())
-        w = np.asarray(model.psd.get_whitening_matrix())
+        w = np.asarray(model.sdm.get_whitening_matrix())
         left_e = np.moveaxis(left[:, :, 0, 0, :], 1, -1)
         expected = np.moveaxis(np.einsum("fij,...fj->...fi", w, left_e), -1, 1)[
             :, :, None, None, :
@@ -184,14 +206,16 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_whiten_dense_batched_matches_manual_channel_mixing(self):
         case = build_fd_pair_batched_2x2(np)
         kernel = dense_kernel_2ch(np)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         whitened = model.whiten(case["left"])
         got = np.asarray(whitened.get_kernel())
 
         left = np.asarray(case["left"].get_kernel())
         left_e = np.moveaxis(left[:, :, 0, 0, :], 1, -1)
-        w = np.asarray(model.psd.get_whitening_matrix())
+        w = np.asarray(model.sdm.get_whitening_matrix())
         expected = np.moveaxis(np.einsum("fij,...fj->...fi", w, left_e), -1, 1)[
             :, :, None, None, :
         ]
@@ -201,7 +225,9 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_overlap_self_is_unity(self):
         case = build_fd_pair(np)
         kernel = dense_kernel_2ch(np)
-        model = FDNoiseModel(SpectralDensity(case["frequencies"], kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+        )
 
         overlap = np.asarray(model.get_overlap(case["left"], case["left"]))
 
@@ -225,7 +251,14 @@ class TestFDNoiseModel(unittest.TestCase):
         kernel = np.zeros((len(freqs), 2, 2), dtype=float)
         kernel[:, 0, 0] = 1.0
         kernel[:, 1, 1] = 1.0
-        model = FDNoiseModel(DiagonalSpectralDensity(freqs, kernel, ["X", "Y"]))
+        model = noise_model(
+            make_sdm(
+                np.diagonal(kernel, axis1=-2, axis2=-1),
+                frequencies=freqs,
+                channel_names=("X", "Y"),
+                is_diagonal=True,
+            )
+        )
 
         with self.assertRaises((TypeError, ValueError)):
             model.get_cross_correlation(fs, fs)
@@ -320,9 +353,12 @@ class TestTFNoiseModel(unittest.TestCase):
             np.eye(2, dtype=float),
             (len(case["frequencies"]), len(case["times"]), 2, 2),
         ).copy()
-        model = TFNoiseModel(
-            EvolutionarySpectralDensity(
-                case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        model = noise_model(
+            make_sdm(
+                invevsdm,
+                frequencies=case["frequencies"],
+                times=case["times"],
+                channel_names=("X", "Y"),
             )
         )
 
@@ -336,9 +372,12 @@ class TestTFNoiseModel(unittest.TestCase):
     def test_scalar_product_dense_esdm_batched_matches_manual_contraction(self):
         case = build_wdm_pair_batched_2x2(np)
         invevsdm = dense_esdm_2ch(np)
-        model = TFNoiseModel(
-            EvolutionarySpectralDensity(
-                case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        model = noise_model(
+            make_sdm(
+                invevsdm,
+                frequencies=case["frequencies"],
+                times=case["times"],
+                channel_names=("X", "Y"),
             )
         )
 
@@ -365,9 +404,12 @@ class TestTFNoiseModel(unittest.TestCase):
             np.eye(2, dtype=float),
             (len(case["frequencies"]), len(case["times"]), 2, 2),
         ).copy()
-        model = TFNoiseModel(
-            EvolutionarySpectralDensity(
-                case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        model = noise_model(
+            make_sdm(
+                invevsdm,
+                frequencies=case["frequencies"],
+                times=case["times"],
+                channel_names=("X", "Y"),
             )
         )
 
@@ -380,10 +422,13 @@ class TestTFNoiseModel(unittest.TestCase):
     def test_whiten_dense_esdm_batched_matches_manual_channel_mixing(self):
         case = build_wdm_pair_batched_2x2(np)
         invevsdm = dense_esdm_2ch(np)
-        esd = EvolutionarySpectralDensity(
-            case["frequencies"], case["times"], invevsdm, ["X", "Y"]
+        esd = make_sdm(
+            invevsdm,
+            frequencies=case["frequencies"],
+            times=case["times"],
+            channel_names=("X", "Y"),
         )
-        model = TFNoiseModel(esd)
+        model = noise_model(esd)
 
         whitened = model.whiten(case["left"])
         got = np.asarray(whitened.get_kernel())
@@ -395,3 +440,70 @@ class TestTFNoiseModel(unittest.TestCase):
         expected = np.moveaxis(expected_e, -1, 1)
 
         npt.assert_allclose(got, expected, rtol=1e-12, atol=1e-12)
+
+
+class TestNoiseModelFactoriesNumpy(unittest.TestCase):
+    def test_make_sdm_builds_dense_diagonal_and_evolutionary_variants(self):
+        frequencies = np.array([0.5, 1.0, 1.5], dtype=float)
+        times = np.array([0.0, 1.0], dtype=float)
+
+        dense_kernel = np.broadcast_to(np.eye(2), (len(frequencies), 2, 2)).copy()
+        diag_kernel = np.ones((len(frequencies), 2), dtype=float)
+        evo_kernel = np.broadcast_to(
+            np.eye(2), (len(frequencies), len(times), 2, 2)
+        ).copy()
+
+        dense_sdm = make_sdm(
+            dense_kernel,
+            frequencies=frequencies,
+            channel_names=("X", "Y"),
+        )
+        diag_sdm = make_sdm(
+            diag_kernel,
+            frequencies=frequencies,
+            channel_names=("X", "Y"),
+            is_diagonal=True,
+        )
+        evo_sdm = make_sdm(
+            evo_kernel,
+            frequencies=frequencies,
+            times=times,
+            channel_names=("X", "Y"),
+        )
+
+        self.assertIsInstance(dense_sdm, SpectralDensity)
+        self.assertIsInstance(diag_sdm, DiagonalSpectralDensity)
+        self.assertIsInstance(evo_sdm, EvolutionarySpectralDensity)
+
+    def test_noise_model_factory_dispatches_by_sdm_type(self):
+        frequencies = np.array([0.5, 1.0, 1.5], dtype=float)
+        times = np.array([0.0, 1.0], dtype=float)
+
+        fd_model = noise_model(
+            make_sdm(
+                np.broadcast_to(np.eye(2), (len(frequencies), 2, 2)).copy(),
+                frequencies=frequencies,
+                channel_names=("X", "Y"),
+            )
+        )
+        tf_model = noise_model(
+            make_sdm(
+                np.broadcast_to(np.eye(2), (len(frequencies), len(times), 2, 2)).copy(),
+                frequencies=frequencies,
+                times=times,
+                channel_names=("X", "Y"),
+            )
+        )
+
+        self.assertIsInstance(fd_model, FDNoiseModel)
+        self.assertIsInstance(tf_model, TFNoiseModel)
+
+    def test_make_sdm_rejects_invalid_shape(self):
+        frequencies = np.array([0.5, 1.0, 1.5], dtype=float)
+
+        with self.assertRaisesRegex(ValueError, "Invalid shape"):
+            _ = make_sdm(
+                np.eye(2),
+                frequencies=frequencies,
+                channel_names=("X", "Y"),
+            )

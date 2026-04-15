@@ -40,6 +40,8 @@ from .types.waveforms import (
     pw,
     sum_harmonics,
 )
+from .types.noisemodel import noise_model, make_sdm
+from .types.likelihood import whittle
 
 __all__ = [
     "frequency_series",
@@ -80,4 +82,7 @@ __all__ = [
     "linspace",
     "linspace_from_array",
     "build_grid2d",
+    "noise_model",
+    "make_sdm",
+    "whittle",
 ]

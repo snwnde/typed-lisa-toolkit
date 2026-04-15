@@ -32,8 +32,11 @@ from typed_lisa_toolkit import (
     load_ldc_data,
     shop,
     stft,
+    stftdata,
     time_series,
+    tsdata,
     wdm,
+    wdmdata,
 )
 from typed_lisa_toolkit.types import (
     FSData,
@@ -49,7 +52,7 @@ def _build_tsdata_jax():
     times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
     x = jnp.asarray([0.0, 1.0, 0.5, -0.5, -1.0, -0.25, 0.75, 0.0], dtype=jnp.float64)
     y = jnp.asarray([1.0, 0.0, -0.5, 0.25, 0.5, -0.75, 0.0, 1.0], dtype=jnp.float64)
-    data = TSData.from_dict(
+    data = tsdata(
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
@@ -115,7 +118,7 @@ class TestDataContainersJAX(unittest.TestCase):
     def test_init_rejects_non_unit_harmonic_dimension(self):
         times = jnp.linspace(0.0, 1.0, 4, dtype=jnp.float64)
         bad_entries = jnp.ones((1, 2, 2, 1, 4), dtype=jnp.float64)
-        built = TSData.from_entries(times=times, entries=bad_entries, channels=("X", "Y"))
+        built = construct_tsdata(times=times, entries=bad_entries, channels=("X", "Y"))
 
         self.assertEqual(built.channel_names, ("X", "Y"))
         npt.assert_allclose(np.asarray(built.get_kernel()), np.asarray(bad_entries))
@@ -384,7 +387,7 @@ class TestDataContainersJAX(unittest.TestCase):
     def test_data_unary_op_and_mismatched_binary_op(self):
         case = build_fd_pair(jnp)
         left = case["left"]
-        right = FSData.from_entries(
+        right = construct_fsdata(
             frequencies=np.asarray(left.frequencies) + 10.0,
             entries=np.asarray(left.get_kernel()),
             channels=("A", "B"),
@@ -647,13 +650,31 @@ class TestDataContainersJAX(unittest.TestCase):
             ),
         }
 
-        stft_data = STFTData.from_dict(stft_mapping)
-        wdm_data = WDMData.from_dict(wdm_mapping)
+        stft_data = stftdata(stft_mapping)
+        wdm_data = wdmdata(wdm_mapping)
 
         self.assertIsInstance(stft_data, STFTData)
         self.assertIsInstance(wdm_data, WDMData)
         self.assertEqual(stft_data.channel_names, ("X", "Y"))
         self.assertEqual(wdm_data.channel_names, ("X", "Y"))
+
+    def test_factory_constructors_reject_non_uniform_axes(self):
+        times = jnp.array([0.0, 1.0, 3.0, 6.0], dtype=jnp.float64)
+        freqs = jnp.fft.rfftfreq(len(times), d=1.0)
+
+        ts_entries = jnp.ones((1, 2, 1, 1, len(times)), dtype=jnp.float64)
+        stft_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
+
+        with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
+            _ = construct_tsdata(times=times, entries=ts_entries, channels=("X", "Y"))
+
+        with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
+            _ = construct_stftdata(
+                frequencies=freqs,
+                times=times,
+                entries=stft_entries,
+                channels=("X", "Y"),
+            )
 
     def test_fsdata_legacy_load(self):
         freqs = np.array([1.0, 2.0, 3.0], dtype=np.float64)

@@ -8,7 +8,7 @@ import numpy.testing as npt
 from numpy import float64
 from numpy._typing._array_like import NDArray
 
-from typed_lisa_toolkit import linspace, shop, time_series
+from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import FSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
 from typed_lisa_toolkit.types.data import TSData
@@ -36,7 +36,7 @@ def _build_tsdata_numpy(n: int = 8) -> tuple[NDArray[float64], TSData]:
     times = np.linspace(0.0, 3.5, n)
     x = np.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=np.float64)
     y = np.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=np.float64)
-    tsd = TSData.from_dict(
+    tsd = tsdata(
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),

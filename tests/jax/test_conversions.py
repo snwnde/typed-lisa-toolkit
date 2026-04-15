@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit import linspace, shop, time_series
+from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import (
     EvolutionarySpectralDensity,
     SpectralDensity,
@@ -22,7 +22,7 @@ def _build_xyz_tsdata_jax(n: int = 8) -> TSData:
     x = jnp.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=jnp.float64)
     y = jnp.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=jnp.float64)
     z = jnp.asarray([-0.2, 0.3, -0.1, 0.5, -0.7, 0.9, -0.4, 0.2], dtype=jnp.float64)
-    return TSData.from_dict(
+    return tsdata(
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),

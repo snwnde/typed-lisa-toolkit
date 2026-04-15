@@ -24,6 +24,7 @@ from typed_lisa_toolkit import (
     phasor,
     stft,
     time_series,
+    tsdata,
     utils,
     wdm,
 )
@@ -108,7 +109,7 @@ class TestL2DContractNumpy(TestCanonicalShape):
         x = time_series(times, entries=np.random.randn(1, 1, 1, 1, len(times)))
         y = time_series(times, entries=np.random.randn(1, 1, 1, 1, len(times)))
 
-        data = TSData.from_dict({"X": x, "Y": y})
+        data = tsdata({"X": x, "Y": y})
         kernel = np.asarray(data.get_kernel())
         self.assertEqual(data.domain, "time")
         self.assertEqual(data.channel_names, ("X", "Y"))

@@ -10,7 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit import linspace, shop, time_series
+from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import FSData, TSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
 
@@ -38,7 +38,7 @@ def _build_tsdata_jax(n: int = 8):
     times = linspace(0.0, 3.5, n)
     x = jnp.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=jnp.float64)
     y = jnp.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=jnp.float64)
-    tsd = TSData.from_dict(
+    tsd = tsdata(
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),

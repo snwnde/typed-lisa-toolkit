@@ -10,13 +10,14 @@ from typing import (
     Self,
     Sequence,
     Union,
+    overload,
 )
-
+import array_api_compat as xpc
 from .. import utils
 from . import _mixins, waveforms
 from . import data as dm
 from . import representations as reps
-from .misc import Array, Axis, Grid2D, Linspace
+from .misc import Array, Axis, Grid2D, Linspace, Domain
 
 
 def _import_quadax() -> ModuleType:
@@ -260,27 +261,34 @@ class DiagonalSpectralDensity(SpectralDensity):
         )
 
 
-class FDNoiseModelLike(Protocol):
-    """Protocol for frequency domain noise models."""
+class _EntryInDomain[DomainT: Domain](Protocol):
+    @property
+    def domain(self) -> DomainT:
+        """Return the domain of the entry."""
+        ...
+
+    def get_kernel(self) -> "Array":
+        """Return the kernel array of the entry."""
+        ...
+
+
+class NoiseModelLike[EntryT1: _EntryInDomain[Domain], EntryT2: _EntryInDomain[Domain]](
+    Protocol
+):
+    """Protocol for noise models."""
 
     def get_scalar_product(
         self,
-        left: FDEntry,
-        right: FDEntry,
+        left: EntryT1 | EntryT2,
+        right: EntryT1 | EntryT2,
     ) -> "Array":
         """Return the scalar product."""
         ...
 
-    def whiten(self, _data: FDEntry) -> FDEntry:
-        """Whiten the data according to the noise model."""
-        ...
 
-    def to_subband(self, f_interval: tuple[float, float]) -> Self:
-        """Return a new noise model with the frequency grid restricted to the given subband."""
-        ...
-
-
-class FDNoiseModel[DensityT: SpectralDensity]:
+class FDNoiseModel(
+    NoiseModelLike[dm.FSData, waveforms.ProjectedWaveform[reps.FrequencySeries["Axis"]]]
+):
     """Frequency domain noise model.
 
     Assuming the noise is stationary, the noise model is given by the
@@ -291,29 +299,29 @@ class FDNoiseModel[DensityT: SpectralDensity]:
 
     def __init__(
         self,
-        psd: DensityT,
+        sdm: SpectralDensity,
         integration_method: IntegrationMethod = "trapezoid",
     ):
-        self._psd: DensityT = psd  # Keep the original PSD object for potential future use (e.g., subband restriction)
-        self.psd: DensityT = psd
-        xp = psd.get_kernel().__array_namespace__()
+        self._sdm_orig_: SpectralDensity = sdm  # Keep the original PSD object for potential future use (e.g., subband restriction)
+        self.sdm: SpectralDensity = sdm
+        xp = sdm.get_kernel().__array_namespace__()
         self._ip: IntegrationPolicy = _make_integration_policy(xp, integration_method)
 
     def reset(self) -> Self:
         """Reset the noise model to its original state."""
-        self.psd = self._psd
+        self.sdm = self._sdm_orig_
         return self
 
     def to_subband(self, f_interval: tuple[float, float]) -> Self:
         """Restrict the noise model to a subband."""
-        self.psd = self._psd.to_subband(f_interval)
+        self.sdm = self._sdm_orig_.to_subband(f_interval)
         return self
 
     def _get_whitened_entries(self, _data: FDEntry) -> "Array":
         """Return the whitened kernel entries of the given dm."""
         kernel = _data.get_kernel()  # (n_batches, n_ch, 1, 1, n_freqs)
         xp = kernel.__array_namespace__()
-        W = self.psd.get_whitening_matrix()  # (n_freqs, n_ch, n_ch)
+        W = self.sdm.get_whitening_matrix()  # (n_freqs, n_ch, n_ch)
         whitened_e = xp.einsum("fij,...fj->...fi", W, xp.moveaxis(kernel, 1, -1))
         return xp.moveaxis(whitened_e, -1, 1)
 
@@ -331,10 +339,10 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         _right = right.get_kernel()  # same shape as _left
         xp = _left.__array_namespace__()
         try:
-            if getattr(self.psd, "is_diagonal"):
+            if getattr(self.sdm, "is_diagonal"):
                 # If the spectral density matrix is diagonal, we can simply divide by the diagonal elements.
                 diag = xp.diagonal(
-                    self.psd.get_kernel(), axis1=-1, axis2=-2
+                    self.sdm.get_kernel(), axis1=-1, axis2=-2
                 )  # shape (n_freqs, n_channels)
                 return (4 * _left.conj() * _right) * diag.T[None, :, None, None, :]
         except AttributeError:
@@ -342,7 +350,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         return 4 * xp.einsum(
             "...fi,fij,...fj->...f",
             xp.moveaxis(_left.conj(), 1, -1),
-            self.psd.get_kernel(),
+            self.sdm.get_kernel(),
             xp.moveaxis(_right, 1, -1),
         )
 
@@ -484,7 +492,7 @@ class FDNoiseModel[DensityT: SpectralDensity]:
         """
         d_k = _data.get_kernel()  # (n_batches, n_ch, 1, 1, n_freqs)
         xp = d_k.__array_namespace__()
-        W = self.psd.get_whitening_matrix()  # (n_freqs, n_ch, n_ch)
+        W = self.sdm.get_whitening_matrix()  # (n_freqs, n_ch, n_ch)
         d_e = xp.moveaxis(d_k[:, :, 0, 0, :], 1, -1)  # (n_batches, n_freqs, n_ch)
         whitened_e = xp.einsum("fij,...fj->...fi", W, d_e)  # (n_batches, n_freqs, n_ch)
         whitened_k = xp.moveaxis(whitened_e, -1, 1)[:, :, None, None, :]
@@ -644,3 +652,136 @@ class TFNoiseModel:
         """Whiten the data according to the noise model."""
         whitened_array = self._get_whitened_entries(_data)
         return _data.create_like(whitened_array)
+
+
+def _validate_shape(entries: "Array", expected_shape: tuple[int, ...]) -> None:
+    if entries.shape != expected_shape:
+        raise ValueError(
+            f"Invalid shape for `inverse_sdm`. Expected {expected_shape}, got {entries.shape}."
+        )
+
+
+@overload
+def make_sdm(
+    inverse_sdm: "Array",
+    /,
+    *,
+    frequencies: "Array",
+    channel_names: Sequence[ChnName],
+    times: None = None,
+    is_diagonal: Literal[False] = False,
+) -> SpectralDensity: ...
+@overload
+def make_sdm(
+    inverse_sdm: "Array",
+    /,
+    *,
+    frequencies: "Array",
+    channel_names: Sequence[ChnName],
+    is_diagonal: Literal[True],
+    times: None = None,
+) -> DiagonalSpectralDensity: ...
+@overload
+def make_sdm(
+    inverse_sdm: "Array",
+    /,
+    *,
+    frequencies: "Array",
+    times: "Array",
+    channel_names: Sequence[ChnName],
+) -> EvolutionarySpectralDensity: ...
+def make_sdm(
+    inverse_sdm: Array,
+    /,
+    *,
+    frequencies: Array,
+    channel_names: Sequence[ChnName],
+    times: Array | None = None,
+    is_diagonal: bool = False,
+):
+    """Make a :class:`~types.SpectralDensity`, a :class:`~types.DiagonalSpectralDensity` or an :class:`~types.EvolutionarySpectralDensity`.
+
+    Parameters
+    ----------
+    inverse_sdm: :class:`~types.misc.Array`
+        The inverse spectral density matrix (SDM) or inverse evolutionary spectral density matrix (ESDM).
+        If `is_diagonal` is False, it must have shape (n_freqs, n_channels, n_channels) for SDM or
+        (n_freqs, n_times, n_channels, n_channels) for ESDM.
+        If `is_diagonal` is True, it must have shape (n_freqs, n_channels) and represent the diagonal elements of the inverse SDM
+        (currently only supported for SDM, not ESDM).
+
+    frequencies: :class:`~types.misc.Array`
+        An array of shape (n_freqs,) representing the frequency grid.
+
+    channel_names: Sequence[str]
+        A sequence of channel names corresponding to the channels in the SDM/ESDM.
+
+    times: :class:`~types.misc.Array`, optional
+        An array of shape (n_times,) representing the time grid. If None, a :class:`~types.SpectralDensity`
+        will be constructed. If provided, an :class:`~types.EvolutionarySpectralDensity` will be constructed.
+
+    is_diagonal: bool
+        Whether the SDM is diagonal. Only relevant if `times` is None. If True, a :class:`~types.DiagonalSpectralDensity`
+        will be constructed. Defaults to False.
+    """
+    if times is None:
+        if not is_diagonal:
+            _validate_shape(
+                inverse_sdm,
+                expected_shape=(
+                    len(frequencies),
+                    len(channel_names),
+                    len(channel_names),
+                ),
+            )
+            return SpectralDensity(frequencies, inverse_sdm, channel_names)
+        xp = xpc.get_namespace(inverse_sdm)
+        _inverse_sdm = inverse_sdm[:, :, None] * xp.eye(
+            len(channel_names), dtype=inverse_sdm.dtype
+        )
+        return DiagonalSpectralDensity(frequencies, _inverse_sdm, channel_names)
+    else:
+        _validate_shape(
+            inverse_sdm,
+            expected_shape=(
+                len(frequencies),
+                len(times),
+                len(channel_names),
+                len(channel_names),
+            ),
+        )
+        return EvolutionarySpectralDensity(
+            frequencies, times, inverse_sdm, channel_names
+        )
+
+
+@overload
+def noise_model(
+    sdm: SpectralDensity,
+    integration_method: IntegrationMethod = "trapezoid",
+) -> FDNoiseModel: ...
+@overload
+def noise_model(
+    sdm: EvolutionarySpectralDensity,
+) -> TFNoiseModel: ...
+
+
+def noise_model(
+    sdm: SpectralDensity | EvolutionarySpectralDensity,
+    integration_method: IntegrationMethod = "trapezoid",
+):
+    """Construct a :class:`~types.FDNoiseModel` or :class:`~types.TFNoiseModel` from a :class:`~types.SpectralDensity` or a :class:`~types.EvolutionarySpectralDensity`.
+
+    Parameters
+    ----------
+    sdm: :class:`~types.SpectralDensity` or :class:`~types.EvolutionarySpectralDensity`
+        The (evolutionary) spectral density matrix defining the noise model.
+
+    integration_method: :class:`~types.IntegrationMethod`
+        The quadrature method to use for integration in the frequency domain.
+        Only relevant if `sdm` is a :class:`~types.SpectralDensity`. Defaults to "trapezoid".
+    """
+    if isinstance(sdm, SpectralDensity):
+        return FDNoiseModel(sdm=sdm, integration_method=integration_method)
+    else:
+        return TFNoiseModel(esd=sdm)

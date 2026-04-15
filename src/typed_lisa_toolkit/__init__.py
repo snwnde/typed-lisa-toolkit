@@ -133,6 +133,21 @@ The following functions construct new waveforms by processing existing waveforms
    phasor_to_fs_hpw
    get_dense_maker
 
+Noise Models and Likelihoods
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. autosummary::
+   :toctree: _generated
+   :template: base.rst
+   :nosignatures:
+
+   make_sdm
+   noise_model
+   whittle
+
+
+
+
 Miscellaneous
 ^^^^^^^^^^^^^
 
@@ -190,6 +205,9 @@ from ._constructors import (
     tsdata,
     wdm,
     wdmdata,
+    noise_model,
+    make_sdm,
+    whittle,
 )
 from ._loaders import load_data, load_ldc_data, load_mojito, load_sangria
 
@@ -240,4 +258,7 @@ __all__ = [
     "linspace",
     "linspace_from_array",
     "build_grid2d",
+    "noise_model",
+    "make_sdm",
+    "whittle",
 ]
