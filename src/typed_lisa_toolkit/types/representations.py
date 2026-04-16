@@ -464,8 +464,8 @@ def frequency_series[AxisT: "Axis"](
 
     Note
     ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    See :external+l2d-interface:ref:`the general description of the shape convention <shape_convention>`
+    for 'entries'.
     """
     _validate_shape(
         entries,
@@ -510,8 +510,8 @@ def time_series[AxisT: "Axis"](
 
     Note
     ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    See :external+l2d-interface:ref:`the general description of the shape convention <shape_convention>`
+    for 'entries'.
     """
     _validate_shape(entries, (entries.shape[0], 1, 1, 1, len(times)))
     try:
@@ -544,6 +544,10 @@ def phasor[AxisT: "Axis"](
         Either an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf)`` where ``Nf`` is the size of ``frequencies``,
         or a 1D array of shape ``(Nf,)`` that will be broadcasted to the shape ``(1, 1, 1, 1, Nf)``
         Must be of the same shape as ``amplitudes``.
+
+    Note
+    ----
+    See :external+l2d-interface:ref:`the general description of the shape convention <shape_convention>`.
     """
     if amplitudes.shape != phases.shape:
         raise ValueError(
@@ -617,8 +621,8 @@ def stft[FreqAxisT: "Axis", TimeAxisT: "Axis"](
 
     Note
     ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    See :external+l2d-interface:ref:`the general description of the shape convention <shape_convention>`
+    for 'entries'.
     """
     if sparse_indices is None:
         _validate_shape(
@@ -693,8 +697,8 @@ def wdm(
 
     Note
     ----
-    See the general description of the shape convention for
-    :external+l2d-interface:attr:`entries <l2d_interface.contract.Representation.entries>`.
+    See :external+l2d-interface:ref:`the general description of the shape convention <shape_convention>`
+    for 'entries'.
     """
     if sparse_indices is None:
         _validate_shape(
