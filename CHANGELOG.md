@@ -2,6 +2,21 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.1 - 2026-04-16
+#### Features
+- update deps - (bc3a646) - Senwen Deng
+- plus cross waveform - (1c626ee) - Senwen Deng
+#### Bug Fixes
+- noise model and likelihood - (f20f63c) - Senwen Deng
+#### Documentation
+- improved presentation - (bf91513) - Senwen Deng
+#### Miscellaneous Chores
+- pre-commit hook and format fix - (be5ea33) - Senwen Deng
+#### Style
+- code format - (4dea5e7) - Senwen Deng
+
+- - -
+
 ## 0.6.0 - 2026-04-14
 #### Features
 - more branches for xyz aet conversions - (a35b83c) - Senwen Deng
