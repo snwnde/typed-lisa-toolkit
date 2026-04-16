@@ -11,11 +11,5 @@ for installation and usage instructions. **It is thoroughly written!**
 
 
 ## For developers
-- Linting: [ruff](https://docs.astral.sh/ruff/)
+- Linting, import sorting, and formatting: [ruff](https://docs.astral.sh/ruff/)
 - Type checking: [basedpyright](https://docs.basedpyright.com/latest/)
-
-The import sorting is also handled by `ruff`:
-
-```bash
-ruff check --select I --fix .
-```

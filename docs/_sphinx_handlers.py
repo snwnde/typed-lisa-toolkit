@@ -55,7 +55,7 @@ def _format_type_expr(tp: object) -> str:
     if isinstance(tp, str):
         text = tp.strip()
     elif hasattr(tp, "__forward_arg__"):
-        text = str(getattr(tp, "__forward_arg__")).strip()
+        text = str(tp.__forward_arg__).strip()
     else:
         name = getattr(tp, "__name__", None)
         text = name.strip() if isinstance(name, str) else str(tp).replace("typing.", "")
@@ -119,7 +119,13 @@ def has_numpy_returns_section(doc: str) -> bool:
 
 
 def process_autodoc_signature(
-    app, what, name, obj, options, signature, return_annotation
+    app,
+    what,
+    name,
+    obj,
+    options,
+    signature,
+    return_annotation,
 ):
     """Conditionally strip type annotations and transform private types in signatures."""
     if signature is None or what not in {"function", "method", "class"}:
@@ -203,7 +209,7 @@ class TransformPrivateTypes(SphinxTransform):
                             role,
                             display_name,
                             reftarget,
-                        )
+                        ),
                     )
 
             if not matches:
@@ -216,7 +222,7 @@ class TransformPrivateTypes(SphinxTransform):
             for start, end, pattern, role, display_name, reftarget in matches:
                 if start >= last_end:  # No overlap
                     filtered_matches.append(
-                        (start, end, pattern, role, display_name, reftarget)
+                        (start, end, pattern, role, display_name, reftarget),
                     )
                     last_end = end
 
