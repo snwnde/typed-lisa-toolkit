@@ -28,14 +28,14 @@ from .conversions import aet2xyz, xyz2aet
 from .transforms import freq2time, freq2wdm, time2freq, time2wdm, wdm2freq, wdm2time
 
 __all__ = [
-    "transforms",
+    "aet2xyz",
     "conversions",
     "freq2time",
+    "freq2wdm",
     "time2freq",
     "time2wdm",
-    "wdm2time",
+    "transforms",
     "wdm2freq",
-    "freq2wdm",
+    "wdm2time",
     "xyz2aet",
-    "aet2xyz",
 ]

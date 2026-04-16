@@ -1,7 +1,7 @@
 stages:
   - test
   - deploy
-
+  
 pytest:
   stage: test
   image: python:3.13
@@ -12,8 +12,9 @@ pytest:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - pip install -q --root-user-action=ignore uv
-    - uv sync --all-extras
+    - uv sync --all-extras --all-groups
     - source .venv/bin/activate
+    - pre-commit run --all-files --show-diff-on-failure
     - basedpyright --gitlabcodequality report.json
     - pytest --cov=typed_lisa_toolkit --cov-branch --cov-report=term-missing
         --cov-report=xml:coverage.xml --junitxml=report.xml 
