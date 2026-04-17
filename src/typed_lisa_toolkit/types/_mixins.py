@@ -102,7 +102,7 @@ class NDArrayMixin(abc.ABC):
         return self._binary_op(other, operator.add, reflected=True)
 
     def __iadd__(self, other: object) -> Self:
-        return self._binary_op(other, operator.iadd, inplace=True)
+        return self._binary_op(other, operator.iadd, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __sub__(self, other: object) -> Self:
         return self._binary_op(other, operator.sub)
@@ -111,7 +111,7 @@ class NDArrayMixin(abc.ABC):
         return self._binary_op(other, operator.sub, reflected=True)
 
     def __isub__(self, other: object) -> Self:
-        return self._binary_op(other, operator.isub, inplace=True)
+        return self._binary_op(other, operator.isub, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __mul__(self, other: object) -> Self:
         return self._binary_op(other, operator.mul)
@@ -120,34 +120,34 @@ class NDArrayMixin(abc.ABC):
         return self._binary_op(other, operator.mul, reflected=True)
 
     def __imul__(self, other: object) -> Self:
-        return self._binary_op(other, operator.imul, inplace=True)
+        return self._binary_op(other, operator.imul, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __matmul__(self, other: object) -> Self:
-        return self._binary_op(other, operator.matmul)
+        return self._binary_op(other, operator.matmul)  # pyright: ignore[reportUnknownMemberType]
 
     def __rmatmul__(self, other: object) -> Self:
-        return self._binary_op(other, operator.matmul, reflected=True)
+        return self._binary_op(other, operator.matmul, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __imatmul__(self, other: object) -> Self:
-        return self._binary_op(other, operator.imatmul, inplace=True)
+        return self._binary_op(other, operator.imatmul, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __truediv__(self, other: object) -> Self:
-        return self._binary_op(other, operator.truediv)
+        return self._binary_op(other, operator.truediv)  # pyright: ignore[reportUnknownMemberType]
 
     def __rtruediv__(self, other: object) -> Self:
-        return self._binary_op(other, operator.truediv, reflected=True)
+        return self._binary_op(other, operator.truediv, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __itruediv__(self, other: object) -> Self:
-        return self._binary_op(other, operator.itruediv, inplace=True)
+        return self._binary_op(other, operator.itruediv, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __floordiv__(self, other: object) -> Self:
-        return self._binary_op(other, operator.floordiv)
+        return self._binary_op(other, operator.floordiv)  # pyright: ignore[reportUnknownMemberType]
 
     def __rfloordiv__(self, other: object) -> Self:
-        return self._binary_op(other, operator.floordiv, reflected=True)
+        return self._binary_op(other, operator.floordiv, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __ifloordiv__(self, other: object) -> Self:
-        return self._binary_op(other, operator.ifloordiv, inplace=True)
+        return self._binary_op(other, operator.ifloordiv, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __mod__(self, other: object) -> Self:
         return self._binary_op(other, operator.mod)
@@ -156,52 +156,52 @@ class NDArrayMixin(abc.ABC):
         return self._binary_op(other, operator.mod, reflected=True)
 
     def __imod__(self, other: object) -> Self:
-        return self._binary_op(other, operator.imod, inplace=True)
+        return self._binary_op(other, operator.imod, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __pow__(self, other: object) -> Self:
-        return self._binary_op(other, operator.pow)
+        return self._binary_op(other, operator.pow)  # pyright: ignore[reportUnknownMemberType]
 
     def __rpow__(self, other: object) -> Self:
-        return self._binary_op(other, operator.pow, reflected=True)
+        return self._binary_op(other, operator.pow, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __ipow__(self, other: object) -> Self:
-        return self._binary_op(other, operator.ipow, inplace=True)
+        return self._binary_op(other, operator.ipow, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __lshift__(self, other: object) -> Self:
-        return self._binary_op(other, operator.lshift)
+        return self._binary_op(other, operator.lshift)  # pyright: ignore[reportUnknownMemberType]
 
     def __rlshift__(self, other: object) -> Self:
-        return self._binary_op(other, operator.lshift, reflected=True)
+        return self._binary_op(other, operator.lshift, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __ilshift__(self, other: object) -> Self:
-        return self._binary_op(other, operator.ilshift, inplace=True)
+        return self._binary_op(other, operator.ilshift, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __rshift__(self, other: object) -> Self:
-        return self._binary_op(other, operator.rshift)
+        return self._binary_op(other, operator.rshift)  # pyright: ignore[reportUnknownMemberType]
 
     def __rrshift__(self, other: object) -> Self:
-        return self._binary_op(other, operator.rshift, reflected=True)
+        return self._binary_op(other, operator.rshift, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __irshift__(self, other: object) -> Self:
-        return self._binary_op(other, operator.irshift, inplace=True)
+        return self._binary_op(other, operator.irshift, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __and__(self, other: object) -> Self:
-        return self._binary_op(other, operator.and_)
+        return self._binary_op(other, operator.and_)  # pyright: ignore[reportUnknownMemberType]
 
     def __rand__(self, other: object) -> Self:
-        return self._binary_op(other, operator.and_, reflected=True)
+        return self._binary_op(other, operator.and_, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __iand__(self, other: object) -> Self:
-        return self._binary_op(other, operator.iand, inplace=True)
+        return self._binary_op(other, operator.iand, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __xor__(self, other: object) -> Self:
-        return self._binary_op(other, operator.xor)
+        return self._binary_op(other, operator.xor)  # pyright: ignore[reportUnknownMemberType]
 
     def __rxor__(self, other: object) -> Self:
-        return self._binary_op(other, operator.xor, reflected=True)
+        return self._binary_op(other, operator.xor, reflected=True)  # pyright: ignore[reportUnknownMemberType]
 
     def __ixor__(self, other: object) -> Self:
-        return self._binary_op(other, operator.ixor, inplace=True)
+        return self._binary_op(other, operator.ixor, inplace=True)  # pyright: ignore[reportUnknownMemberType]
 
     # unary methods
     def __neg__(self) -> Self:
@@ -425,7 +425,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
         return type(self)(self.grid, picked_entries, channels, name=self.name)
 
     @classmethod
-    def from_dict(cls, data_dict: Mapping[str, "AnyReps"], **kwargs: Any) -> Self:
+    def from_dict(cls, data_dict: Mapping[str, "AnyReps"], /, **kwargs: Any) -> Self:
         """Create a new instance from a dictionary of channel names to representations."""
         return cls(_mapping=data_dict, **kwargs)
 
@@ -486,7 +486,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
         return self.entries
 
 
-def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"]):
+def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"], /):
     """Validate that a mapping maps to valid representations."""
     for key, rep in mapping.items():
         try:

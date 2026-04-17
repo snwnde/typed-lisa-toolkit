@@ -36,6 +36,7 @@ doc = [
     "sphinx-copybutton",
     "sphinxcontrib-bibtex",
     "sphinxcontrib-mermaid",
+    "sphinx-inline-tabs",
     "furo",
     "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git",
     "anybadge",
@@ -87,14 +88,15 @@ build-backend = "hatchling.build"
 
 
 [tool.ruff.lint]
+# select = ["D", "PL", "F"]
 select = ["D"]
-ignore = ["D100", "D104"]
+ignore = ["D100", "D104", "PLC0415"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D"]
+"tests/**" = ["D", "PL", "DOC"]
 
 [tool.coverage.report]
 omit = [
