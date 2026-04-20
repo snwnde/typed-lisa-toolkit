@@ -104,6 +104,7 @@ select = [
     "INP",
     "PIE",
     "PYI",
+    "PT",
 ]
 ignore = ["D104", "PLC0415", "PLR0913", "COM812"]
 
@@ -111,7 +112,7 @@ ignore = ["D104", "PLC0415", "PLR0913", "COM812"]
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "PL", "DOC", "INP"]
+"tests/**" = ["D", "PL", "DOC", "INP", "S101"]
 "docs/**" = ["D", "PL", "DOC", "INP"]
 
 [tool.coverage.report]

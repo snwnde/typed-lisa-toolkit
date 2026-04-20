@@ -9,6 +9,7 @@ jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 from tests._helpers import (
     build_fd_pair,
@@ -70,7 +71,7 @@ class TestSpectralDensityJAX(unittest.TestCase):
             channel_order=["X", "Y"],
         )
 
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             sdm.get_kernel(backend="numpy")
 
     def test_whitening_matrix_reconstructs_inverse_sdm(self):
@@ -96,7 +97,7 @@ class TestSpectralDensityJAX(unittest.TestCase):
             channel_order=["X", "Y"],
         )
 
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             sdm.get_whitening_matrix(kind="qr")
 
     def test_diagonal_whitening_default_kind(self):
@@ -128,7 +129,7 @@ class TestSpectralDensityJAX(unittest.TestCase):
         )
 
         kernel = np.asarray(sdm.get_kernel())
-        self.assertEqual(kernel.shape, (3, 2, 2))
+        assert kernel.shape == (3, 2, 2)
         npt.assert_allclose(kernel[:, 0, 0], np.ones(3))
         npt.assert_allclose(kernel[:, 1, 1], np.ones(3))
 
@@ -149,8 +150,8 @@ class TestFDNoiseModelJAX(unittest.TestCase):
 
         got = model.get_scalar_product(case["left"], case["right"])
 
-        self.assertIs(model.reset(), model)
-        self.assertTrue(np.isfinite(np.asarray(got)).all())
+        assert model.reset() is model
+        assert np.isfinite(np.asarray(got)).all()
 
     def test_get_integrand_diagonal_shape_and_value(self):
         case = build_fd_pair(jnp)
@@ -214,7 +215,7 @@ class TestFDNoiseModelJAX(unittest.TestCase):
             axis=-1,
         ).real
 
-        self.assertEqual(got.shape[0], 2)
+        assert got.shape[0] == 2
         npt.assert_allclose(np.squeeze(got), np.squeeze(expected))
 
     def test_cumulative_scalar_product_matches_final_scalar_product(self):
@@ -319,25 +320,20 @@ class TestFDNoiseModelJAX(unittest.TestCase):
             ),
         )
 
-        with self.assertRaises((TypeError, ValueError)):
+        with pytest.raises((TypeError, ValueError)):
             model.get_cross_correlation(fs, fs)
 
 
 class TestEvolutionarySpectralDensityJAX(unittest.TestCase):
     def test_invalid_shape_returns_false_without_raising(self):
-        self.assertFalse(
-            EvolutionarySpectralDensity.is_valid_sdm(
-                jnp.eye(2),
-                channel_order=["X", "Y"],
-            ),
+        assert not EvolutionarySpectralDensity.is_valid_sdm(
+            jnp.eye(2), channel_order=["X", "Y"]
         )
 
     def test_duplicate_channel_names_return_false_without_raising(self):
-        self.assertFalse(
-            EvolutionarySpectralDensity.is_valid_sdm(
-                jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (2, 2, 2, 2)),
-                channel_order=["X", "X"],
-            ),
+        assert not EvolutionarySpectralDensity.is_valid_sdm(
+            jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (2, 2, 2, 2)),
+            channel_order=["X", "X"],
         )
 
     def test_whitening_matrix_reconstructs_inverse_esdm(self):
@@ -379,7 +375,7 @@ class TestEvolutionarySpectralDensityJAX(unittest.TestCase):
             channel_order=["X", "Y"],
         )
 
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             esd.get_kernel(backend="numpy")
 
     def test_whitening_matrix_invalid_kind_raises(self):
@@ -390,7 +386,7 @@ class TestEvolutionarySpectralDensityJAX(unittest.TestCase):
             channel_order=["X", "Y"],
         )
 
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             esd.get_whitening_matrix(kind="qr")
 
 
@@ -528,9 +524,9 @@ class TestNoiseModelFactoriesJAX(unittest.TestCase):
             channel_names=("X", "Y"),
         )
 
-        self.assertIsInstance(dense_sdm, SpectralDensity)
-        self.assertIsInstance(diag_sdm, DiagonalSpectralDensity)
-        self.assertIsInstance(evo_sdm, EvolutionarySpectralDensity)
+        assert isinstance(dense_sdm, SpectralDensity)
+        assert isinstance(diag_sdm, DiagonalSpectralDensity)
+        assert isinstance(evo_sdm, EvolutionarySpectralDensity)
 
     def test_noise_model_factory_dispatches_by_sdm_type(self):
         frequencies = jnp.array([0.5, 1.0, 1.5], dtype=jnp.float64)
@@ -558,13 +554,13 @@ class TestNoiseModelFactoriesJAX(unittest.TestCase):
             ),
         )
 
-        self.assertIsInstance(fd_model, FDNoiseModel)
-        self.assertIsInstance(tf_model, TFNoiseModel)
+        assert isinstance(fd_model, FDNoiseModel)
+        assert isinstance(tf_model, TFNoiseModel)
 
     def test_make_sdm_rejects_invalid_shape(self):
         frequencies = jnp.array([0.5, 1.0, 1.5], dtype=jnp.float64)
 
-        with self.assertRaisesRegex(ValueError, "Invalid shape"):
+        with pytest.raises(ValueError, match="Invalid shape"):
             _ = make_sdm(
                 jnp.eye(2, dtype=jnp.float64),
                 frequencies=frequencies,

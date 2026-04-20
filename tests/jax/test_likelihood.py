@@ -40,8 +40,8 @@ def _build_fsdata(freqs, x_values, y_values):
 
 class TestFDWhittleLikelihoodJAX(unittest.TestCase):
     def test_classmethod_formulas(self):
-        self.assertEqual(FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0), 4.0)
-        self.assertEqual(FDWhittleLikelihood.log_likelihood(4.0, 2.0), 3.0)
+        assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0
+        assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0
 
     def test_cross_product_and_template_square_match_noise_model(self):
         case = build_fd_pair(jnp)
@@ -152,4 +152,4 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
 
         likelihood = whittle(case["left"], model)
 
-        self.assertIsInstance(likelihood, FDWhittleLikelihood)
+        assert isinstance(likelihood, FDWhittleLikelihood)

@@ -41,7 +41,7 @@ class _Probe(NDArrayMixin):
 class TestNDArrayMixinDelegates(unittest.TestCase):
     def test_xp_property(self):
         probe = _Probe()
-        self.assertIs(probe.xp, np)
+        assert probe.xp is np
 
     def test_binary_operator_delegation_flags(self):
         probe = _Probe()
@@ -93,17 +93,17 @@ class TestNDArrayMixinDelegates(unittest.TestCase):
         _ = probe.__ixor__(1)
 
         calls = probe.calls
-        self.assertGreaterEqual(len(calls), 42)
+        assert len(calls) >= 42
 
         reflected_ops = [entry for entry in calls if entry[2]]
         inplace_ops = [entry for entry in calls if entry[3]]
 
-        self.assertTrue(any(op == operator.add for _, op, _, _ in reflected_ops))
-        self.assertTrue(any(op == operator.sub for _, op, _, _ in reflected_ops))
-        self.assertTrue(any(op == operator.mul for _, op, _, _ in reflected_ops))
-        self.assertTrue(any(op == operator.iadd for _, op, _, _ in inplace_ops))
-        self.assertTrue(any(op == operator.isub for _, op, _, _ in inplace_ops))
-        self.assertTrue(any(op == operator.imul for _, op, _, _ in inplace_ops))
+        assert any(op == operator.add for _, op, _, _ in reflected_ops)
+        assert any(op == operator.sub for _, op, _, _ in reflected_ops)
+        assert any(op == operator.mul for _, op, _, _ in reflected_ops)
+        assert any(op == operator.iadd for _, op, _, _ in inplace_ops)
+        assert any(op == operator.isub for _, op, _, _ in inplace_ops)
+        assert any(op == operator.imul for _, op, _, _ in inplace_ops)
 
     def test_unary_and_namespace_method_delegation(self):
         probe = _Probe()
@@ -123,16 +123,16 @@ class TestNDArrayMixinDelegates(unittest.TestCase):
         _ = probe.unwrap()
 
         unary_ops = [entry[1] for entry in probe.calls if entry[0] == "unary"]
-        self.assertIn(operator.neg, unary_ops)
-        self.assertIn(operator.pos, unary_ops)
-        self.assertIn(operator.abs, unary_ops)
-        self.assertIn(operator.invert, unary_ops)
-        self.assertIn(np.square, unary_ops)
-        self.assertIn(np.exp, unary_ops)
-        self.assertIn(np.sqrt, unary_ops)
-        self.assertIn(np.conj, unary_ops)
-        self.assertIn(np.real, unary_ops)
-        self.assertIn(np.imag, unary_ops)
-        self.assertIn(np.abs, unary_ops)
-        self.assertIn(np.angle, unary_ops)
-        self.assertIn(np.unwrap, unary_ops)
+        assert operator.neg in unary_ops
+        assert operator.pos in unary_ops
+        assert operator.abs in unary_ops
+        assert operator.invert in unary_ops
+        assert np.square in unary_ops
+        assert np.exp in unary_ops
+        assert np.sqrt in unary_ops
+        assert np.conj in unary_ops
+        assert np.real in unary_ops
+        assert np.imag in unary_ops
+        assert np.abs in unary_ops
+        assert np.angle in unary_ops
+        assert np.unwrap in unary_ops

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 from typed_lisa_toolkit import (
     frequency_series,
@@ -362,21 +363,21 @@ class LinspaceExtraPropertiesMixin:
 
     def test_shape_property(self):
         ls = Linspace(1.0, 0.5, 4)
-        self.assertEqual(ls.shape, (4,))
+        assert ls.shape == (4,)
 
     def test_stop_property(self):
         ls = Linspace(1.0, 0.5, 4)
-        self.assertAlmostEqual(ls.stop, 2.5)
+        assert ls.stop == pytest.approx(2.5)
 
     def test_eq_raises_for_non_linspacelike(self):
         ls = Linspace(0.0, 1.0, 5)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ls.__eq__(42)
 
     def test_eq_returns_false_for_step_mismatch(self):
         ls1 = Linspace(0.0, 1.0, 5)
         ls2 = Linspace(0.0, 2.0, 5)
-        self.assertFalse(ls1 == ls2)
+        assert not ls1 == ls2
 
     def test_array_with_copy_false(self):
         ls = Linspace(0.0, 1.0, 5)
@@ -385,7 +386,7 @@ class LinspaceExtraPropertiesMixin:
 
     def test_getitem_invalid_type_raises(self):
         ls = Linspace(0.0, 1.0, 10)
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             ls["bad"]  # type: ignore[index]
 
     def test_make_from_linspace_like(self):
@@ -406,10 +407,10 @@ class LinspaceExtraPropertiesMixin:
 
         mock = _MockLinspaceLike(2.0, 0.5, 8)
         ls = Linspace.make(mock)  # type: ignore[arg-type]
-        self.assertIsInstance(ls, Linspace)
-        self.assertAlmostEqual(ls.start, 2.0)
-        self.assertAlmostEqual(ls.step, 0.5)
-        self.assertEqual(ls.num, 8)
+        assert isinstance(ls, Linspace)
+        assert ls.start == pytest.approx(2.0)
+        assert ls.step == pytest.approx(0.5)
+        assert ls.num == 8
 
 
 class HelperFunctionsMixin:
@@ -424,14 +425,14 @@ class HelperFunctionsMixin:
         xp = self.xp
         grid = (xp.asarray(np.linspace(0, 1, 10)),)
         entries = xp.asarray(np.ones((1, 1, 1, 1, 20)))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError, match=r".+"):
             _check_entry_grid_compatibility(grid, entries)
 
     def test_take_subset_slice_dimension_mismatch_raises(self):
         xp = self.xp
         grid = (xp.asarray(np.linspace(0, 1, 10)),)
         entries = xp.asarray(np.ones((1, 1, 1, 1, 10)))
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError, match=r".+"):
             _take_subset(grid, entries, (slice(0, 5), slice(0, 3)))
 
     def test_take_subset_with_array_grid(self):
@@ -452,7 +453,7 @@ class HelperFunctionsMixin:
             grid=(non_uniform,),
             entries=xp.asarray(np.ones((1, 1, 1, 1, 4))),
         )
-        self.assertNotIsInstance(ts.grid[0], Linspace)
+        assert not isinstance(ts.grid[0], Linspace)
 
     def test_axis_onset_and_end_from_plain_arrays(self):
         xp = self.xp
@@ -461,8 +462,8 @@ class HelperFunctionsMixin:
             grid=(freqs,),
             entries=xp.asarray(np.ones((1, 1, 1, 1, 4))),
         )
-        self.assertAlmostEqual(fs.f_min, 0.01)
-        self.assertAlmostEqual(fs.f_max, 0.04)
+        assert fs.f_min == pytest.approx(0.01)
+        assert fs.f_max == pytest.approx(0.04)
 
 
 class AdvancedRepresentationMethodsMixin:
@@ -487,8 +488,8 @@ class AdvancedRepresentationMethodsMixin:
         ]
         fs = UniformFrequencySeries(grid=(freqs,), entries=entries_fs)
         shifted = fs.get_time_shifted(2 * dt)
-        self.assertIsInstance(shifted, UniformFrequencySeries)
-        self.assertEqual(shifted.entries.shape, fs.entries.shape)
+        assert isinstance(shifted, UniformFrequencySeries)
+        assert shifted.entries.shape == fs.entries.shape
 
     def test_frequency_series_angle(self):
         xp = self.xp
@@ -502,15 +503,15 @@ class AdvancedRepresentationMethodsMixin:
         ]
         fs = UniformFrequencySeries(grid=(freqs,), entries=z)
         angles = fs.angle()
-        self.assertIsInstance(angles, UniformFrequencySeries)
-        self.assertEqual(angles.entries.shape, fs.entries.shape)
+        assert isinstance(angles, UniformFrequencySeries)
+        assert angles.entries.shape == fs.entries.shape
 
     def test_stft_make_classmethod(self):
         times = np.linspace(0, 10, 100)
         freqs = np.linspace(0, 1, 50)
         entries = np.random.randn(1, 1, 1, 1, 100, 50)
         stft = STFT.make(times=times, frequencies=freqs, entries=entries)
-        self.assertIsInstance(stft, STFT)
+        assert isinstance(stft, STFT)
         npt.assert_allclose(np.array(stft.grid[1]), times, rtol=1e-10)
         npt.assert_allclose(np.array(stft.grid[0]), freqs, rtol=1e-10)
 
@@ -528,7 +529,7 @@ class AdvancedRepresentationMethodsMixin:
         entries = xp.asarray(np.ones((1, 1, 1, 1, 20)))
         fs = UniformFrequencySeries(grid=(freqs,), entries=entries)
         r = repr(fs)
-        self.assertIn("UniformFrequencySeries", r)
+        assert "UniformFrequencySeries" in r
 
 
 class WDMPropertiesAndMethodsMixin:
@@ -539,15 +540,15 @@ class WDMPropertiesAndMethodsMixin:
 
     def test_nd_duration_sample_interval(self):
         wdm = self.wdm
-        self.assertEqual(wdm.ND, wdm.Nf * wdm.Nt)
+        assert wdm.ND == wdm.Nf * wdm.Nt
         # self.assertAlmostEqual(wdm.duration, wdm.Nt * wdm.times.step)
         # self.assertAlmostEqual(wdm.sample_interval, wdm.duration / wdm.ND)
-        self.assertAlmostEqual(wdm.dt, wdm.sample_interval)
+        assert wdm.dt == pytest.approx(wdm.sample_interval)
 
     def test_df_shape_sample_rate_nyquist(self):
         wdm = self.wdm
         # self.assertAlmostEqual(wdm.df, 1.0 / wdm.duration)
-        self.assertEqual(wdm.shape, (wdm.Nf, wdm.Nt))
+        assert wdm.shape == (wdm.Nf, wdm.Nt)
         # self.assertAlmostEqual(wdm.sample_rate, 1.0 / wdm.sample_interval)
         # self.assertAlmostEqual(wdm.nyquist, wdm.sample_rate / 2.0)
 
@@ -555,23 +556,23 @@ class WDMPropertiesAndMethodsMixin:
         wdm = self.wdm
         result = wdm.is_critically_sampled()
         expected = bool(np.isclose(wdm.dT * wdm.dF, 0.5))
-        self.assertEqual(bool(result), expected)
+        assert bool(result) == expected
 
     def test_get_subset_time(self):
         wdm = self.wdm
         times_arr = np.asarray(wdm.times)
         t_mid = float(times_arr[len(times_arr) // 2])
         sub = wdm.get_subset(time_interval=(float(times_arr[0]), t_mid))
-        self.assertIsInstance(sub, WDM)
-        self.assertLess(sub.Nt, wdm.Nt)
+        assert isinstance(sub, WDM)
+        assert sub.Nt < wdm.Nt
 
     def test_get_subset_freq(self):
         wdm = self.wdm
         freqs_arr = np.asarray(wdm.frequencies)
         f_mid = float(freqs_arr[len(freqs_arr) // 2])
         sub = wdm.get_subset(freq_interval=(float(freqs_arr[0]), f_mid))
-        self.assertIsInstance(sub, WDM)
-        self.assertLess(sub.Nf, wdm.Nf)
+        assert isinstance(sub, WDM)
+        assert sub.Nf < wdm.Nf
 
 
 class DataAbstractBranchesMixin:
@@ -593,7 +594,7 @@ class DataAbstractBranchesMixin:
         representation = TimeSeries[Axis]((times,), np.ones((1, 1, 1, 1, 4)))
         dummy = Dummy.from_dict({"X": representation})
 
-        with self.assertRaises(AttributeError):  # type: ignore[attr-defined]
+        with pytest.raises(AttributeError):  # type: ignore[attr-defined]
             dummy._get_plotter()
 
 

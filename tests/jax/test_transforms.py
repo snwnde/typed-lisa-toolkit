@@ -55,7 +55,7 @@ class TestTransformsJax(unittest.TestCase):
 
         fs = shop.time2freq(ts)
 
-        self.assertIsInstance(fs, reps.UniformFrequencySeries)
+        assert isinstance(fs, reps.UniformFrequencySeries)
         expected = jnp.fft.rfft(entries * ts.dt)
         npt.assert_allclose(np.asarray(fs.entries).squeeze(), np.asarray(expected))
 
@@ -65,11 +65,11 @@ class TestTransformsJax(unittest.TestCase):
         fs_no_time = shop.time2freq(tsd, keep_time=False)
         fs_with_time = shop.time2freq(tsd, keep_time=True)
 
-        self.assertIsInstance(fs_no_time, FSData)
-        self.assertNotIn("times", dir(fs_no_time))
-        self.assertIsInstance(fs_with_time, FSData)
+        assert isinstance(fs_no_time, FSData)
+        assert "times" not in dir(fs_no_time)
+        assert isinstance(fs_with_time, FSData)
         npt.assert_allclose(np.asarray(fs_with_time.times), np.asarray(times))
-        self.assertEqual(fs_with_time.channel_names, tsd.channel_names)
+        assert fs_with_time.channel_names == tsd.channel_names
 
     def test_freq2time_frequencyseries_roundtrip(self):
         _, entries, ts = _build_timeseries_jax()
@@ -77,7 +77,7 @@ class TestTransformsJax(unittest.TestCase):
         fs = shop.time2freq(ts)
         recovered = shop.freq2time(fs, times=np.asarray(ts.times))
 
-        self.assertIsInstance(recovered, reps.UniformTimeSeries)
+        assert isinstance(recovered, reps.UniformTimeSeries)
         npt.assert_allclose(
             np.asarray(recovered.entries).squeeze(),
             np.asarray(entries),
@@ -90,8 +90,8 @@ class TestTransformsJax(unittest.TestCase):
         fsd = shop.time2freq(tsd, keep_time=False)
         recovered = shop.freq2time(fsd, times=np.asarray(times))
 
-        self.assertIsInstance(recovered, TSData)
-        self.assertEqual(recovered.channel_names, tsd.channel_names)
+        assert isinstance(recovered, TSData)
+        assert recovered.channel_names == tsd.channel_names
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(times))
         npt.assert_allclose(
             np.asarray(recovered.get_kernel()),
@@ -112,10 +112,8 @@ class TestTransformsJax(unittest.TestCase):
             warnings.simplefilter("always")
             _ = shop.freq2time(fs, times=dense_times)
 
-        self.assertTrue(
-            any(
-                "denser than the Nyquist limit" in str(item.message) for item in caught
-            ),
+        assert any(
+            "denser than the Nyquist limit" in str(item.message) for item in caught
         )
 
     def test_time2wdm_roundtrip_timeseries(self):
@@ -125,8 +123,8 @@ class TestTransformsJax(unittest.TestCase):
         wdm = shop.time2wdm(ts, Nt=2, Nf=4)
         recovered = shop.wdm2time(wdm)
 
-        self.assertIsInstance(wdm, reps.WDM)
-        self.assertIsInstance(recovered, reps.UniformTimeSeries)
+        assert isinstance(wdm, reps.WDM)
+        assert isinstance(recovered, reps.UniformTimeSeries)
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(ts.times))
         npt.assert_allclose(
             np.asarray(recovered.entries).squeeze(),
@@ -141,9 +139,9 @@ class TestTransformsJax(unittest.TestCase):
         wdmdata = shop.time2wdm(tsd, Nt=2, Nf=4)
         recovered = shop.wdm2time(wdmdata)
 
-        self.assertIsInstance(wdmdata, WDMData)
-        self.assertIsInstance(recovered, TSData)
-        self.assertEqual(recovered.channel_names, tsd.channel_names)
+        assert isinstance(wdmdata, WDMData)
+        assert isinstance(recovered, TSData)
+        assert recovered.channel_names == tsd.channel_names
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(times))
         npt.assert_allclose(
             np.asarray(recovered.get_kernel()),
@@ -159,8 +157,8 @@ class TestTransformsJax(unittest.TestCase):
         wdm = shop.freq2wdm(fs, Nt=2, Nf=4)
         recovered = shop.wdm2freq(wdm)
 
-        self.assertIsInstance(wdm, reps.WDM)
-        self.assertIsInstance(recovered, reps.UniformFrequencySeries)
+        assert isinstance(wdm, reps.WDM)
+        assert isinstance(recovered, reps.UniformFrequencySeries)
         npt.assert_allclose(np.asarray(recovered.entries), np.asarray(fs.entries))
         npt.assert_allclose(
             np.asarray(recovered.frequencies),
@@ -175,9 +173,9 @@ class TestTransformsJax(unittest.TestCase):
         wdmdata = shop.freq2wdm(fsd, Nt=2, Nf=4)
         recovered = shop.wdm2freq(wdmdata)
 
-        self.assertIsInstance(wdmdata, WDMData)
-        self.assertIsInstance(recovered, FSData)
-        self.assertEqual(recovered.channel_names, fsd.channel_names)
+        assert isinstance(wdmdata, WDMData)
+        assert isinstance(recovered, FSData)
+        assert recovered.channel_names == fsd.channel_names
         npt.assert_allclose(
             np.asarray(recovered.get_kernel()),
             np.asarray(fsd.get_kernel()),
