@@ -34,6 +34,7 @@ extensions = [
     "sphinx.ext.extlinks",
     "myst_nb",
     "sphinx.ext.mathjax",
+    "sphinx_inline_tabs",
     # "sphinx_autodoc_typehints",
 ]
 

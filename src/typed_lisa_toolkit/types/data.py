@@ -711,7 +711,7 @@ class WDMData[GridT: Grid2D[Linspace, Linspace]](_2DGridData[reps.WDM[GridT]]):
         return "wdm"
 
 
-def _enforce_uniform(ary: Axis) -> Linspace:
+def _enforce_uniform(ary: Axis, /) -> Linspace:
     """Enforce that the given array is uniform and return it as a Linspace."""
     try:
         return Linspace.make(ary)
@@ -721,17 +721,102 @@ def _enforce_uniform(ary: Axis) -> Linspace:
         ) from e
 
 
+def _validate_rep_shape(mapping: Mapping[Any, "AnyReps"], /):
+    _msg = "For data objects, the representation entries must have shape (n_batches, 1, 1, n_features, ...)."
+    for rep in mapping.values():
+        if rep.entries.shape[1:3] != (1, 1):
+            raise ValueError(_msg)
+
+
+_func_deprecation_msg = (
+    "The factory function `{deprecated_func_name}` is deprecated and will be removed in 0.8.0;"
+    + " use the factory function {func_name} instead."
+)
+
+
+@overload
 def tsdata(
-    mapping: Mapping[str, reps.TimeSeries[Linspace]], *, name: str | None = None
+    mapping: Mapping[str, reps.TimeSeries[Linspace]], /, *, name: str | None = None
+) -> TSData: ...
+
+
+@overload
+def tsdata(
+    *,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    name: str | None = None,
+) -> TSData: ...
+
+
+def tsdata(
+    mapping: Mapping[str, reps.TimeSeries[Linspace]] | None = None,
+    /,
+    *,
+    times: Axis | None = None,
+    entries: Array | None = None,
+    channels: tuple[str, ...] | None = None,
+    name: str | None = None,
 ) -> TSData:
-    """Construct :class:`~types.data.TSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.TimeSeries`."""
-    _ = _mixins.validate_maps_to_reps(mapping)
-    return TSData.from_dict(mapping, name=name)
+    """Construct a :class:`~types.TSData`.
+
+    This function provides **two mutually exclusive** construction ways:
+
+    **First**, from a positional-only `mapping` argument:
+
+    Parameters
+    ----------
+    mapping:
+        A mapping from channel names to :class:`~types.TimeSeries` with :class:`~types.Linspace` axes.
+
+    name: str, optional
+        Name of the data.
+
+
+    **Second**, from several keyword arguments:
+
+    Parameters
+    ----------
+    times: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
+        object representing the time grid of the data.
+
+    entries: :class:`~types.misc.Array`
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)`` where ``Nt`` is the size of ``times``.
+        See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+        for more details.
+
+    channels:
+        A tuple of channel names in the data.
+
+    name: str, optional
+        Name of the data.
+    """
+    if mapping is not None:
+        _msg_from_mapping = (
+            "Cannot specify `times`, `entries`, or `channels` "
+            + "when using `mapping` to construct TSData."
+        )
+        assert all(arg is None for arg in (times, entries, channels)), _msg_from_mapping
+        _ = _mixins.validate_maps_to_reps(mapping)
+        _ = _validate_rep_shape(mapping)
+        return TSData.from_dict(mapping, name=name)
+    _msg = (
+        "Must specify `times`, `entries`, and `channels`"
+        + "when not using `mapping` to construct TSData."
+    )
+    assert times is not None and entries is not None and channels is not None, _msg
+    times = _enforce_uniform(times)
+    return TSData.from_entries(
+        times=times, entries=entries, channels=channels, name=name
+    )
 
 
 @overload
 def fsdata(
     mapping: Mapping[str, reps.FrequencySeries[Linspace]],
+    /,
     *,
     times: Axis,
     name: str | None = None,
@@ -740,22 +825,117 @@ def fsdata(
 
 @overload
 def fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]], *, name: str | None = None
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]], /, *, name: str | None = None
 ) -> FSData: ...
 
 
+@overload
 def fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
     *,
+    frequencies: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    times: None = None,
     name: str | None = None,
+) -> FSData: ...
+
+
+@overload
+def fsdata(
+    *,
+    frequencies: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    times: Axis,
+    name: str | None = None,
+) -> TimedFSData: ...
+
+
+def fsdata(
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]] | None = None,
+    /,
+    *,
+    frequencies: Axis | None = None,
+    entries: Array | None = None,
+    channels: tuple[str, ...] | None = None,
     times: Axis | None = None,
+    name: str | None = None,
 ):
-    """Construct :class:`~types.data.FSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.FrequencySeries`."""
-    _ = _mixins.validate_maps_to_reps(mapping)
+    """Construct :class:`~types.FSData` or :class:`.TimedFSData`.
+
+    This function provides **two mutually exclusive** construction ways:
+
+    **First**, from a positional-only `mapping` argument:
+
+    Parameters
+    ----------
+        mapping:
+            A mapping from channel names to :class:`~types.FrequencySeries` with :class:`~types.Linspace` axes.
+
+        times: :class:`~types.misc.Axis`, optional
+            A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
+            object representing the associated time grid of the data.
+            Returns a :class:`~types.TimedFSData` if provided, otherwise returns
+            a :class:`~types.FSData`.
+
+        name: str, optional
+            Name of the data.
+
+
+    **Second**, from several keyword arguments:
+
+    Parameters
+    ----------
+        frequencies: :class:`~types.misc.Axis`
+            A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
+            object representing the frequency grid of the data.
+
+        entries: :class:`~types.misc.Array`
+            A array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+            See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+            for more details.
+
+        channels:
+            A tuple of channel names in the data.
+
+        times: :class:`~types.misc.Axis`, optional
+            A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
+            object representing the associated time grid of the data.
+            Returns a :class:`~types.TimedFSData` if provided, otherwise returns
+            a :class:`~types.FSData`.
+
+        name: str, optional
+            Name of the data.
+
+    Note
+    ----
+    The associated time grid does not count as a grid dimension of the data,
+    hence the shape of `entries` does include the time dimension.
+    """
+    if mapping is not None:
+        _msg_from_mapping = "Cannot specify `frequencies`, `entries`, or `channels` when using `mapping` to construct FSData."
+        assert all(arg is None for arg in (frequencies, entries, channels)), (
+            _msg_from_mapping
+        )
+        _ = _mixins.validate_maps_to_reps(mapping)
+        _ = _validate_rep_shape(mapping)
+        _fsdata = FSData.from_dict(mapping, name=name)
+    else:
+        _msg = "Must specify `frequencies`, `entries`, and `channels` when not using `mapping` to construct FSData."
+        assert (
+            frequencies is not None and entries is not None and channels is not None
+        ), _msg
+        frequencies = _enforce_uniform(frequencies)
+        _fsdata = FSData.from_entries(
+            frequencies=frequencies,
+            entries=entries,
+            channels=channels,
+            name=name,
+        )
     if times is not None:
         times = _enforce_uniform(times)
-        return TimedFSData.from_dict(mapping, times=times, name=name)
-    return FSData.from_dict(mapping, name=name)
+        return _fsdata.set_times(times)
+    return _fsdata
 
 
 def timed_fsdata(
@@ -763,33 +943,286 @@ def timed_fsdata(
     times: Linspace | npt.NDArray[np.floating[Any]],
     name: str | None = None,
 ) -> TimedFSData:
-    """Construct :class:`~types.data.TimedFSData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.FrequencySeries` and a time grid. (*Deprecated*)."""
+    """Construct :class:`~types.TimedFSData` (*Deprecated*).
+
+    Warning
+    -------
+    This function is deprecated and will be removed in 0.8.0;
+    use the :func:`.fsdata` function with the `times` argument instead.
+    """
+    _warn_msg = _func_deprecation_msg.format(
+        deprecated_func_name="timed_fsdata", func_name="`fsdata` with `times` argument"
+    )
     warnings.warn(
-        "The 'timed_fsdata' function is deprecated and will be removed in 0.8.0; use the `fsdata` function with the `times` argument instead.",
+        _warn_msg,
         DeprecationWarning,
         stacklevel=2,
     )
     return fsdata(mapping, times=times, name=name)
 
 
+@overload
 def stftdata[GridT: Grid2D[Linspace, Linspace]](
     mapping: Mapping[str, reps.STFT[GridT]],
+    /,
     *,
     name: str | None = None,
-) -> STFTData[GridT]:
-    """Construct :class:`~types.data.STFTData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.ShortTimeFourierTransform`."""
-    _ = _mixins.validate_maps_to_reps(mapping)
-    return STFTData[GridT].from_dict(mapping, name=name)
+) -> STFTData[GridT]: ...
+
+
+@overload
+def stftdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: None = None,
+    name: str | None = None,
+) -> STFTData[Grid2DCartesian[Linspace, Linspace]]: ...
+
+
+@overload
+def stftdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: Array,
+    name: str | None = None,
+) -> STFTData[Grid2DSparse[Linspace, Linspace]]: ...
+
+
+def stftdata[GridT: Grid2D[Linspace, Linspace]](
+    mapping: Mapping[str, reps.STFT[GridT]] | None = None,
+    /,
+    *,
+    frequencies: Axis | None = None,
+    times: Axis | None = None,
+    entries: Array | None = None,
+    channels: tuple[str, ...] | None = None,
+    sparse_indices: Array | None = None,
+    name: str | None = None,
+):
+    """Construct :class:`~types.STFTData`.
+
+    This function provides **two mutually exclusive** construction ways:
+
+    **First**, from a positional-only `mapping` argument:
+
+    Parameters
+    ----------
+        mapping:
+            A mapping from channel names to :class:`~types.STFT` with :class:`~types.misc.Grid2D`
+            or :class:`~types.Linspace` axes.
+
+        name: str, optional
+            Name of the data.
+
+
+    **Second**, from several keyword arguments:
+
+    Parameters
+    ----------
+        frequencies: :class:`~types.misc.Axis`
+            A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
+            object representing the frequency grid of the data.
+
+        times: :class:`~types.misc.Axis`
+            A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
+            object representing the time grid of the data.
+
+        entries: :class:`~types.misc.Array`
+            An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
+            ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
+            :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+            for more details.
+
+        channels:
+            A tuple of channel names in the data.
+
+        sparse_indices: :class:`~types.misc.Array`, optional
+            An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+            See :attr:`~types.misc.Grid2DSparse.indices` for more details.
+            If not provided, the data is treated as dense.
+
+        name: str, optional
+            Name of the data.
+    """
+    if mapping is not None:
+        _msg_from_mapping = (
+            "Cannot specify `frequencies`, `times`, `entries`, `channels`, "
+            + "or `sparse_indices` when using `mapping` to construct STFTData."
+        )
+        assert all(
+            arg is None
+            for arg in (frequencies, times, entries, channels, sparse_indices)
+        ), _msg_from_mapping
+        _ = _mixins.validate_maps_to_reps(mapping)
+        _ = _validate_rep_shape(mapping)
+        return STFTData[GridT].from_dict(mapping, name=name)
+    _msg = (
+        "Must specify `frequencies`, `times`, `entries`, and `channels` "
+        + "when not using `mapping` to construct STFTData."
+    )
+    assert (
+        frequencies is not None
+        and times is not None
+        and entries is not None
+        and channels is not None
+    ), _msg
+    frequencies = _enforce_uniform(frequencies)
+    times = _enforce_uniform(times)
+    if sparse_indices is None:
+        return STFTData[Grid2DCartesian[Linspace, Linspace]].from_entries(
+            frequencies=frequencies,
+            times=times,
+            entries=entries,
+            channels=channels,
+            sparse_indices=sparse_indices,
+            name=name,
+        )
+    return STFTData[Grid2DSparse[Linspace, Linspace]].from_entries(
+        frequencies=frequencies,
+        times=times,
+        entries=entries,
+        channels=channels,
+        sparse_indices=sparse_indices,
+        name=name,
+    )
+
+
+@overload
+def wdmdata[GridT: Grid2D[Linspace, Linspace]](
+    mapping: Mapping[str, reps.WDM[GridT]],
+    /,
+    *,
+    name: str | None = None,
+) -> WDMData[GridT]: ...
+
+
+@overload
+def wdmdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: None = None,
+    name: str | None = None,
+) -> WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+
+
+@overload
+def wdmdata(
+    *,
+    frequencies: Axis,
+    times: Axis,
+    entries: Array,
+    channels: tuple[str, ...],
+    sparse_indices: Array,
+    name: str | None = None,
+) -> WDMData[Grid2DSparse[Linspace, Linspace]]: ...
 
 
 def wdmdata[GridT: Grid2D[Linspace, Linspace]](
-    mapping: Mapping[str, reps.WDM[GridT]],
+    mapping: Mapping[str, reps.WDM[GridT]] | None = None,
+    /,
     *,
+    frequencies: Axis | None = None,
+    times: Axis | None = None,
+    entries: Array | None = None,
+    channels: tuple[str, ...] | None = None,
+    sparse_indices: Array | None = None,
     name: str | None = None,
-) -> WDMData[GridT]:
-    """Construct :class:`~types.WDMData` from a mapping of channel names to :class:`~typed_lisa_toolkit.types.WilsonDaubechiesMeyer`."""
-    _ = _mixins.validate_maps_to_reps(mapping)
-    return WDMData[GridT].from_dict(mapping, name=name)
+):
+    """Construct :class:`~types.WDMData`.
+
+    This function provides **two mutually exclusive** construction ways:
+
+    **First**, from a positional-only `mapping` argument:
+
+    Parameters
+    ----------
+        mapping:
+            A mapping from channel names to :class:`~types.WDM` with :class:`~types.misc.Grid2D`
+            or :class:`~types.Linspace` axes.
+
+        name: str, optional
+            Name of the data.
+
+
+    **Second**, from several keyword arguments:
+
+    Parameters
+    ----------
+        frequencies: :class:`~types.misc.Axis`
+            A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
+            object representing the frequency grid of the data.
+
+        times: :class:`~types.misc.Axis`
+            A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
+            object representing the time grid of the data.
+
+        entries: :class:`~types.misc.Array`
+            An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
+            ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
+            :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
+            for more details.
+
+        channels:
+            A tuple of channel names in the data.
+
+        sparse_indices: :class:`~types.misc.Array`, optional
+            An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+            See :attr:`~types.misc.Grid2DSparse.indices` for more details.
+            If not provided, the data is treated as dense.
+
+        name: str, optional
+            Name of the data.
+    """
+    if mapping is not None:
+        _msg_from_mapping = (
+            "Cannot specify `frequencies`, `times`, `entries`, `channels`, "
+            + "or `sparse_indices` when using `mapping` to construct WDMData."
+        )
+        assert all(
+            arg is None
+            for arg in (frequencies, times, entries, channels, sparse_indices)
+        ), _msg_from_mapping
+        _ = _mixins.validate_maps_to_reps(mapping)
+        _ = _validate_rep_shape(mapping)
+        return WDMData[GridT].from_dict(mapping, name=name)
+    _msg = (
+        "Must specify `frequencies`, `times`, `entries`, and `channels` "
+        + "when not using `mapping` to construct WDMData."
+    )
+    assert (
+        frequencies is not None
+        and times is not None
+        and entries is not None
+        and channels is not None
+    ), _msg
+    frequencies = _enforce_uniform(frequencies)
+    times = _enforce_uniform(times)
+    if sparse_indices is None:
+        return WDMData[Grid2DCartesian[Linspace, Linspace]].from_entries(
+            frequencies=frequencies,
+            times=times,
+            entries=entries,
+            channels=channels,
+            sparse_indices=sparse_indices,
+            name=name,
+        )
+    return WDMData[Grid2DSparse[Linspace, Linspace]].from_entries(
+        frequencies=frequencies,
+        times=times,
+        entries=entries,
+        channels=channels,
+        sparse_indices=sparse_indices,
+        name=name,
+    )
 
 
 def construct_tsdata(
@@ -799,29 +1232,41 @@ def construct_tsdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> TSData:
-    """Construct a :class:`~types.TSData`.
+    """Construct a :class:`~types.TSData` (*Deprecated*).
 
     Parameters
     ----------
-    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        A uniform array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    times: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the time grid of the data.
 
-    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+    entries: :class:`~types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)`` where ``Nt`` is the size of ``times``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
 
-    channels: tuple[str, ...]
+    channels:
         Names of the channels in the data.
 
-    name: str | None
-        Name of the data. Default is ``None``.
+    name: str, optional
+        Name of the data.
+
+
+    Warning
+    -------
+    This function is deprecated and will be removed in 0.8.0; use the :func:`.tsdata`
+    function with the keyword arguments instead.
     """
-    times = _enforce_uniform(times)
-    return TSData.from_entries(
-        times=times, entries=entries, channels=channels, name=name
+    _msg = _func_deprecation_msg.format(
+        deprecated_func_name="construct_tsdata",
+        func_name="`tsdata` with keyword arguments",
     )
+    warnings.warn(
+        _msg,
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return tsdata(times=times, entries=entries, channels=channels, name=name)
 
 
 @overload
@@ -853,40 +1298,46 @@ def construct_fsdata(
     name: str | None = None,
     times: Axis | None = None,
 ) -> FSData:
-    """Construct an :class:`~types.data.FSData`.
+    """Construct an :class:`~types.data.FSData` (*Deprecated*).
 
     Parameters
     ----------
-    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    frequencies: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
         object representing the frequency grid of the data.
 
-    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+    entries: :class:`~types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
 
-    channels: tuple[str, ...]
+    channels:
         Names of the channels in the data.
 
-    name: str | None
-        Name of the data. Default is ``None``.
+    name: str, optional
+        Name of the data.
+
+    Warning
+    -------
+    This function is deprecated and will be removed in 0.8.0; use the
+    :func:`.fsdata` function with the keyword arguments instead.
     """
-    frequencies = _enforce_uniform(frequencies)
-    if times is None:
-        return FSData.from_entries(
-            frequencies=frequencies,
-            entries=entries,
-            channels=channels,
-            name=name,
-        )
-    times = _enforce_uniform(times)
-    return TimedFSData.from_entries(
+    _msg = _func_deprecation_msg.format(
+        deprecated_func_name="construct_fsdata",
+        func_name="`fsdata` with keyword arguments",
+    )
+    warnings.warn(
+        _msg,
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return fsdata(
         frequencies=frequencies,
         entries=entries,
         channels=channels,
         name=name,
-    ).set_times(times)
+        times=times,
+    )
 
 
 def construct_timed_fsdata(
@@ -901,11 +1352,11 @@ def construct_timed_fsdata(
 
     Parameters
     ----------
-    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    frequencies: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
         object representing the frequency grid of the data.
 
-    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+    entries: :class:`~types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
@@ -913,8 +1364,8 @@ def construct_timed_fsdata(
     channels: tuple[str, ...]
         Names of the channels in the data.
 
-    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        An array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    times: :class:`~types.misc.Axis`
+        An array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the associated time grid of the data.
 
     name: str | None
@@ -925,18 +1376,27 @@ def construct_timed_fsdata(
     The associated time grid does not count as a grid dimension of the data,
     hence the shape of `entries` does include the time dimension.
 
+    Warning
+    -------
+    This function is deprecated and will be removed in 0.8.0; use the
+    :func:`.fsdata` function with the `times` argument instead.
+
     """
+    _msg = _func_deprecation_msg.format(
+        deprecated_func_name="construct_timed_fsdata",
+        func_name="`fsdata` with `times` argument",
+    )
     warnings.warn(
-        "The 'construct_timed_fsdata' function is deprecated and will be removed in 0.8.0; use `construct_fsdata` with the `times` argument instead.",
+        _msg,
         DeprecationWarning,
         stacklevel=2,
     )
-    return construct_fsdata(
+    return fsdata(
         frequencies=frequencies,
         entries=entries,
         channels=channels,
-        name=name,
         times=times,
+        name=name,
     )
 
 
@@ -973,19 +1433,19 @@ def construct_stftdata(
     sparse_indices: Array | None = None,
     name: str | None = None,
 ):
-    """Construct an :class:`~types.data.STFTData`.
+    """Construct an :class:`~types.data.STFTData` (*Deprecated*).
 
     Parameters
     ----------
-    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    frequencies: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
         object representing the frequency grid of the data.
 
-    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        A uniform array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    times: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the time grid of the data.
 
-    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+    entries: :class:`~types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
         ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
         :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -994,26 +1454,29 @@ def construct_stftdata(
     channels: tuple[str, ...]
         Names of the channels in the data.
 
-    sparse_indices: :class:`~typed_lisa_toolkit.types.misc.Array` | None
+    sparse_indices: :class:`~types.misc.Array`, optional
         An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
-        See :attr:`~typed_lisa_toolkit.types.misc.Grid2DSparse.indices` for more details.
-        If ``None``, the data is treated as dense.
+        See :attr:`~types.misc.Grid2DSparse.indices` for more details.
+        If not provided, the data is treated as dense.
 
-    name: str | None
-        Name of the data. Default is ``None``.
+    name: str, optional
+        Name of the data.
+
+    Warning
+    -------
+    This function is deprecated and will be removed in 0.8.0; use the
+    :func:`.stftdata` function with the keyword arguments instead.
     """
-    frequencies = _enforce_uniform(frequencies)
-    times = _enforce_uniform(times)
-    if sparse_indices is None:
-        return STFTData[Grid2DCartesian[Linspace, Linspace]].from_entries(
-            frequencies=frequencies,
-            times=times,
-            entries=entries,
-            channels=channels,
-            sparse_indices=sparse_indices,
-            name=name,
-        )
-    return STFTData[Grid2DSparse[Linspace, Linspace]].from_entries(
+    _msg = _func_deprecation_msg.format(
+        deprecated_func_name="construct_stftdata",
+        func_name="`stftdata` with keyword arguments",
+    )
+    warnings.warn(
+        _msg,
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return stftdata(
         frequencies=frequencies,
         times=times,
         entries=entries,
@@ -1056,51 +1519,55 @@ def construct_wdmdata(
     sparse_indices: Array | None = None,
     name: str | None = None,
 ):
-    """Construct a :class:`~types.data.WDMData`.
+    """Construct a :class:`~types.data.WDMData` (*Deprecated*).
 
     Parameters
     ----------
-    frequencies: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        A uniform array of shape ``(n_freqs,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    frequencies: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
         object representing the frequency grid of the data.
 
-    times: :class:`~typed_lisa_toolkit.types.misc.Axis`
-        A uniform array of shape ``(n_times,)`` or a :class:`~typed_lisa_toolkit.types.Linspace`
+    times: :class:`~types.misc.Axis`
+        A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the time grid of the data.
 
-    entries: :class:`~typed_lisa_toolkit.types.misc.Array`
+    entries: :class:`~types.misc.Array`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
         ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
         :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
 
-    channels: tuple[str, ...]
+    channels:
         Names of the channels in the data.
 
-    sparse_indices: :class:`~typed_lisa_toolkit.types.misc.Array` | None
+    sparse_indices: :class:`~types.misc.Array`, optional
         An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
-        See :attr:`~typed_lisa_toolkit.types.misc.Grid2DSparse.indices` for more details.
-        If ``None``, the data is treated as dense.
+        See :attr:`~types.misc.Grid2DSparse.indices` for more details.
+        If not provided, the data is treated as dense.
 
-    name: str | None
+    name: str, optional
         Name of the data. Default is ``None``.
+
+    Warning
+    -------
+    This function is deprecated and will be removed in 0.8.0; use the
+    :func:`.wdmdata` function with the keyword arguments instead.
     """
-    frequencies = _enforce_uniform(frequencies)
-    times = _enforce_uniform(times)
-    if sparse_indices is None:
-        return WDMData[Grid2DCartesian[Linspace, Linspace]].from_entries(
-            frequencies=frequencies,
-            times=times,
-            entries=entries,
-            channels=channels,
-            sparse_indices=sparse_indices,
-            name=name,
-        )
-    return WDMData[Grid2DSparse[Linspace, Linspace]].from_entries(
+    _msg = _func_deprecation_msg.format(
+        deprecated_func_name="construct_wdmdata",
+        func_name="`wdmdata` with keyword arguments",
+    )
+    warnings.warn(
+        _msg,
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return wdmdata(
         frequencies=frequencies,
         times=times,
         entries=entries,
         channels=channels,
+        sparse_indices=sparse_indices,
         name=name,
     )
 
