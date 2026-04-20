@@ -8,14 +8,13 @@ All tests should pass with JAX arrays.
 """
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
+import contextlib
 import unittest
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
-
-jax.config.update("jax_enable_x64", val=True)
-import jax.numpy as jnp
 import pytest
 
 from tests._helpers import (
@@ -39,7 +38,7 @@ from typed_lisa_toolkit.types import (
     Linspace,
     Phasor,
 )
-from typed_lisa_toolkit.types.representations import (  # extra symbols for coverage tests
+from typed_lisa_toolkit.types.representations import (
     _embed_entries_to_grid_2d_sparse,
     _get_full_slice,
     _get_subset_slice,
@@ -47,9 +46,14 @@ from typed_lisa_toolkit.types.representations import (  # extra symbols for cove
     _take_subset,
 )
 
+jax.config.update("jax_enable_x64", val=True)
+
+SEED = 11324214
+rng = np.random.default_rng(SEED)
+
 
 class TestCanonicalShapeJAX(unittest.TestCase):
-    """Test semantic benefits of canonical shape with JAX: (n_batches, n_channels, n_harmonics, n_features, *grid_dims)."""
+    """Test semantic benefits of canonical shape with JAX: (n_batches, n_channels, n_harmonics, n_features, *grid_dims)."""  # noqa: E501
 
     def setUp(self):
         """Create test fixtures with JAX arrays."""
@@ -76,7 +80,7 @@ class TestCanonicalShapeJAX(unittest.TestCase):
         self.tf = case["tf"]
 
     def test_batch_dimension_indexing(self):
-        """Test that batch dimension is first, enabling natural batch selection with JAX."""
+        """Test that batch dimension is first, enabling natural batch selection with JAX."""  # noqa: E501
         # Verify series report correct batch count
         assert self.fs.n_batches == self.n_batches
         assert self.ts.n_batches == self.n_batches
@@ -104,7 +108,7 @@ class TestCanonicalShapeJAX(unittest.TestCase):
         )
 
     def test_channel_dimension_indexing(self):
-        """Test that channel dimension is second, enabling natural channel selection with JAX."""
+        """Test that channel dimension is second, enabling natural channel selection with JAX."""  # noqa: E501
         # Verify series report correct channel count
         assert self.fs.n_channels == self.n_channels
         assert self.ts.n_channels == self.n_channels
@@ -132,7 +136,7 @@ class TestCanonicalShapeJAX(unittest.TestCase):
         )
 
     def test_harmonic_dimension_indexing(self):
-        """Test that harmonic dimension is third, enabling natural harmonic selection with JAX."""
+        """Test that harmonic dimension is third, enabling natural harmonic selection with JAX."""  # noqa: E501
         # Verify series report correct harmonic count
         assert self.fs.n_harmonics == self.n_harmonics
         assert self.ts.n_harmonics == self.n_harmonics
@@ -271,12 +275,14 @@ class TestSubsetOperationsJAX(unittest.TestCase):
         freqs_large_np = np.linspace(1e-4, 1e-1, self.len_grid_large)
         self.freqs_large = jnp.array(freqs_large_np)
         entries_fs_large = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_grid_large,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_grid_large,
+                )
             ),
         )
         self.fs_large = frequency_series(self.freqs_large, entries=entries_fs_large)
@@ -284,12 +290,14 @@ class TestSubsetOperationsJAX(unittest.TestCase):
         # Time series fixture with Linspace and JAX entries
         self.times_ls = Linspace(0.0, 0.01, 1000)
         entries_ts_ls = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                1000,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    1000,
+                )
             ),
         )
         self.ts_ls = time_series(self.times_ls, entries=entries_ts_ls)
@@ -344,12 +352,14 @@ class TestSubsetOperationsJAX(unittest.TestCase):
         # Create grid and canonical entries with JAX using parameterized shape
         grid = (jnp.linspace(0, 10, self.len_grid_small),)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_grid_small,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_grid_small,
+                )
             ),
         )
 
@@ -427,12 +437,14 @@ class TestSubsetOperationsJAX(unittest.TestCase):
         # Create test series with parameterized shape
         freqs = jnp.linspace(0, 1, 100)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                100,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    100,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -455,13 +467,15 @@ class TestSubsetOperationsJAX(unittest.TestCase):
         times = jnp.linspace(0, 10, 100)
         freqs = jnp.linspace(0, 1, 50)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                50,
-                100,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    50,
+                    100,
+                )
             ),
         )
         tf = STFT(grid=(freqs, times), entries=entries)
@@ -489,13 +503,15 @@ class TestSubsetOperationsJAX(unittest.TestCase):
         times = jnp.linspace(0, 10, 100)
         freqs = jnp.linspace(0, 1, 50)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                50,
-                100,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    50,
+                    100,
+                )
             ),
         )
         tf = STFT(grid=(freqs, times), entries=entries)
@@ -528,7 +544,7 @@ class TestEmbedOperationsJAX(unittest.TestCase):
         large_grid = (jnp.linspace(0, 10, 101),)
 
         # Create canonical shape entries with JAX
-        entries_small = jnp.array(np.random.randn(2, 3, 2, 1, 31))
+        entries_small = jnp.array(rng.standard_normal((2, 3, 2, 1, 31)))
 
         # Extend
         extender = utils.extend_to(large_grid)
@@ -592,7 +608,7 @@ class TestEmbedOperationsJAX(unittest.TestCase):
         """Test TimeSeries.get_embedded with JAX arrays."""
         # Small grid (Linspace), JAX entries
         times_small = Linspace(2.0, 0.1, 30)
-        entries_small = jnp.array(np.random.randn(2, 1, 1, 1, 30))
+        entries_small = jnp.array(rng.standard_normal((2, 1, 1, 1, 30)))
         ts_small = time_series(times=times_small, entries=entries_small)
 
         # Large grid (Linspace)
@@ -632,44 +648,54 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
         times_large = jnp.linspace(0, 10, 100)
         freqs_large = jnp.linspace(0, 1, 50)
         entries_tf = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                100,
-                50,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    100,
+                    50,
+                )
             ),
         )
         self.tf_large = STFT(grid=(times_large, freqs_large), entries=entries_tf)
 
     def test_addition_same_grid(self):
         """Test adding two series with same grid and canonical shape using JAX."""
-        entries1_np = np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            self.len_freq,
-        ) + 1j * np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            self.len_freq,
+        entries1_np = rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                self.len_freq,
+            )
+        ) + 1j * rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                self.len_freq,
+            )
         )
-        entries2_np = np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            self.len_freq,
-        ) + 1j * np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            self.len_freq,
+        entries2_np = rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                self.len_freq,
+            )
+        ) + 1j * rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                self.len_freq,
+            )
         )
         entries1 = jnp.array(entries1_np)
         entries2 = jnp.array(entries2_np)
@@ -699,12 +725,14 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
     def test_multiplication_scalar(self):
         """Test multiplying series by scalar with canonical shape using JAX."""
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_time,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_time,
+                )
             ),
         )
         ts = time_series(times=self.times, entries=entries)
@@ -728,21 +756,25 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
     def test_subtraction(self):
         """Test subtraction with canonical shape using JAX."""
         entries1 = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq,
+                )
             ),
         )
         entries2 = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq,
+                )
             ),
         )
 
@@ -768,24 +800,28 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
         """Test create_like preserves grid but replaces entries with JAX."""
         freqs = Linspace(0.0, 1e-3, 200)
         entries_old = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                200,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    200,
+                )
             ),
         )
         fs_old = frequency_series(freqs, entries=entries_old)
 
         # Create new entries with JAX, same shape
         entries_new = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                200,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    200,
+                )
             )
             * 10,
         )
@@ -809,21 +845,25 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
     def test_division_scalar(self):
         """Test dividing series by scalar with canonical shape using JAX."""
         entries_np = (
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq,
+                )
             )
             + 0.5
             + 1j
-            * np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq,
+            * rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq,
+                )
             )
         )
         entries = jnp.array(entries_np)
@@ -841,12 +881,14 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
 
     def test_right_multiplication(self):
         """Test right multiplication (scalar * series) with JAX."""
-        entries_np = np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            self.len_time,
+        entries_np = rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                self.len_time,
+            )
         )
         entries = jnp.array(entries_np)
         ts = time_series(self.times_short, entries=entries)
@@ -864,21 +906,25 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
     def test_right_division(self):
         """Test right division (scalar / series) with JAX."""
         entries_np = (
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq,
+                )
             )
             + 0.5
             + 1j
-            * np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq,
+            * rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq,
+                )
             )
         )
         entries = jnp.array(entries_np)
@@ -896,12 +942,14 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
 
     def test_negation(self):
         """Test unary negation operator with JAX."""
-        entries_np = np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            self.len_freq,
+        entries_np = rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                self.len_freq,
+            )
         )
         entries = jnp.array(entries_np)
         fs = frequency_series(self.freqs_short, entries=entries)
@@ -922,21 +970,25 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
         # Addition
         times = jnp.linspace(0, 10, 100)
         freqs = jnp.linspace(0, 1, 50)
-        entries1_np = np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            100,
-            50,
+        entries1_np = rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                100,
+                50,
+            )
         )
-        entries2_np = np.random.randn(
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-            100,
-            50,
+        entries2_np = rng.standard_normal(
+            (
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                100,
+                50,
+            )
         )
         entries1 = jnp.array(entries1_np)
         entries2 = jnp.array(entries2_np)
@@ -993,12 +1045,14 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
         """Test FrequencySeries.df property with JAX entries."""
         freqs = Linspace(0.0, 1e-3, self.len_freq_long)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq_long,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq_long,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -1021,12 +1075,14 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
         """Test TimeSeries.dt property with JAX entries."""
         times = Linspace(0.0, 0.01, self.len_time)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_time,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_time,
+                )
             ),
         )
         ts = time_series(times, entries=entries)
@@ -1049,12 +1105,14 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
         """Test frequencies property returns grid[0] with JAX."""
         freqs = jnp.linspace(0, 1, self.len_freq_short)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq_short,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq_short,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -1072,12 +1130,14 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
         """Test times property returns grid[0] with JAX."""
         times = jnp.linspace(0, 10, self.len_freq_long)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_freq_long,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_freq_long,
+                )
             ),
         )
         ts = time_series(times=times, entries=entries)
@@ -1106,12 +1166,14 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
         """Test that 1D series have grid as tuple with JAX."""
         freqs = jnp.linspace(0, 1, self.len_grid_small)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_grid_small,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_grid_small,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -1130,12 +1192,14 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
         """Test that uniform JAX arrays are converted to Linspace."""
         freqs = jnp.linspace(0, 1, self.len_grid_large)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_grid_large,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_grid_large,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -1156,12 +1220,14 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
         """Test that non-uniform JAX arrays are not converted to Linspace."""
         freqs = jnp.array([0.1, 0.2, 0.5, 1.0, 2.0])  # Non-uniform
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                5,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    5,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -1190,12 +1256,14 @@ class TestEdgeCasesJAX(unittest.TestCase):
         """Test that subset operations preserve JAX array type."""
         freqs = jnp.linspace(0, 1, self.len_grid_large)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_grid_large,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_grid_large,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -1220,21 +1288,25 @@ class TestEdgeCasesJAX(unittest.TestCase):
         """Test that arithmetic operations preserve JAX array type."""
         freqs = jnp.linspace(0, 1, 50)
         entries1 = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                50,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    50,
+                )
             ),
         )
         entries2 = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                50,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    50,
+                )
             ),
         )
 
@@ -1260,12 +1332,14 @@ class TestEdgeCasesJAX(unittest.TestCase):
         """Test behavior with empty subsets using JAX."""
         freqs = jnp.array([0.0, 0.01, 0.05, 0.2, 1.0])
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_grid_small,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    self.len_grid_small,
+                )
             ),
         )
         fs = frequency_series(freqs, entries=entries)
@@ -1477,7 +1551,8 @@ class TestComplexPropertiesJAX(unittest.TestCase):
         )
 
 
-# It's a design choice to not validate shape on construction, so some tests are commented out.
+# It's a design choice to not validate shape on construction,
+# so some tests are commented out.
 # If strict validation is added, they should be re-enabled.
 class TestErrorHandlingJAX(unittest.TestCase):
     """Test error handling and validation for invalid operations with JAX."""
@@ -1493,9 +1568,9 @@ class TestErrorHandlingJAX(unittest.TestCase):
     #     freqs = jnp.linspace(0, 1, 50)
     #     # Entries have 60 grid points, but grid only has 50
     #     entries = jnp.array(
-    #         np.random.randn(
+    #         rng.standard_normal((
     #             self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 60
-    #         )
+    #         ))
     #     )
 
     #     # Should raise error on construction
@@ -1505,21 +1580,25 @@ class TestErrorHandlingJAX(unittest.TestCase):
     def test_addition_incompatible_grids(self):
         """Test that adding series with different grids raises error."""
         entries1 = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                50,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    50,
+                )
             ),
         )
         entries2 = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                100,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    100,
+                )
             ),
         )
 
@@ -1530,28 +1609,18 @@ class TestErrorHandlingJAX(unittest.TestCase):
         with pytest.raises(ValueError, match=r".+"):
             _ = fs1 + fs2
 
-    # def test_invalid_canonical_shape(self):
-    #     """Test that invalid canonical shapes are rejected."""
-    #     # Missing features dimension (should have 5 dimensions, has 4)
-    #     freqs = jnp.linspace(0, 1, 50)
-    #     entries = jnp.array(
-    #         np.random.randn(self.n_batches, self.n_channels, self.n_harmonics, 50)
-    #     )
-
-    #     # Should raise error on construction
-    #     with self.assertRaises(ValueError):
-    #         FrequencySeries(grid=(freqs,), entries=entries)
-
     def test_empty_grid(self):
         """Test that empty grids are handled appropriately."""
         freqs = jnp.array([])
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                0,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    0,
+                )
             ),
         )
 
@@ -1566,33 +1635,35 @@ class TestErrorHandlingJAX(unittest.TestCase):
         times = jnp.linspace(0, 10, 100)
         freqs = jnp.linspace(0, 1, 50)
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                100,
-                50,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    100,
+                    50,
+                )
             ),
         )
 
         tf_correct = STFT(grid=(times, freqs), entries=entries)
         assert len(tf_correct.grid) == 2
 
-        try:
+        with contextlib.suppress(ValueError):
             STFT(grid=(times, freqs, times), entries=entries)
-        except ValueError:
-            pass
 
     def test_invalid_subset_interval(self):
         """Test that subset intervals are handled gracefully."""
         entries = jnp.array(
-            np.random.randn(
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                50,
+            rng.standard_normal(
+                (
+                    self.n_batches,
+                    self.n_channels,
+                    self.n_harmonics,
+                    self.n_features,
+                    50,
+                )
             ),
         )
         fs = frequency_series(self.freqs_short, entries=entries)
@@ -1673,10 +1744,8 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
         entries_small = jnp.ones((1, 1, 1, 1, 3), dtype=jnp.float64) * 2.0
         fs_large = frequency_series(large_freqs_arr, entries=entries_large)
         fs_small = frequency_series(small_freqs_arr, entries=entries_small)
-        try:
+        with contextlib.suppress(ValueError, IndexError, TypeError):
             fs_large += fs_small
-        except (ValueError, IndexError, TypeError):
-            pass
 
     def test_addition_with_equal_nonuniform_array_grids(self):
         # Non-uniform grids avoid Linspace coercion and force array_equal path.
@@ -1803,7 +1872,8 @@ class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
             source_times,
             sparse_indices=source_indices,
         )
-        # For sparse grids, entries is 5D: (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
+        # For sparse grids, entries is 5D:
+        # (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
         source_entries = jnp.array([[[[1.0, 2.0, 3.0]]]])
 
         embedding_grid = (
@@ -1826,11 +1896,12 @@ class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
         npt.assert_array_equal(np.asarray(new_entries), np.array([[[[1.0, 2.0, 3.0]]]]))
 
     def test_sparse_stft_factory_with_sparse_indices(self):
-        """Test that stft factory returns sparse-grid representation when indices are provided (JAX)."""
+        """Test that stft factory returns sparse-grid representation when indices are provided (JAX)."""  # noqa: E501
         freqs = jnp.array([2.0, 3.0, 4.0])
         times = jnp.array([10.0, 20.0, 30.0])
         sparse_indices = np.array([[0, 0], [1, 2], [2, 1]], dtype=int)
-        # For sparse grids, entries is 5D: (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
+        # For sparse grids, entries is 5D:
+        # (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
         entries = jnp.array([[[[[7.0, 8.0, 9.0]]]]])
 
         tf = stft(freqs, times, entries=entries, sparse_indices=sparse_indices)

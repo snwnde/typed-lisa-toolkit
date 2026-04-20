@@ -60,9 +60,9 @@ class WhittleLikelihood[
     """Abstract Whittle likelihood."""
 
     def __init__(self, data: "AnyData", noisemodel: nm.NoiseModelLike[Any, Any]):
-        self._data: "AnyData" = data
+        self._data: AnyData = data
         self._noisemodel: nm.NoiseModelLike[Any, Any] = noisemodel
-        self.data_square: "Array" = self.noisemodel.get_scalar_product(data, data)
+        self.data_square: Array = self.noisemodel.get_scalar_product(data, data)
 
     @property
     def data(self):  # pyright: ignore[reportRedeclaration]
@@ -74,7 +74,7 @@ class WhittleLikelihood[
     @property
     def noisemodel(self) -> NoiseModelT:
         """Get the noise model."""
-        return cast(NoiseModelT, self._noisemodel)
+        return cast("NoiseModelT", self._noisemodel)
 
     @classmethod
     def log_likelihood_ratio(cls, cross_product: "Array", template_square: "Array"):
@@ -104,11 +104,13 @@ class FDWhittleLikelihood(WhittleLikelihood[nm.FDNoiseModel]):
         \log \mathcal{L} = -\frac{1}{2} \left( d \middle| d \right) +
         \left( d \middle| h \right) -\frac{1}{2} \left( h \middle| h \right).
 
-    The term :math:`\left( d \middle| d \right)` is computed upon initialization and is constant.
+    The term :math:`\left( d \middle| d \right)` is computed upon
+    initialization and is constant.
 
     Attention
     ---------
-    This class is considered experimental. If you are interested in using it, please reach out to the
+    This class is considered experimental. If you are interested in using it,
+    please reach out to the
     developers to discuss your use case and how we can best support it.
     """
 

@@ -6,8 +6,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import jax
-
-jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -40,6 +38,8 @@ from typed_lisa_toolkit import (
     sum_harmonics,
 )
 from typed_lisa_toolkit.types import modes
+
+jax.config.update("jax_enable_x64", val=True)
 
 
 class TestHarmonicWaveformJAX(unittest.TestCase):
@@ -175,7 +175,8 @@ class TestDenseMakerJAX(unittest.TestCase):
     @staticmethod
     def _windowed(frequencies, phasor):
         # JAX arrays are converted to NumPy for searchsorted; mirrors the windowing
-        # inside get_dense_maker so we can check the exact slice sent to get_interpolated.
+        # inside get_dense_maker so we can check the exact
+        # slice sent to get_interpolated.
         freqs = np.asarray(frequencies)
         return freqs[
             np.searchsorted(freqs, phasor.f_min, side="left") : np.searchsorted(
@@ -192,7 +193,8 @@ class TestDenseMakerJAX(unittest.TestCase):
                 phasor.entries = frequencies
 
     def test_dense_maker_embed_false_calls_interpolated_only(self):
-        # Full frequency grid (JAX array) passed to `make`; each phasor covers a sub-range.
+        # Full frequency grid (JAX array) passed to `make`;
+        # each phasor covers a sub-range.
         frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
         wf, handles = build_harmonic_projected_phasor_waveform()

@@ -159,10 +159,7 @@ def build_canonical_representations(
 
 
 def build_freq_series(xp, *, uniform=True):
-    if uniform:
-        frequencies = _build_uniform_frequencies(xp)
-    else:
-        frequencies = _build_frequencies(xp)
+    frequencies = _build_uniform_frequencies(xp) if uniform else _build_frequencies(xp)
     _entries = _build_complex_entries(
         xp,
         [1.0 + 0.5j, -1.0j, 2.0 + 0.0j],
@@ -377,7 +374,7 @@ class LinspaceExtraPropertiesMixin:
     def test_eq_returns_false_for_step_mismatch(self):
         ls1 = Linspace(0.0, 1.0, 5)
         ls2 = Linspace(0.0, 2.0, 5)
-        assert not ls1 == ls2
+        assert ls1 != ls2
 
     def test_array_with_copy_false(self):
         ls = Linspace(0.0, 1.0, 5)
@@ -509,7 +506,7 @@ class AdvancedRepresentationMethodsMixin:
     def test_stft_make_classmethod(self):
         times = np.linspace(0, 10, 100)
         freqs = np.linspace(0, 1, 50)
-        entries = np.random.randn(1, 1, 1, 1, 100, 50)
+        entries = rng.standard_normal((1, 1, 1, 1, 100, 50))
         stft = STFT.make(times=times, frequencies=freqs, entries=entries)
         assert isinstance(stft, STFT)
         npt.assert_allclose(np.array(stft.grid[1]), times, rtol=1e-10)
@@ -518,7 +515,7 @@ class AdvancedRepresentationMethodsMixin:
     def test_stft_times_and_frequencies_properties(self):
         freqs = np.linspace(0, 1, 50)
         times = np.linspace(0, 10, 100)
-        entries = np.random.randn(1, 1, 1, 1, 50, 100)
+        entries = rng.standard_normal((1, 1, 1, 1, 50, 100))
         stft = STFT(grid=(freqs, times), entries=entries)
         npt.assert_allclose(np.array(stft.times), times)
         npt.assert_allclose(np.array(stft.frequencies), freqs)
@@ -540,7 +537,7 @@ class WDMPropertiesAndMethodsMixin:
 
     def test_nd_duration_sample_interval(self):
         wdm = self.wdm
-        assert wdm.ND == wdm.Nf * wdm.Nt
+        assert wdm.Nf * wdm.Nt == wdm.ND
         # self.assertAlmostEqual(wdm.duration, wdm.Nt * wdm.times.step)
         # self.assertAlmostEqual(wdm.sample_interval, wdm.duration / wdm.ND)
         assert wdm.dt == pytest.approx(wdm.sample_interval)
@@ -633,7 +630,8 @@ def make_valid_mock_representation(*, name: str | None = None, frequencies: Any 
             frequencies=np.arange(entries_arr.shape[-1], dtype=np.float64),
         )
         out.entries = entries_arr
-        # Preserve waveform-helper methods/metadata when ProjectedWaveform views call create_like.
+        # Preserve waveform-helper methods/metadata
+        # when ProjectedWaveform views call create_like.
         for attr in ("f_min", "f_max"):
             if hasattr(rep, attr):
                 setattr(out, attr, getattr(rep, attr))
@@ -655,7 +653,7 @@ def set_mock_frequency_entries(rep: Any, frequencies: Any):
 
 
 def make_mock_phasor(*, f_min: float, f_max: float, frequencies: Any = None):
-    """Return (phasor, interpolated, embedded) mock triple with a preset frequency range."""
+    """Return (phasor, interpolated, embedded) mock triple with a preset frequency range."""  # noqa: E501
     phasor = make_valid_mock_representation(name="phasor", frequencies=frequencies)
     phasor.f_min = f_min
     phasor.f_max = f_max

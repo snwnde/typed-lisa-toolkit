@@ -1,9 +1,9 @@
 """Miscellaneous utility types."""
 
 import logging
+from collections.abc import Callable
 from types import ModuleType
 from typing import (
-    Callable,
     Literal,
     Self,
     cast,
@@ -27,12 +27,12 @@ else:
     type Array = jax.Array | npt.NDArray[np.number]  # pyright: ignore[reportRedeclaration]
     """An array from any array library supporting the Python Array API standard.
 
-    Currently only NumPy and JAX arrays have been tested, but in principle any array 
+    Currently only NumPy and JAX arrays have been tested, but in principle any array
     library that implements the Python Array API standard should be compatible.
     """
 
 ArrayFunc = Callable[[Array], Array]
-"""A callable that takes an :class:`array <.Array>` as input and returns an :class:`array <.Array>` as output."""
+"""A callable that takes an :class:`array <.Array>` as input and returns an :class:`array <.Array>` as output."""  # noqa: E501
 
 Interpolator = Callable[[Array, Array], ArrayFunc]
 """A callable providing interpolation functionality.
@@ -40,7 +40,7 @@ Interpolator = Callable[[Array, Array], ArrayFunc]
 
 The callable takes two :class:`arrays <.Array>` as input,
 representing the x and y coordinates of the known data points,
-and returns a function that can be used to interpolate values 
+and returns a function that can be used to interpolate values
 at new x coordinates.
 """
 
@@ -114,7 +114,7 @@ class Linspace:
             return False
         if not self.step == other.step:
             return False
-        if not len(self) == len(other):
+        if not len(self) == len(other):  # noqa: SIM103
             return False
         return True
 
@@ -156,7 +156,7 @@ class Linspace:
 
     @classmethod
     def make(cls, array: "ArrayLike | LinspaceLike") -> "Linspace":
-        """Create a Linspace from a numpy array or return the input if already Linspace."""
+        """Create a Linspace from a numpy array or return the input if already Linspace."""  # noqa: E501
         if isinstance(array, Linspace):
             return array
         if isinstance(array, LinspaceLike):
@@ -181,7 +181,7 @@ class Linspace:
 
 
 Axis = Array | Linspace
-"""An axis of a grid, which can be either an :class:`array <.Array>` or a :class:`Linspace`."""
+"""An axis of a grid, which can be either an :class:`array <.Array>` or a :class:`Linspace`."""  # noqa: E501
 
 
 def linspace(start: float, step: float, num: int) -> Linspace:
@@ -191,11 +191,11 @@ def linspace(start: float, step: float, num: int) -> Linspace:
 
 def linspace_from_array(array: ArrayLike) -> Linspace:
     """Create a :class:`~types.Linspace` instance from an array."""
-    MIN_SIZE = 2
+    min_size = 2
     xp = xpc.get_namespace(array)
     _array = xp.asarray(array)
-    if len(_array) < MIN_SIZE:
-        msg = f"Array must have at least {MIN_SIZE} elements to create Linspace."
+    if len(_array) < min_size:
+        msg = f"Array must have at least {min_size} elements to create Linspace."
         raise ValueError(msg)
     diff = xp.diff(_array)
     if not xp.allclose(diff, diff[0], rtol=1e-8, atol=0):
@@ -209,20 +209,20 @@ class Grid2DSparse[Axis0: Axis, Axis1: Axis]:
 
     indices: Array
     """
-    The indices of the non-empty points in the grid, represented as an array of shape 
-    ``(n_sparse_points, 2)`` where each row is a pair of indices corresponding to the 
+    The indices of the non-empty points in the grid, represented as an array of shape
+    ``(n_sparse_points, 2)`` where each row is a pair of indices corresponding to the
     positions in ``axis0`` and ``axis1``.
     """
 
     @property
     def axis0(self) -> Axis0:
         """The first axis of the grid."""
-        return cast(Axis0, self._axis0)
+        return cast("Axis0", self._axis0)
 
     @property
     def axis1(self) -> Axis1:
         """The second axis of the grid."""
-        return cast(Axis1, self._axis1)
+        return cast("Axis1", self._axis1)
 
     def __init__(self, axis0: Axis, axis1: Axis, *, sparse_indices: Array):
         self._axis0: Axis = axis0
@@ -242,11 +242,10 @@ class Grid2DSparse[Axis0: Axis, Axis1: Axis]:
         """Return the axis at the given index."""
         if idx == 0:
             return self.axis0
-        elif idx == 1:
+        if idx == 1:
             return self.axis1
-        else:
-            msg = f"Invalid index {idx} for Grid2DSparse."
-            raise IndexError(msg)
+        msg = f"Invalid index {idx} for Grid2DSparse."
+        raise IndexError(msg)
 
     def __len__(self):
         """Return the number of axes."""
@@ -268,7 +267,7 @@ type Grid2DCartesian[Axis0: Axis, Axis1: Axis] = tuple[Axis0, Axis1]
 type Grid2D[Axis0: Axis, Axis1: Axis] = (
     Grid2DCartesian[Axis0, Axis1] | Grid2DSparse[Axis0, Axis1]
 )
-"""A 2D grid, which can be either :class:`.Grid2DCartesian` or :class:`.Grid2DSparse`."""
+"""A 2D grid, which is either :class:`.Grid2DCartesian` or :class:`.Grid2DSparse`."""
 
 
 UniformGrid2D = Grid2D["Linspace", "Linspace"]
@@ -278,7 +277,7 @@ AnyGrid = Grid1D["Axis"] | Grid2D["Axis", "Axis"]
 """A grid that can be either 1D or 2D."""
 
 Domain = Literal["time", "frequency", "time-frequency"]
-"""A type representing the physical domain of a representation, which can be either "time", "frequency", or "time-frequency"."""
+"""A type representing the physical domain of a representation, which can be either "time", "frequency", or "time-frequency"."""  # noqa: E501
 
 
 @overload
@@ -308,8 +307,7 @@ def build_grid2d[Axis0: Axis, Axis1: Axis](
     *,
     sparse_indices: Array | None = None,
 ) -> Grid2DCartesian[Axis0, Axis1] | Grid2DSparse[Axis0, Axis1]:
-    """Build a :class:`~typed_lisa_toolkit.types.misc.Grid2D`, either :class:`dense <typed_lisa_toolkit.types.misc.Grid2DCartesian>` or :class:`sparse <typed_lisa_toolkit.types.misc.Grid2DSparse>`."""
+    """Build a :class:`~typed_lisa_toolkit.types.misc.Grid2D`, either :class:`dense <typed_lisa_toolkit.types.misc.Grid2DCartesian>` or :class:`sparse <typed_lisa_toolkit.types.misc.Grid2DSparse>`."""  # noqa: E501
     if sparse_indices is None:
         return (axis0, axis1)
-    else:
-        return Grid2DSparse[Axis0, Axis1](axis0, axis1, sparse_indices=sparse_indices)
+    return Grid2DSparse[Axis0, Axis1](axis0, axis1, sparse_indices=sparse_indices)

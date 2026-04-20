@@ -4,8 +4,6 @@
 import unittest
 
 import jax
-
-jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -27,6 +25,8 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import (
     FDWhittleLikelihood,
 )
+
+jax.config.update("jax_enable_x64", val=True)
 
 
 def _build_fsdata(freqs, x_values, y_values):

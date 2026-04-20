@@ -3,8 +3,6 @@
 import unittest
 
 import jax
-
-jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -16,6 +14,8 @@ from typed_lisa_toolkit.types import (
     SpectralDensity,
     TSData,
 )
+
+jax.config.update("jax_enable_x64", val=True)
 
 
 def _build_xyz_tsdata_jax(n: int = 8) -> TSData:

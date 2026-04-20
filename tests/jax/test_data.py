@@ -6,10 +6,8 @@ import unittest
 import warnings
 from unittest.mock import MagicMock, patch
 
-import jax
-
-jax.config.update("jax_enable_x64", val=True)
 import h5py
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -47,6 +45,8 @@ from typed_lisa_toolkit.types import (
     WDMData,
 )
 from typed_lisa_toolkit.types.data import load_mojito
+
+jax.config.update("jax_enable_x64", val=True)
 
 
 def _build_tsdata_jax():
@@ -171,8 +171,7 @@ class TestDataContainersJAX(unittest.TestCase):
             for item in caught
         )
         assert any(
-            "The method `UniformTimeSeries.rfft` is deprecated"
-            in str(item.message)
+            "The method `UniformTimeSeries.rfft` is deprecated" in str(item.message)
             for item in caught
         )
         npt.assert_allclose(
@@ -441,12 +440,14 @@ class TestDataContainersJAX(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             with h5py.File(handle.name, "w") as f:
                 f.attrs["type"] = "UnknownData"
-            with pytest.raises(ValueError, match=r".+"):
-                with self.assertWarnsRegex(
+            with (
+                pytest.raises(ValueError, match=r".+"),
+                self.assertWarnsRegex(
                     DeprecationWarning,
                     "load_data",
-                ):
-                    load_data(handle.name, legacy=True)
+                ),
+            ):
+                load_data(handle.name, legacy=True)
 
     def test_load_data_dispatches_fsdata(self):
         _, tsdata = _build_tsdata_jax()
@@ -686,22 +687,26 @@ class TestDataContainersJAX(unittest.TestCase):
         ts_entries = jnp.ones((1, 2, 1, 1, len(times)), dtype=jnp.float64)
         stft_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
 
-        with pytest.raises(ValueError, match="grid axes must be uniform"):
-            with self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"):
-                _ = construct_tsdata(
-                    times=times,
-                    entries=ts_entries,
-                    channels=("X", "Y"),
-                )
+        with (
+            pytest.raises(ValueError, match="grid axes must be uniform"),
+            self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"),
+        ):
+            _ = construct_tsdata(
+                times=times,
+                entries=ts_entries,
+                channels=("X", "Y"),
+            )
 
-        with pytest.raises(ValueError, match="grid axes must be uniform"):
-            with self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"):
-                _ = construct_stftdata(
-                    frequencies=freqs,
-                    times=times,
-                    entries=stft_entries,
-                    channels=("X", "Y"),
-                )
+        with (
+            pytest.raises(ValueError, match="grid axes must be uniform"),
+            self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"),
+        ):
+            _ = construct_stftdata(
+                frequencies=freqs,
+                times=times,
+                entries=stft_entries,
+                channels=("X", "Y"),
+            )
 
     def test_fsdata_legacy_load(self):
         freqs = np.array([1.0, 2.0, 3.0], dtype=np.float64)

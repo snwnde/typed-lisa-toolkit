@@ -320,7 +320,7 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = densify_phasor_pw(wf, interpolator, frequencies, embed=False)
 
@@ -352,7 +352,7 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = densify_phasor_hpw(wf, interpolator, frequencies, embed=False)
 
@@ -397,7 +397,7 @@ class TestCombineHelpersNumpy(unittest.TestCase):
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = phasor_to_fs_pw(wf)
 
@@ -418,7 +418,7 @@ class TestCombineHelpersNumpy(unittest.TestCase):
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = phasor_to_fs_hpw(wf)
 

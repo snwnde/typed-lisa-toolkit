@@ -2,7 +2,8 @@
 Module for tapering functions.
 
 This module provides a function to create tapering functions compatible with
-the transformations defined in the :mod:`.representations` module, for the window functions
+the transformations defined in the :mod:`.representations` module,
+for the window functions
 from the :mod:`scipy.signal.windows` module. For this purpose, use the
 :func:`get_tapering_func` function.
 
@@ -28,7 +29,7 @@ Tapering Functions
 """
 
 import logging
-from typing import TYPE_CHECKING, Generic, ParamSpec, Protocol, final
+from typing import TYPE_CHECKING, ParamSpec, Protocol, final
 
 import numpy as np
 import numpy.typing as npt
@@ -58,7 +59,7 @@ class Tapering(Protocol):
         ...
 
 
-class LenWindow(Protocol, Generic[P]):
+class LenWindow[**P](Protocol):
     """Protocol for window functions with a length argument."""
 
     def __call__(  # noqa: D102
@@ -92,7 +93,7 @@ class LenWindow(Protocol, Generic[P]):
 
 
 @final
-class ldc_window(Tapering):
+class ldc_window(Tapering):  # noqa: N801
     """A window function that tapers a margin at both ends.
 
     Parameters
@@ -119,7 +120,7 @@ class ldc_window(Tapering):
 
 
 @final
-class planck_window(Tapering):
+class planck_window(Tapering):  # noqa: N801
     """A Planck taper window [1]_.
 
     Parameters
@@ -127,7 +128,8 @@ class planck_window(Tapering):
     left_margin :
         The margin to taper at the left end of the array, in the same units as the grid.
     right_margin :
-        The margin to taper at the right end of the array, in the same units as the grid.
+        The margin to taper at the right end of the array,
+        in the same units as the grid.
 
     References
     ----------
@@ -160,7 +162,9 @@ class planck_window(Tapering):
         return win
 
 
-def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwargs):  # type: ignore
+def get_tapering_func[**P](  # pyright: ignore[reportUnknownParameterType]
+    window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwargs
+):
     """Return a callable tapering function.
 
     This function wraps the given window function with their arguments (if any)
@@ -175,20 +179,22 @@ def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwa
     >>> tapering_func1 = get_tapering_func(scipy.signal.windows.tukey, alpha=0.5, sym=False)
     >>> tapering_func2 = get_tapering_func("hann", sym=False)
 
-    """
-    _msg = "Unknown window type: {window}. "
-    "Supported window types are those in `scipy.signal.windows`."
+    """  # noqa: E501
+    _msg = (
+        "Unknown window type: {window}. "
+        "Supported window types are those in `scipy.signal.windows`."
+    )
     if not isinstance(window, str):
-        return lambda x: window(len(x), *args, **kwargs)  # type: ignore
+        return lambda x: window(len(x), *args, **kwargs)  # pyright: ignore[reportUnknownVariableType, reportUnknownLambdaType, reportUnknownArgumentType]
     try:
-        winfunc = _windows._win_equiv[window]  # type: ignore
+        winfunc = _windows._win_equiv[window]  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
     except AttributeError:
         try:
-            winfunc = _windows._WIN_FUNCS[window][0]  # type: ignore
+            winfunc = _windows._WIN_FUNCS[window][0]  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportPrivateUsage]
         except KeyError as e:
             msg = _msg.format(window=window)
             raise ValueError(msg) from e
     except KeyError as e:
         msg = _msg.format(window=window)
         raise ValueError(msg) from e
-    return get_tapering_func(winfunc, *args, **kwargs)  # type: ignore
+    return get_tapering_func(winfunc, *args, **kwargs)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]

@@ -4,8 +4,6 @@ import unittest
 import warnings
 
 import jax
-
-jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -13,6 +11,8 @@ import numpy.testing as npt
 from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import FSData, TSData, WDMData
 from typed_lisa_toolkit.types import representations as reps
+
+jax.config.update("jax_enable_x64", val=True)
 
 
 def _require_wdm_transform():

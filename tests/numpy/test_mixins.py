@@ -28,7 +28,7 @@ class _Probe(NDArrayMixin):
         inplace: bool = False,
         **kwargs,
     ):
-        del kwargs
+        del other, kwargs
         self.calls.append(("binary", op, reflected, inplace))
         return self if inplace else _Probe()
 

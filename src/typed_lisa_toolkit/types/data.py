@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
     AnyReps = Representation[AnyGrid]
 
-    class _1DSubsettableRep(AnyReps, Protocol):
+    class _SubsettableRep1D(AnyReps, Protocol):
         def get_subset(
             self,
             *,
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
             slice: slice | None = None,
         ) -> Self: ...
 
-    class _2DSubsettableRep(AnyReps, Protocol):
+    class _SubsettableRep2D(AnyReps, Protocol):
         def get_subset(
             self,
             *,
@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def _save_axis(grp: h5py.Group, name: str, axis: "Axis") -> None:
+def _save_axis(grp: h5py.Group, name: str, axis: Axis) -> None:
     """Serialize one grid axis, preserving Linspace compactness."""
     axis_grp = grp.create_group(name)
     if isinstance(axis, Linspace):
@@ -84,7 +84,7 @@ def _attr_bool(attrs: Any, key: str, *, default: bool = False) -> bool:
     return bool(attrs.get(key, default))
 
 
-def _load_axis(node: h5py.Group | h5py.Dataset) -> "Axis":
+def _load_axis(node: h5py.Group | h5py.Dataset) -> Axis:
     """Deserialize one grid axis.
 
     Supports both new grouped axis format and old raw-dataset axis format.
@@ -99,10 +99,10 @@ def _load_axis(node: h5py.Group | h5py.Dataset) -> "Axis":
             step=_attr_float(node.attrs, "step"),
             num=_attr_int(node.attrs, "num"),
         )
-    return cast("Axis", cast(h5py.Dataset, node["values"])[()])
+    return cast("Axis", cast("h5py.Dataset", node["values"])[()])
 
 
-def _save_grid(grp: h5py.Group, grid: "AnyGrid") -> None:
+def _save_grid(grp: h5py.Group, grid: AnyGrid) -> None:
     """Serialize a representation grid into an HDF5 group."""
     if isinstance(grid, Grid2DSparse):
         grp.attrs["sparse"] = True
@@ -124,7 +124,7 @@ def _save_grid(grp: h5py.Group, grid: "AnyGrid") -> None:
         return
 
 
-def _load_grid(node: h5py.Group | h5py.Dataset) -> "AnyGrid":
+def _load_grid(node: h5py.Group | h5py.Dataset) -> AnyGrid:
     """Deserialize a representation grid from HDF5."""
     # Backward compatibility: previous format stored `grid` as a single dataset.
     if isinstance(node, h5py.Dataset):
@@ -133,16 +133,16 @@ def _load_grid(node: h5py.Group | h5py.Dataset) -> "AnyGrid":
     sparse = _attr_bool(node.attrs, "sparse", default=False)
     dim = _attr_int(node.attrs, "dim") if "dim" in node.attrs else -1
     if not sparse and dim == 1:
-        axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
+        axis0 = _load_axis(cast("h5py.Group | h5py.Dataset", node["axis0"]))
         return (axis0,)
     if not sparse and dim == 2:  # noqa: PLR2004
-        axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
-        axis1 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis1"]))
+        axis0 = _load_axis(cast("h5py.Group | h5py.Dataset", node["axis0"]))
+        axis1 = _load_axis(cast("h5py.Group | h5py.Dataset", node["axis1"]))
         return (axis0, axis1)
     if sparse and dim == 2:  # noqa: PLR2004
-        axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
-        axis1 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis1"]))
-        sparse_indices = cast(h5py.Dataset, node["sparse_indices"])[()]
+        axis0 = _load_axis(cast("h5py.Group | h5py.Dataset", node["axis0"]))
+        axis1 = _load_axis(cast("h5py.Group | h5py.Dataset", node["axis1"]))
+        sparse_indices = cast("h5py.Dataset", node["sparse_indices"])[()]
         return Grid2DSparse(axis0, axis1, sparse_indices=sparse_indices)
 
     msg = f"Unknown grid serialization format with attributes: {node.attrs}"
@@ -159,17 +159,17 @@ def _load_data[DataT: "Data[AnyReps]"](
     if legacy:
         return cls._load_legacy(file_path)  # pyright: ignore[reportPrivateUsage]
     with h5py.File(str(file_path), "r") as f:
-        channels_attr = cast(Iterable[object], f.attrs["channels"])
+        channels_attr = cast("Iterable[object]", f.attrs["channels"])
         channels = tuple(str(ch) for ch in channels_attr)
         additions = cls._additional_load(f)  # pyright: ignore[reportPrivateUsage]
-        data_group = cast(h5py.Group, f["data"])
-        grid_node = cast(h5py.Group | h5py.Dataset, data_group["grid"])
+        data_group = cast("h5py.Group", f["data"])
+        grid_node = cast("h5py.Group | h5py.Dataset", data_group["grid"])
         grid_data = _load_grid(grid_node)
-        entries_data = cast(h5py.Dataset, data_group["entries"])[()]
+        entries_data = cast("h5py.Dataset", data_group["entries"])[()]
         return cls(grid_data, entries_data, channels=channels, **additions)
 
 
-class _1DSubsetMixin[RepT: _1DSubsettableRep](_mixins.ChannelMapping[RepT], abc.ABC):
+class _SubsetMixin1D[RepT: _SubsettableRep1D](_mixins.ChannelMapping[RepT], abc.ABC):
     def get_subset(
         self,
         *,
@@ -192,7 +192,8 @@ class _1DSubsetMixin[RepT: _1DSubsettableRep](_mixins.ChannelMapping[RepT], abc.
     ):
         """Plot the data.
 
-        If `compare_to` is not `None`, the method draws both the data and the data in `compare_to`.
+        If `compare_to` is not `None`, the method draws both
+        the data and the data in `compare_to`.
         """
         plotter = self._get_plotter()
 
@@ -209,7 +210,7 @@ class _1DSubsetMixin[RepT: _1DSubsettableRep](_mixins.ChannelMapping[RepT], abc.
         raise NotImplementedError(msg)
 
 
-class _2DSubsetMixin[RepT: _2DSubsettableRep](_mixins.ChannelMapping[RepT], abc.ABC):
+class _SubsetMixin2D[RepT: _SubsettableRep2D](_mixins.ChannelMapping[RepT], abc.ABC):
     def get_subset(
         self,
         *,
@@ -240,7 +241,8 @@ class _2DSubsetMixin[RepT: _2DSubsettableRep](_mixins.ChannelMapping[RepT], abc.
     ):
         """Plot the data.
 
-        If `compare_to` is not `None`, the method draws both the data and the data in `compare_to`.
+        If `compare_to` is not `None`, the method draws both
+        the data and the data in `compare_to`.
         """
         plotter = self._get_plotter()
 
@@ -293,7 +295,8 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
           - ``grid`` for the grid.
           - ``entries`` for the entries.
 
-        - For :class:`.TimedFSData`, there will be a dataset ``times`` at the root level containing the time grid.
+        - For :class:`.TimedFSData`, there will be a dataset ``times`` at
+        the root level containing the time grid.
 
         """
         with h5py.File(str(file_path), "a") as f:
@@ -303,7 +306,7 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
             self._additional_save(f)
             grp = f.create_group("data")
             _save_grid(grp.create_group("grid"), self.grid)
-            grp.create_dataset("entries", data=cast(Any, self.get_kernel()))
+            grp.create_dataset("entries", data=cast("Any", self.get_kernel()))
 
     @classmethod
     def _additional_load(cls, f: h5py.File) -> dict[str, Any]:
@@ -317,8 +320,8 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
             additions = cls._additional_load(f)
             dict_ = {
                 chnname: cls._REP_TYPE(
-                    grid=(f[chnname]["grid"][...],),  # type: ignore
-                    entries=f[chnname]["entries"][...][None, None, None, None, ...],  # type: ignore
+                    grid=(f[chnname]["grid"][...],),  # pyright: ignore[reportArgumentType, reportIndexIssue]
+                    entries=f[chnname]["entries"][...][None, None, None, None, ...],  # pyright: ignore[reportArgumentType, reportIndexIssue]
                 )
                 for chnname in f
                 if isinstance(f[chnname], h5py.Group)
@@ -331,10 +334,15 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
 
         Warning
         -------
-        This method is deprecated and will be removed in 0.8.0; use :func:`~typed_lisa_toolkit.load_data` instead.
+        This method is deprecated and will be removed in 0.8.0;
+        use :func:`~load_data` instead.
         """
+        msg = (
+            "The 'load' method is deprecated and will be removed in 0.8.0; "
+            "use the function `load_data` instead."
+        )
         warnings.warn(
-            "The 'load' method is deprecated and will be removed in 0.8.0; use the function `load_data` instead.",
+            msg,
             DeprecationWarning,
             stacklevel=2,
         )
@@ -343,12 +351,12 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
 
 class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](  # pyright: ignore[reportUnsafeMultipleInheritance]
     Data[RepT],
-    _1DSubsetMixin[RepT],
+    _SubsetMixin1D[RepT],
     abc.ABC,
 ):
     def get_embedded(
         self,
-        embedding_grid: "Grid1D[Axis]",
+        embedding_grid: Grid1D[Axis],
         *,
         known_slices: tuple[slice, ...] | None = None,
     ):
@@ -392,8 +400,9 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
 
         Warning
         -------
-        This method is considered an expert-level API; for most users, prefer to construct a :class:`.TSData` with factory functions:
-        :func:`~typed_lisa_toolkit.tsdata` or :func:`~typed_lisa_toolkit.construct_tsdata`.
+        This method is considered an expert-level API; for most users,
+        prefer to construct a :class:`.TSData` with the factory function
+        :func:`~tsdata`.
         """
         return cls((times,), entries, channels=channels, name=name)
 
@@ -462,8 +471,12 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         """
         from ..shop import time2freq
 
+        msg = (
+            "The 'to_fsdata' method is deprecated and will be removed in 0.8.0; "
+            "use the function `shop.time2freq` instead."
+        )
         warnings.warn(
-            "The 'to_fsdata' method is deprecated and will be removed in 0.8.0; use the function `shop.time2freq` instead.",
+            msg,
             DeprecationWarning,
             stacklevel=2,
         )
@@ -535,8 +548,9 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
 
         Warning
         -------
-        This method is considered an expert-level API; for most users, prefer to construct a :class:`.FSData` with factory functions:
-        :func:`~typed_lisa_toolkit.fsdata` or :func:`~typed_lisa_toolkit.construct_fsdata`.
+        This method is considered an expert-level API; for most users,
+        prefer to construct a :class:`.FSData` with the factory function
+        :func:`~fsdata`.
         """
         return cls((frequencies,), entries, channels=channels, name=name)
 
@@ -565,7 +579,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         """Return the maximum frequency."""
         return self.frequencies.stop
 
-    def set_times(self, times: "Axis") -> TimedFSData:
+    def set_times(self, times: Axis) -> TimedFSData:
         """Return a :class:`.TimedFSData` with the time grid set."""
         return TimedFSData(
             self.grid,
@@ -588,8 +602,13 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         """
         from ..shop import freq2time
 
+        msg = (
+            "The 'to_tsdata' method is deprecated and will be removed in 0.8.0; "
+            "use the function `shop.freq2time` instead."
+        )
+
         warnings.warn(
-            "The 'to_tsdata' method is deprecated and will be removed in 0.8.0; use the function `shop.freq2time` instead.",
+            msg,
             DeprecationWarning,
             stacklevel=2,
         )
@@ -621,7 +640,7 @@ class TimedFSData(FSData):
 
     @classmethod
     def _additional_load(cls, f: h5py.File):
-        times_data = cast(h5py.Dataset, f["times"])[()]
+        times_data = cast("h5py.Dataset", f["times"])[()]
         return {"times": times_data}
 
     def set_times(self, times: Axis) -> Self:
@@ -669,11 +688,11 @@ class TimedFSData(FSData):
         return super().to_tsdata(times=self.times, tapering=tapering)
 
 
-class _2DGridData[  # pyright: ignore[reportUnsafeMultipleInheritance]
+class _Grid2DData[  # pyright: ignore[reportUnsafeMultipleInheritance]
     RepT: reps.STFT[Grid2D[Linspace, Linspace]] | reps.WDM[Grid2D[Linspace, Linspace]],
 ](
     Data[RepT],
-    _2DSubsetMixin[RepT],
+    _SubsetMixin2D[RepT],
     abc.ABC,
 ):
     @classmethod
@@ -697,7 +716,7 @@ class _2DGridData[  # pyright: ignore[reportUnsafeMultipleInheritance]
         return plotters.TFDataPlotter
 
 
-class STFTData[GridT: Grid2D[Linspace, Linspace]](_2DGridData[reps.STFT[GridT]]):
+class STFTData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.STFT[GridT]]):
     """Multi-channel short-time Fourier transform data container.
 
     .. note::
@@ -714,7 +733,7 @@ class STFTData[GridT: Grid2D[Linspace, Linspace]](_2DGridData[reps.STFT[GridT]])
         return "stft"
 
 
-class WDMData[GridT: Grid2D[Linspace, Linspace]](_2DGridData[reps.WDM[GridT]]):
+class WDMData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.WDM[GridT]]):
     """Multi-channel wavelet domain model data container.
 
     .. note::
@@ -740,15 +759,19 @@ def _enforce_uniform(ary: Axis, /) -> Linspace:
         raise ValueError(msg) from e
 
 
-def _validate_rep_shape(mapping: Mapping[Any, "AnyReps"], /):
-    _msg = "For data objects, the representation entries must have shape (n_batches, 1, 1, n_features, ...)."
+def _validate_rep_shape(mapping: Mapping[Any, AnyReps], /):
+    _msg = (
+        "For data objects, the representation entries must have shape "
+        "(n_batches, 1, 1, n_features, ...)."
+    )
     for rep in mapping.values():
         if rep.entries.shape[1:3] != (1, 1):
             raise ValueError(_msg)
 
 
 _func_deprecation_msg = (
-    "The factory function `{deprecated_func_name}` is deprecated and will be removed in 0.8.0;"
+    "The factory function `{deprecated_func_name}` is deprecated "
+    "and will be removed in 0.8.0;"
     " use the factory function {func_name} instead."
 )
 
@@ -790,7 +813,8 @@ def tsdata(
     Parameters
     ----------
     mapping:
-        A mapping from channel names to :class:`~types.TimeSeries` with :class:`~types.Linspace` axes.
+        A mapping from channel names to :class:`~types.TimeSeries`
+        with :class:`~types.Linspace` axes.
 
     name: str, optional
         Name of the data.
@@ -805,7 +829,8 @@ def tsdata(
         object representing the time grid of the data.
 
     entries: :class:`~types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)`` where ``Nt`` is the size of ``times``.
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)``
+        where ``Nt`` is the size of ``times``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
 
@@ -814,7 +839,7 @@ def tsdata(
 
     name: str, optional
         Name of the data.
-    """
+    """  # noqa: E501
     if mapping is not None:
         _msg_from_mapping = (
             "Cannot specify `times`, `entries`, or `channels` "
@@ -900,7 +925,8 @@ def fsdata(
     Parameters
     ----------
         mapping:
-            A mapping from channel names to :class:`~types.FrequencySeries` with :class:`~types.Linspace` axes.
+            A mapping from channel names to :class:`~types.FrequencySeries`
+            with :class:`~types.Linspace` axes.
 
         times: :class:`~types.misc.Axis`, optional
             A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
@@ -921,7 +947,8 @@ def fsdata(
             object representing the frequency grid of the data.
 
         entries: :class:`~types.misc.Array`
-            A array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+            A array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)``
+            where ``Nf`` is the size of ``frequencies``.
             See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
             for more details.
 
@@ -941,16 +968,22 @@ def fsdata(
     ----
     The associated time grid does not count as a grid dimension of the data,
     hence the shape of `entries` does include the time dimension.
-    """
+    """  # noqa: E501
     if mapping is not None:
-        _msg_from_mapping = "Cannot specify `frequencies`, `entries`, or `channels` when using `mapping` to construct FSData."
+        _msg_from_mapping = (
+            "Cannot specify `frequencies`, `entries`, or `channels` "
+            "when using `mapping` to construct FSData."
+        )
         if not all(arg is None for arg in (frequencies, entries, channels)):
             raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
         _fsdata = FSData.from_dict(mapping, name=name)
     else:
-        _msg = "Must specify `frequencies`, `entries`, and `channels` when not using `mapping` to construct FSData."
+        _msg = (
+            "Must specify `frequencies`, `entries`, and `channels` when "
+            "not using `mapping` to construct FSData."
+        )
         if not (
             frequencies is not None and entries is not None and channels is not None
         ):
@@ -1045,7 +1078,8 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
     Parameters
     ----------
         mapping:
-            A mapping from channel names to :class:`~types.STFT` with :class:`~types.misc.Grid2D`
+            A mapping from channel names to :class:`~types.STFT`
+            with :class:`~types.misc.Grid2D`
             or :class:`~types.Linspace` axes.
 
         name: str, optional
@@ -1074,13 +1108,14 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
             A tuple of channel names in the data.
 
         sparse_indices: :class:`~types.misc.Array`, optional
-            An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+            An array of shape ``(n_sparse, 2)`` containing the indices of the
+            non-zero entries in the sparse grid.
             See :attr:`~types.misc.Grid2DSparse.indices` for more details.
             If not provided, the data is treated as dense.
 
         name: str, optional
             Name of the data.
-    """
+    """  # noqa: E501
     if mapping is not None:
         _msg_from_mapping = (
             "Cannot specify `frequencies`, `times`, `entries`, `channels`, "
@@ -1179,7 +1214,8 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
     Parameters
     ----------
         mapping:
-            A mapping from channel names to :class:`~types.WDM` with :class:`~types.misc.Grid2D`
+            A mapping from channel names to :class:`~types.WDM`
+            with :class:`~types.misc.Grid2D`
             or :class:`~types.Linspace` axes.
 
         name: str, optional
@@ -1208,13 +1244,14 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
             A tuple of channel names in the data.
 
         sparse_indices: :class:`~types.misc.Array`, optional
-            An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+            An array of shape ``(n_sparse, 2)`` containing the indices of
+            the non-zero entries in the sparse grid.
             See :attr:`~types.misc.Grid2DSparse.indices` for more details.
             If not provided, the data is treated as dense.
 
         name: str, optional
             Name of the data.
-    """
+    """  # noqa: E501
     if mapping is not None:
         _msg_from_mapping = (
             "Cannot specify `frequencies`, `times`, `entries`, `channels`, "
@@ -1276,7 +1313,8 @@ def construct_tsdata(
         object representing the time grid of the data.
 
     entries: :class:`~types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)`` where ``Nt`` is the size of ``times``.
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)``
+        where ``Nt`` is the size of ``times``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
 
@@ -1291,7 +1329,7 @@ def construct_tsdata(
     -------
     This function is deprecated and will be removed in 0.8.0; use the :func:`.tsdata`
     function with the keyword arguments instead.
-    """
+    """  # noqa: E501
     _msg = _func_deprecation_msg.format(
         deprecated_func_name="construct_tsdata",
         func_name="`tsdata` with keyword arguments",
@@ -1342,7 +1380,8 @@ def construct_fsdata(
         object representing the frequency grid of the data.
 
     entries: :class:`~types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)``
+        where ``Nf`` is the size of ``frequencies``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
 
@@ -1356,7 +1395,7 @@ def construct_fsdata(
     -------
     This function is deprecated and will be removed in 0.8.0; use the
     :func:`.fsdata` function with the keyword arguments instead.
-    """
+    """  # noqa: E501
     _msg = _func_deprecation_msg.format(
         deprecated_func_name="construct_fsdata",
         func_name="`fsdata` with keyword arguments",
@@ -1392,7 +1431,8 @@ def construct_timed_fsdata(
         object representing the frequency grid of the data.
 
     entries: :class:`~types.misc.Array`
-        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)`` where ``Nf`` is the size of ``frequencies``.
+        An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)``
+        where ``Nf`` is the size of ``frequencies``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
         for more details.
 
@@ -1416,7 +1456,7 @@ def construct_timed_fsdata(
     This function is deprecated and will be removed in 0.8.0; use the
     :func:`.fsdata` function with the `times` argument instead.
 
-    """
+    """  # noqa: E501
     _msg = _func_deprecation_msg.format(
         deprecated_func_name="construct_timed_fsdata",
         func_name="`fsdata` with `times` argument",
@@ -1490,7 +1530,8 @@ def construct_stftdata(
         Names of the channels in the data.
 
     sparse_indices: :class:`~types.misc.Array`, optional
-        An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+        An array of shape ``(n_sparse, 2)`` containing the indices of
+        the non-zero entries in the sparse grid.
         See :attr:`~types.misc.Grid2DSparse.indices` for more details.
         If not provided, the data is treated as dense.
 
@@ -1501,7 +1542,7 @@ def construct_stftdata(
     -------
     This function is deprecated and will be removed in 0.8.0; use the
     :func:`.stftdata` function with the keyword arguments instead.
-    """
+    """  # noqa: E501
     _msg = _func_deprecation_msg.format(
         deprecated_func_name="construct_stftdata",
         func_name="`stftdata` with keyword arguments",
@@ -1576,7 +1617,8 @@ def construct_wdmdata(
         Names of the channels in the data.
 
     sparse_indices: :class:`~types.misc.Array`, optional
-        An array of shape ``(n_sparse, 2)`` containing the indices of the non-zero entries in the sparse grid.
+        An array of shape ``(n_sparse, 2)`` containing the indices of
+        the non-zero entries in the sparse grid.
         See :attr:`~types.misc.Grid2DSparse.indices` for more details.
         If not provided, the data is treated as dense.
 
@@ -1587,7 +1629,7 @@ def construct_wdmdata(
     -------
     This function is deprecated and will be removed in 0.8.0; use the
     :func:`.wdmdata` function with the keyword arguments instead.
-    """
+    """  # noqa: E501
     _msg = _func_deprecation_msg.format(
         deprecated_func_name="construct_wdmdata",
         func_name="`wdmdata` with keyword arguments",
@@ -1694,8 +1736,12 @@ def load_data(
 ):
     """Load the data from a saved HDF5 file."""
     if legacy:
+        msg = (
+            "The `legacy` mode of `load_data` is deprecated "
+            "and will be removed in 0.9.0;"
+        )
         warnings.warn(
-            "The `legacy` mode of `load_data` is deprecated and will be removed in 0.9.0; ",
+            msg,
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1720,7 +1766,8 @@ def load_data(
             _msg = (
                 "The `domain` argument of `load_data` is not provided. "
                 "From 0.8.0, this argument will be required. "
-                "Currently, it is inferred from the data, but this behavior is deprecated."
+                "Currently, it is inferred from the data, "
+                "but this behavior is deprecated."
             )
             warnings.warn(
                 _msg,
@@ -1734,13 +1781,14 @@ def load_data(
             f"The data has domain {domain_attr}, but `domain` is {domain}."
             raise ValueError(_msg)
         if kind_attr != expected_kind:
-            _msg = "The kind of the data does not match the provided `kind` argument. "
-            f"The data has kind {kind_attr}, but `kind` is {kind}."
+            _msg = (
+                "The kind of the data does not match the provided `kind` argument. "
+                f"The data has kind {kind_attr}, but `kind` is {kind}."
+            )
             raise ValueError(_msg)
-        if domain_attr in {"time", "frequency"}:
-            if sparse:
-                _msg = f"Sparse grid is not supported for domain {domain_attr}."
-                raise ValueError(_msg)
+        if domain_attr in {"time", "frequency"} and sparse:
+            _msg = f"Sparse grid is not supported for domain {domain_attr}."
+            raise ValueError(_msg)
 
     classes = {
         ("time", "None", False): TSData,
@@ -1756,10 +1804,11 @@ def load_data(
     cls = classes.get((domain_attr, kind_attr, sparse))
     if cls is None:
         _msg = (
-            f"Unsupported combination of domain, kind, and sparse: domain={domain_attr}, "
+            "Unsupported combination of domain, kind, "
+            f"and sparse: domain={domain_attr}, "
             f"kind={kind_attr}, sparse={sparse}. "
             "Supported combinations are: "
-            f"{', '.join(str(key) for key in classes.keys())}."
+            f"{', '.join(str(key) for key in classes)}."
         )
         raise ValueError(_msg)
     return _load_data(cls, file_path)
@@ -1788,7 +1837,8 @@ def load_sangria(
         if set(channel_names).issubset(("A", "E", "T")):
             return xyz2aet(data).pick(channel_names)
         msg = (
-            f"Cannot transform the channels to the requested ones. The data has channels {data.channel_names}, "
+            "Cannot transform the channels to the requested ones. "
+            f"The data has channels {data.channel_names}, "
             f"but the requested channels are {channel_names}."
         )
         raise ValueError(msg)
@@ -1824,7 +1874,7 @@ def load_ldc_data(file_path: str | pathlib.Path, **kwargs: Any) -> TSData:
 def load_mojito(processed_data: SignalProcessor):
     """Load the data from a preprocessed Mojito data object."""
     channel_names = tuple(processed_data.channels)
-    _data = cast(dict[str, "Array"], processed_data.data)
+    _data = cast("dict[str, Array]", processed_data.data)
     _mapping = {
         chnname: reps.time_series(
             processed_data.t,
@@ -1832,4 +1882,4 @@ def load_mojito(processed_data: SignalProcessor):
         )
         for chnname in channel_names
     }
-    return tsdata(cast(Mapping[str, reps.UniformTimeSeries], _mapping))
+    return tsdata(cast("Mapping[str, reps.UniformTimeSeries]", _mapping))

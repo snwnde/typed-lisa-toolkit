@@ -4,12 +4,12 @@
 import unittest
 
 import jax
-
-jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 
 from typed_lisa_toolkit import utils
+
+jax.config.update("jax_enable_x64", val=True)
 
 
 class TestUtilsJax(unittest.TestCase):
@@ -48,7 +48,7 @@ class TestUtilsJax(unittest.TestCase):
     def test_trim_interp_decorator(self):
         # entries is 1D (support detection); interp must return canonical 5D output
         def interp(x, y):
-            return lambda t: jnp.array(  # type: ignore
+            return lambda t: jnp.array(
                 np.interp(np.asarray(t), np.asarray(x), np.asarray(y), left=0, right=0),
             ).reshape(1, 1, 1, 1, -1)
 
