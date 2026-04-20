@@ -23,6 +23,7 @@ class _Probe(NDArrayMixin):
         other: object,
         op: object,
         /,
+        *,
         reflected: bool = False,
         inplace: bool = False,
         **kwargs,

@@ -5,7 +5,7 @@ import unittest
 
 import jax
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 
@@ -44,14 +44,14 @@ class TestUtilsJax(unittest.TestCase):
         self.assertTrue((np.asarray(extended[..., 3:8]) == np.asarray(entries)).all())
         self.assertTrue(
             (np.asarray(extended[..., :3]) == 0).all()
-            and (np.asarray(extended[..., 8:]) == 0).all()
+            and (np.asarray(extended[..., 8:]) == 0).all(),
         )
 
     def test_trim_interp_decorator(self):
         # entries is 1D (support detection); interp must return canonical 5D output
         def interp(x, y):
             return lambda t: jnp.array(  # type: ignore
-                np.interp(np.asarray(t), np.asarray(x), np.asarray(y), left=0, right=0)
+                np.interp(np.asarray(t), np.asarray(x), np.asarray(y), left=0, right=0),
             ).reshape(1, 1, 1, 1, -1)
 
         decorated = utils.trim_interp(interp)

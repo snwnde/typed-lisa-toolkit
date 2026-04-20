@@ -28,9 +28,8 @@ def _import_quadax() -> ModuleType:
 
         return quadax
     except ImportError:
-        raise ImportError(
-            "Default JAX-backed integration requires quadax. Install it with: pip install quadax"
-        ) from None
+        msg = "Default JAX-backed integration requires quadax. Install it with: pip install quadax"
+        raise ImportError(msg) from None
 
 
 def _import_scipy_integrate() -> ModuleType:
@@ -39,16 +38,15 @@ def _import_scipy_integrate() -> ModuleType:
 
         return scipy.integrate
     except ImportError:
-        raise ImportError(
-            "Default Numpy-backed integration requires scipy. Install it with: pip install scipy"
-        ) from None
+        msg = "Default Numpy-backed integration requires scipy. Install it with: pip install scipy"
+        raise ImportError(msg) from None
 
 
 log = logging.getLogger(__name__)
 
 
 ChnName = str
-FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries["Axis"]]
+FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries[Axis]]
 TFEntry = (
     dm.WDMData[Grid2D[Linspace, Linspace]]
     | waveforms.ProjectedWaveform[reps.WDM[Grid2D[Linspace, Linspace]]]
@@ -56,11 +54,11 @@ TFEntry = (
 IntegrationMethod = Literal["trapezoid", "simpson"]
 
 
-def _first_frequencies(__x: FDEntry):
+def _first_frequencies(__x: FDEntry, /):
     return next(iter(__x.values())).frequencies
 
 
-def _first_entries(__x: FDEntry):
+def _first_entries(__x: FDEntry, /):
     return next(iter(__x.values())).entries
 
 
@@ -69,7 +67,7 @@ class IntegrationPolicy(Protocol):
 
     def integrate(
         self,
-        __y: "Array",
+        __y: "Array",  # noqa: PYI063
         *,
         x: Union["Array", None] = None,
         **kwargs: Any,
@@ -79,7 +77,7 @@ class IntegrationPolicy(Protocol):
 
     def cumulative(
         self,
-        __y: "Array",
+        __y: "Array",  # noqa: PYI063
         *,
         x: Union["Array", None] = None,
         **kwargs: Any,
@@ -98,13 +96,21 @@ class _NumpyIntegrationPolicy(IntegrationPolicy):
         self.method: IntegrationMethod = method
 
     def integrate(
-        self, __y: "Array", *, x: Union["Array", None] = None, **kwargs: Any
+        self,
+        __y: "Array",  # noqa: PYI063
+        *,
+        x: Union["Array", None] = None,
+        **kwargs: Any,
     ) -> Any:
         scipy_integrate = _import_scipy_integrate()
         return getattr(scipy_integrate, self.method)(__y, x=x, **kwargs)
 
     def cumulative(
-        self, __y: "Array", *, x: Union["Array", None] = None, **kwargs: Any
+        self,
+        __y: "Array",  # noqa: PYI063
+        *,
+        x: Union["Array", None] = None,
+        **kwargs: Any,
     ) -> Any:
         scipy_integrate = _import_scipy_integrate()
         return getattr(scipy_integrate, "cumulative_" + self.method)(__y, x=x, **kwargs)
@@ -120,13 +126,21 @@ class _JaxIntegrationPolicy(IntegrationPolicy):
         self.method: IntegrationMethod = method
 
     def integrate(
-        self, __y: "Array", *, x: Union["Array", None] = None, **kwargs: Any
+        self,
+        __y: "Array",  # noqa: PYI063
+        *,
+        x: Union["Array", None] = None,
+        **kwargs: Any,
     ) -> Any:
         quadax = _import_quadax()
         return getattr(quadax, self.method)(__y, x=x, **kwargs)
 
     def cumulative(
-        self, __y: "Array", *, x: Union["Array", None] = None, **kwargs: Any
+        self,
+        __y: "Array",  # noqa: PYI063
+        *,
+        x: Union["Array", None] = None,
+        **kwargs: Any,
     ) -> Any:
         quadax = _import_quadax()
         return getattr(quadax, "cumulative_" + self.method)(__y, x=x, **kwargs)
@@ -142,9 +156,8 @@ def _make_integration_policy(
         return _NumpyIntegrationPolicy(method=method)
     if module_name == "jax.numpy":
         return _JaxIntegrationPolicy(method=method)
-    raise NotImplementedError(
-        f"Unsupported array module {xp}. Cannot create integration policy."
-    )
+    msg = f"Unsupported array module {module_name}. Cannot create integration policy."
+    raise NotImplementedError(msg)
 
 
 class _StationaryFDNoise(Protocol):
@@ -199,11 +212,13 @@ class SpectralDensity:
         .. note:: We denote the inverse SDM as :math:`S_n^{-1}`.
         """
         if backend is not None:
-            raise NotImplementedError("Backend conversion is not implemented yet.")
+            msg = f"Backend conversion is not implemented yet. Got backend={backend}."
+            raise NotImplementedError(msg)
         return self._inverse_sdm
 
     def get_whitening_matrix(
-        self, kind: Literal["cholesky"] | None = "cholesky"
+        self,
+        kind: Literal["cholesky"] | None = "cholesky",
     ) -> "Array":
         r"""Return whitening matrix :math:`W` with shape ``(n_freqs, n_channels, n_channels)``.
 
@@ -214,7 +229,8 @@ class SpectralDensity:
         .. note:: :math:`W` satisfies :math:`S_n^{-1} = W^\top W`.
         """
         if kind != "cholesky":
-            raise NotImplementedError(f"Unsupported whitening matrix kind {kind}.")
+            msg = f"Unsupported whitening matrix kind {kind}. Only 'cholesky' is supported currently."
+            raise NotImplementedError(msg)
         xp = self._inverse_sdm.__array_namespace__()
         return xp.linalg.cholesky(self._inverse_sdm, upper=True)
 
@@ -250,10 +266,12 @@ class DiagonalSpectralDensity(SpectralDensity):
         }
         xp = next(iter(_dict.values())).__array_namespace__()
         diag = xp.stack(
-            [xp.squeeze(_dict[c]) for c in channel_names], axis=-1
+            [xp.squeeze(_dict[c]) for c in channel_names],
+            axis=-1,
         )  # (n_freqs, n_channels)
         kernel = diag[:, :, None] * xp.eye(
-            len(channel_names), dtype=diag.dtype
+            len(channel_names),
+            dtype=diag.dtype,
         )  # (n_freqs, n_channels, n_channels)
         return cls(frequencies, kernel, channel_names)
 
@@ -272,7 +290,8 @@ class DiagonalSpectralDensity(SpectralDensity):
         # S_n^{-1} is diagonal => W = sqrt(S_n^{-1})
         diag = xp.diagonal(self._inverse_sdm, axis1=-2, axis2=-1)
         return xp.sqrt(diag)[:, :, None] * xp.eye(
-            len(self.channel_order), dtype=diag.dtype
+            len(self.channel_order),
+            dtype=diag.dtype,
         )
 
 
@@ -288,7 +307,7 @@ class _EntryInDomain[DomainT: Domain](Protocol):
 
 
 class NoiseModelLike[EntryT1: _EntryInDomain[Domain], EntryT2: _EntryInDomain[Domain]](
-    Protocol
+    Protocol,
 ):
     """Protocol for noise models."""
 
@@ -302,7 +321,7 @@ class NoiseModelLike[EntryT1: _EntryInDomain[Domain], EntryT2: _EntryInDomain[Do
 
 
 class FDNoiseModel(
-    NoiseModelLike[dm.FSData, waveforms.ProjectedWaveform[reps.FrequencySeries["Axis"]]]
+    NoiseModelLike[dm.FSData, waveforms.ProjectedWaveform[reps.FrequencySeries[Axis]]],
 ):
     """Frequency domain noise model.
 
@@ -363,10 +382,12 @@ class FDNoiseModel(
         _right = right.get_kernel()  # same shape as _left
         xp = _left.__array_namespace__()
         try:
-            if getattr(self.sdm, "is_diagonal"):
+            if self.sdm.is_diagonal:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
                 # If the spectral density matrix is diagonal, we can simply divide by the diagonal elements.
                 diag = xp.diagonal(
-                    self.sdm.get_kernel(), axis1=-1, axis2=-2
+                    self.sdm.get_kernel(),
+                    axis1=-1,
+                    axis2=-2,
                 )  # shape (n_freqs, n_channels)
                 return (4 * _left.conj() * _right) * diag.T[None, :, None, None, :]
         except AttributeError:
@@ -395,7 +416,8 @@ class FDNoiseModel(
         frequencies = _first_frequencies(left)
         xp = _first_entries(left).__array_namespace__()
         return self._ip.integrate(
-            self.get_integrand(left, right), x=_mixins.to_array(frequencies, xp=xp)
+            self.get_integrand(left, right),
+            x=_mixins.to_array(frequencies, xp=xp),
         )
 
     def get_cumulative_complex_scalar_product(
@@ -490,12 +512,13 @@ class FDNoiseModel(
         """
         xp = _first_entries(left).__array_namespace__()
         two_sided_freq = xp.fft.fftshift(
-            xp.fft.fftfreq(len(left.times), left.times.step)
+            xp.fft.fftfreq(len(left.times), left.times.step),
         )
         _first = next(iter(left.values()))
         frequencies, df = _mixins.to_array(_first.frequencies, xp), _first.df
         two_sided_integrand_entries = utils.extend_to(two_sided_freq)(
-            frequencies, self.get_integrand(left, right)
+            frequencies,
+            self.get_integrand(left, right),
         )
         cross_correlation = xp.fft.ifft(
             xp.fft.ifftshift(two_sided_integrand_entries) * df,
@@ -534,7 +557,7 @@ class FDNoiseModel(
         """
         xp = _first_entries(left).__array_namespace__()
         return self.get_scalar_product(left, right) / xp.sqrt(
-            self.get_scalar_product(left, left) * self.get_scalar_product(right, right)
+            self.get_scalar_product(left, left) * self.get_scalar_product(right, right),
         )
 
 
@@ -568,7 +591,8 @@ class EvolutionarySpectralDensity:
         The returned array has shape ``(n_freqs, n_times, n_channels, n_channels)``.
         """
         if backend is not None:
-            raise NotImplementedError("Backend conversion is not implemented yet.")
+            msg = f"Backend conversion is not implemented yet. Got backend={backend}."
+            raise NotImplementedError(msg)
         return self._inverse_esdm
 
     @staticmethod
@@ -584,22 +608,21 @@ class EvolutionarySpectralDensity:
         # Check if channel_order is valid.
         if len(channel_order) != len(set(channel_order)):
             if raise_exception:
-                raise ValueError(
-                    f"Received channel_order {channel_order} with duplicate channels."
-                )
+                msg = f"Invalid channel_order {channel_order}. Channel names must be unique."
+                raise ValueError(msg)
             else:
                 return False
         # Check if the shape is correct.
-        if len(_d.shape) != 4 or _d.shape[-2:] != (
+        SHAPE_SIZE = 4
+        if len(_d.shape) != SHAPE_SIZE or _d.shape[-2:] != (
             len(channel_order),
             len(channel_order),
         ):
             if raise_exception:
-                raise ValueError(
-                    "Expected (inverse) evolutionary spectral density matrix",
-                    "to have shape (n_freq, n_time, n_channels, n_channels), ",
-                    f"but got shape {_d.shape} instead.",
-                )
+                msg = "Expected (inverse) evolutionary spectral density matrix."
+                "To have shape (n_freq, n_time, n_channels, n_channels), "
+                f"but got shape {_d.shape} instead."
+                raise ValueError(msg)
             else:
                 return False
         return True
@@ -621,7 +644,8 @@ class EvolutionarySpectralDensity:
         kind: the kind of whitening matrix. Defaults to "cholesky".
         """
         if kind != "cholesky":
-            raise NotImplementedError(f"Unsupported whitening matrix kind {kind}.")  # pyright: ignore[reportUnreachable]
+            msg = f"Unsupported whitening matrix kind {kind}. Only 'cholesky' is supported currently."
+            raise NotImplementedError(msg)  # pyright: ignore[reportUnreachable]
         xp = self._inverse_esdm.__array_namespace__()
         return xp.linalg.cholesky(self._inverse_esdm, upper=True)
 
@@ -689,9 +713,8 @@ class TFNoiseModel:
 
 def _validate_shape(entries: "Array", expected_shape: tuple[int, ...]) -> None:
     if entries.shape != expected_shape:
-        raise ValueError(
-            f"Invalid shape for `inverse_sdm`. Expected {expected_shape}, got {entries.shape}."
-        )
+        msg = f"Invalid shape for `inverse_sdm`. Expected {expected_shape}, got {entries.shape}."
+        raise ValueError(msg)
 
 
 @overload
@@ -770,7 +793,8 @@ def make_sdm(
             return SpectralDensity(frequencies, inverse_sdm, channel_names)
         xp = xpc.get_namespace(inverse_sdm)
         _inverse_sdm = inverse_sdm[:, :, None] * xp.eye(
-            len(channel_names), dtype=inverse_sdm.dtype
+            len(channel_names),
+            dtype=inverse_sdm.dtype,
         )
         return DiagonalSpectralDensity(frequencies, _inverse_sdm, channel_names)
     else:
@@ -784,7 +808,10 @@ def make_sdm(
             ),
         )
         return EvolutionarySpectralDensity(
-            frequencies, times, inverse_sdm, channel_names
+            frequencies,
+            times,
+            inverse_sdm,
+            channel_names,
         )
 
 

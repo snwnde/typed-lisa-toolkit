@@ -4,7 +4,7 @@ import unittest
 
 import jax
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -27,7 +27,7 @@ def _build_xyz_tsdata_jax(n: int = 8) -> TSData:
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
             "Z": time_series(times, z[None, None, None, None, :]),
-        }
+        },
     )
 
 
@@ -53,7 +53,10 @@ def _build_xyz_evolutionary_spectral_density_jax() -> EvolutionarySpectralDensit
     scales = jnp.array([[1.0, 1.05], [1.1, 1.15]], dtype=jnp.float64)
     inverse_esdm = scales[:, :, None, None] * base[None, None, :, :]
     return EvolutionarySpectralDensity(
-        frequencies, times, inverse_esdm, ["X", "Y", "Z"]
+        frequencies,
+        times,
+        inverse_esdm,
+        ["X", "Y", "Z"],
     )
 
 
@@ -68,7 +71,9 @@ class TestConversionsJax(unittest.TestCase):
         self.assertEqual(recovered.channel_names, xyz.channel_names)
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(xyz.times))
         npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(xyz.get_kernel()), atol=1e-12
+            np.asarray(recovered.get_kernel()),
+            np.asarray(xyz.get_kernel()),
+            atol=1e-12,
         )
 
     def test_xyz_aet_roundtrip_spectral_density(self):
@@ -121,13 +126,15 @@ class TestConversionsJax(unittest.TestCase):
 
     def test_xyz2aet_without_inputs_raises(self):
         with self.assertRaisesRegex(
-            ValueError, "Must specify either xyz or all of X, Y, Z"
+            ValueError,
+            "Must specify either xyz or all of X, Y, Z",
         ):
             shop.xyz2aet()
 
     def test_aet2xyz_without_inputs_raises(self):
         with self.assertRaisesRegex(
-            ValueError, "Must specify either aet or all of A, E, T"
+            ValueError,
+            "Must specify either aet or all of A, E, T",
         ):
             shop.aet2xyz()
 
@@ -157,23 +164,25 @@ class TestConversionsJax(unittest.TestCase):
         kernel = jnp.broadcast_to(jnp.eye(3, dtype=jnp.float64), (2, 3, 3))
 
         wrong_xyz_input = SpectralDensity(freqs, kernel, ["A", "E", "T"])
-        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+        with self.assertRaisesRegex(ValueError, "Expected original channel order"):
             shop.xyz2aet(wrong_xyz_input)
 
         wrong_aet_input = SpectralDensity(freqs, kernel, ["X", "Y", "Z"])
-        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+        with self.assertRaisesRegex(ValueError, "Expected original channel order"):
             shop.aet2xyz(wrong_aet_input)
 
     def test_array_last_dimension_assertions(self):
         wrong_shape = jnp.ones((4, 2), dtype=jnp.float64)
 
         with self.assertRaisesRegex(
-            AssertionError, "Expected last dimension of input array to be 3"
+            ValueError,
+            "Expected last dimension of input array to be",
         ):
             shop.xyz2aet(wrong_shape)
 
         with self.assertRaisesRegex(
-            AssertionError, "Expected last dimension of input array to be 3"
+            ValueError,
+            "Expected last dimension of input array to be",
         ):
             shop.aet2xyz(wrong_shape)
 

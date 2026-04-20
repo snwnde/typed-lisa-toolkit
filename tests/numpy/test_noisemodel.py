@@ -43,7 +43,9 @@ class TestSpectralDensity(unittest.TestCase):
     def test_to_subband_slices_frequency_axis(self):
         case = build_fdata(np)
         sdm = SpectralDensity(
-            case.frequencies, dense_kernel_2ch(np), channel_order=["X", "Y"]
+            case.frequencies,
+            dense_kernel_2ch(np),
+            channel_order=["X", "Y"],
         )
 
         try:
@@ -57,7 +59,9 @@ class TestSpectralDensity(unittest.TestCase):
     def test_get_kernel_backend_argument_is_not_supported(self):
         case = build_fdata(np)
         sdm = SpectralDensity(
-            case.frequencies, dense_kernel_2ch(np), channel_order=["X", "Y"]
+            case.frequencies,
+            dense_kernel_2ch(np),
+            channel_order=["X", "Y"],
         )
 
         with self.assertRaises(NotImplementedError):
@@ -76,7 +80,9 @@ class TestSpectralDensity(unittest.TestCase):
     def test_whitening_matrix_invalid_kind_raises(self):
         case = build_fdata(np)
         sdm = SpectralDensity(
-            case.frequencies, dense_kernel_2ch(np), channel_order=["X", "Y"]
+            case.frequencies,
+            dense_kernel_2ch(np),
+            channel_order=["X", "Y"],
         )
 
         with self.assertRaises(NotImplementedError):
@@ -85,7 +91,9 @@ class TestSpectralDensity(unittest.TestCase):
     def test_diagonal_from_fd_noise(self):
         case = build_fdata(np)
         sdm = DiagonalSpectralDensity.from_fd_noise(
-            _FlatFDNoise(), case.frequencies, ["X", "Y"]
+            _FlatFDNoise(),
+            case.frequencies,
+            ["X", "Y"],
         )
 
         kernel = np.asarray(sdm.get_kernel())
@@ -110,7 +118,7 @@ class TestFDNoiseModel(unittest.TestCase):
                 frequencies=case["frequencies"],
                 channel_names=("X", "Y"),
                 is_diagonal=True,
-            )
+            ),
         )
 
         integrand = np.asarray(model.get_integrand(case["left"], case["right"]))
@@ -125,7 +133,7 @@ class TestFDNoiseModel(unittest.TestCase):
         case = build_fd_pair(np)
         kernel = dense_kernel_2ch(np)
         model = noise_model(
-            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y")),
         )
 
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
@@ -145,7 +153,7 @@ class TestFDNoiseModel(unittest.TestCase):
         case = build_fd_pair_batched_2x2(np)
         kernel = dense_kernel_2ch(np)
         model = noise_model(
-            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y")),
         )
 
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
@@ -170,11 +178,11 @@ class TestFDNoiseModel(unittest.TestCase):
         case = build_fd_pair(np)
         kernel = dense_kernel_2ch(np)
         model = noise_model(
-            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y")),
         )
 
         cumulative = np.asarray(
-            model.get_cumulative_scalar_product(case["left"], case["right"])
+            model.get_cumulative_scalar_product(case["left"], case["right"]),
         )
         scalar = np.asarray(model.get_scalar_product(case["left"], case["right"]))
 
@@ -189,7 +197,7 @@ class TestFDNoiseModel(unittest.TestCase):
                 frequencies=case["frequencies"],
                 channel_names=("X", "Y"),
                 is_diagonal=True,
-            )
+            ),
         )
 
         whitened = model.whiten(case["left"])
@@ -198,7 +206,11 @@ class TestFDNoiseModel(unittest.TestCase):
         w = np.asarray(model.sdm.get_whitening_matrix())
         left_e = np.moveaxis(left[:, :, 0, 0, :], 1, -1)
         expected = np.moveaxis(np.einsum("fij,...fj->...fi", w, left_e), -1, 1)[
-            :, :, None, None, :
+            :,
+            :,
+            None,
+            None,
+            :,
         ]
 
         npt.assert_allclose(got, expected)
@@ -207,7 +219,7 @@ class TestFDNoiseModel(unittest.TestCase):
         case = build_fd_pair_batched_2x2(np)
         kernel = dense_kernel_2ch(np)
         model = noise_model(
-            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y")),
         )
 
         whitened = model.whiten(case["left"])
@@ -217,7 +229,11 @@ class TestFDNoiseModel(unittest.TestCase):
         left_e = np.moveaxis(left[:, :, 0, 0, :], 1, -1)
         w = np.asarray(model.sdm.get_whitening_matrix())
         expected = np.moveaxis(np.einsum("fij,...fj->...fi", w, left_e), -1, 1)[
-            :, :, None, None, :
+            :,
+            :,
+            None,
+            None,
+            :,
         ]
 
         npt.assert_allclose(got, expected, rtol=1e-12, atol=1e-12)
@@ -226,7 +242,7 @@ class TestFDNoiseModel(unittest.TestCase):
         case = build_fd_pair(np)
         kernel = dense_kernel_2ch(np)
         model = noise_model(
-            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y"))
+            make_sdm(kernel, frequencies=case["frequencies"], channel_names=("X", "Y")),
         )
 
         overlap = np.asarray(model.get_overlap(case["left"], case["left"]))
@@ -236,7 +252,7 @@ class TestFDNoiseModel(unittest.TestCase):
     def test_cross_correlation_currently_raises_for_linspace_grid(self):
         times = np.linspace(0.0, 7.0, 8)
         frequencies = linspace_from_array(
-            np.fft.rfftfreq(len(times), d=times[1] - times[0])
+            np.fft.rfftfreq(len(times), d=times[1] - times[0]),
         )
         x = np.array([1.0 + 0.0j, 0.5 + 0.25j, -0.25 + 0.5j, 0.1 - 0.2j, 0.05 + 0.0j])
         y = np.array([0.5 + 0.0j, -0.2 + 0.1j, 0.3 - 0.4j, -0.1 + 0.2j, 0.01 + 0.0j])
@@ -245,7 +261,7 @@ class TestFDNoiseModel(unittest.TestCase):
             {
                 "X": frequency_series(frequencies, x[None, None, None, None, :]),
                 "Y": frequency_series(frequencies, y[None, None, None, None, :]),
-            }
+            },
         ).set_times(times)
         freqs = np.asarray(fs.frequencies)
         kernel = np.zeros((len(freqs), 2, 2), dtype=float)
@@ -257,7 +273,7 @@ class TestFDNoiseModel(unittest.TestCase):
                 frequencies=freqs,
                 channel_names=("X", "Y"),
                 is_diagonal=True,
-            )
+            ),
         )
 
         with self.assertRaises((TypeError, ValueError)):
@@ -270,13 +286,13 @@ class TestEvolutionarySpectralDensity(unittest.TestCase):
             EvolutionarySpectralDensity.is_valid_sdm(
                 np.eye(2),
                 channel_order=["X", "Y"],
-            )
+            ),
         )
         self.assertFalse(
             EvolutionarySpectralDensity.is_valid_sdm(
                 np.broadcast_to(np.eye(2), (2, 2, 2, 2)).copy(),
                 channel_order=["X", "X"],
-            )
+            ),
         )
 
     def test_invalid_shape_raises(self):
@@ -359,12 +375,12 @@ class TestTFNoiseModel(unittest.TestCase):
                 frequencies=case["frequencies"],
                 times=case["times"],
                 channel_names=("X", "Y"),
-            )
+            ),
         )
 
         got = model.get_scalar_product(case["left"], case["right"])
         expected = np.sum(
-            case["left_x"] * case["right_x"] + case["left_y"] * case["right_y"]
+            case["left_x"] * case["right_x"] + case["left_y"] * case["right_y"],
         )
 
         npt.assert_allclose(got, expected)
@@ -378,7 +394,7 @@ class TestTFNoiseModel(unittest.TestCase):
                 frequencies=case["frequencies"],
                 times=case["times"],
                 channel_names=("X", "Y"),
-            )
+            ),
         )
 
         got = np.asarray(model.get_scalar_product(case["left"], case["right"]))
@@ -410,13 +426,14 @@ class TestTFNoiseModel(unittest.TestCase):
                 frequencies=case["frequencies"],
                 times=case["times"],
                 channel_names=("X", "Y"),
-            )
+            ),
         )
 
         whitened = model.whiten(case["left"])
 
         npt.assert_allclose(
-            np.asarray(whitened.get_kernel()), np.asarray(case["left"].get_kernel())
+            np.asarray(whitened.get_kernel()),
+            np.asarray(case["left"].get_kernel()),
         )
 
     def test_whiten_dense_esdm_batched_matches_manual_channel_mixing(self):
@@ -450,7 +467,8 @@ class TestNoiseModelFactoriesNumpy(unittest.TestCase):
         dense_kernel = np.broadcast_to(np.eye(2), (len(frequencies), 2, 2)).copy()
         diag_kernel = np.ones((len(frequencies), 2), dtype=float)
         evo_kernel = np.broadcast_to(
-            np.eye(2), (len(frequencies), len(times), 2, 2)
+            np.eye(2),
+            (len(frequencies), len(times), 2, 2),
         ).copy()
 
         dense_sdm = make_sdm(
@@ -484,7 +502,7 @@ class TestNoiseModelFactoriesNumpy(unittest.TestCase):
                 np.broadcast_to(np.eye(2), (len(frequencies), 2, 2)).copy(),
                 frequencies=frequencies,
                 channel_names=("X", "Y"),
-            )
+            ),
         )
         tf_model = noise_model(
             make_sdm(
@@ -492,7 +510,7 @@ class TestNoiseModelFactoriesNumpy(unittest.TestCase):
                 frequencies=frequencies,
                 times=times,
                 channel_names=("X", "Y"),
-            )
+            ),
         )
 
         self.assertIsInstance(fd_model, FDNoiseModel)

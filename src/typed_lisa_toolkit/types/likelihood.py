@@ -19,9 +19,9 @@ if TYPE_CHECKING:
 ChnName = str
 Modes = modes.Harmonic | modes.QNM
 FDUniformHomogeneous = (
-    dm.Data[reps.FrequencySeries["Linspace"]]
-    | wf.ProjectedWaveform[reps.FrequencySeries["Linspace"]]
-    | wf.HomogeneousHarmonicProjectedWaveform[Modes, reps.FrequencySeries["Linspace"]]
+    dm.Data[reps.FrequencySeries[Linspace]]
+    | wf.ProjectedWaveform[reps.FrequencySeries[Linspace]]
+    | wf.HomogeneousHarmonicProjectedWaveform[Modes, reps.FrequencySeries[Linspace]]
 )
 
 

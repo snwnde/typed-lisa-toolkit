@@ -23,7 +23,7 @@ def _build_xyz_tsdata_numpy(n: int = 8) -> TSData:
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
             "Z": time_series(times, z[None, None, None, None, :]),
-        }
+        },
     )
 
 
@@ -51,7 +51,10 @@ def _build_xyz_evolutionary_spectral_density_numpy() -> EvolutionarySpectralDens
         for j in range(len(times)):
             inverse_esdm[i, j] = base * (1.0 + 0.1 * i + 0.05 * j)
     return EvolutionarySpectralDensity(
-        frequencies, times, inverse_esdm, ["X", "Y", "Z"]
+        frequencies,
+        times,
+        inverse_esdm,
+        ["X", "Y", "Z"],
     )
 
 
@@ -66,7 +69,9 @@ class TestConversionsNumpy(unittest.TestCase):
         self.assertEqual(recovered.channel_names, xyz.channel_names)
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(xyz.times))
         npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(xyz.get_kernel()), atol=1e-12
+            np.asarray(recovered.get_kernel()),
+            np.asarray(xyz.get_kernel()),
+            atol=1e-12,
         )
 
     def test_xyz_aet_roundtrip_spectral_density(self):
@@ -109,13 +114,15 @@ class TestConversionsNumpy(unittest.TestCase):
 
     def test_xyz2aet_without_inputs_raises(self):
         with self.assertRaisesRegex(
-            ValueError, "Must specify either xyz or all of X, Y, Z"
+            ValueError,
+            "Must specify either xyz or all of X, Y, Z",
         ):
             shop.xyz2aet()
 
     def test_aet2xyz_without_inputs_raises(self):
         with self.assertRaisesRegex(
-            ValueError, "Must specify either aet or all of A, E, T"
+            ValueError,
+            "Must specify either aet or all of A, E, T",
         ):
             shop.aet2xyz()
 
@@ -145,23 +152,25 @@ class TestConversionsNumpy(unittest.TestCase):
         kernel = np.broadcast_to(np.eye(3, dtype=np.float64), (2, 3, 3)).copy()
 
         wrong_xyz_input = SpectralDensity(freqs, kernel, ["A", "E", "T"])
-        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+        with self.assertRaisesRegex(ValueError, "Expected original channel order"):
             shop.xyz2aet(wrong_xyz_input)
 
         wrong_aet_input = SpectralDensity(freqs, kernel, ["X", "Y", "Z"])
-        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+        with self.assertRaisesRegex(ValueError, "Expected original channel order"):
             shop.aet2xyz(wrong_aet_input)
 
     def test_array_last_dimension_assertions(self):
         wrong_shape = np.ones((4, 2), dtype=np.float64)
 
         with self.assertRaisesRegex(
-            AssertionError, "Expected last dimension of input array to be 3"
+            ValueError,
+            "Expected last dimension of input array to be 3",
         ):
             shop.xyz2aet(wrong_shape)
 
         with self.assertRaisesRegex(
-            AssertionError, "Expected last dimension of input array to be 3"
+            ValueError,
+            "Expected last dimension of input array to be 3",
         ):
             shop.aet2xyz(wrong_shape)
 

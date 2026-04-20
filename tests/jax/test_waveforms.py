@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import jax
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -178,7 +178,9 @@ class TestDenseMakerJAX(unittest.TestCase):
         freqs = np.asarray(frequencies)
         return freqs[
             np.searchsorted(freqs, phasor.f_min, side="left") : np.searchsorted(
-                freqs, phasor.f_max, side="right"
+                freqs,
+                phasor.f_max,
+                side="right",
             )
         ]
 
@@ -276,7 +278,9 @@ class TestDensifyHelpersJAX(unittest.TestCase):
         frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, _ = make_mock_phasor(
-            f_min=1.0, f_max=3.0, frequencies=frequencies
+            f_min=1.0,
+            f_max=3.0,
+            frequencies=frequencies,
         )
 
         out = densify_phasor(phasor, interpolator, frequencies, embed=False)
@@ -293,7 +297,9 @@ class TestDensifyHelpersJAX(unittest.TestCase):
         frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, embedded = make_mock_phasor(
-            f_min=1.0, f_max=3.0, frequencies=frequencies
+            f_min=1.0,
+            f_max=3.0,
+            frequencies=frequencies,
         )
 
         out = densify_phasor(phasor, interpolator, frequencies, embed=True)
@@ -309,7 +315,7 @@ class TestDensifyHelpersJAX(unittest.TestCase):
         frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
         fake_hpw, handles = build_harmonic_projected_phasor_waveform(
-            frequencies=frequencies
+            frequencies=frequencies,
         )
         mode = fake_hpw.harmonics[0]
         wf = fake_hpw[mode]
@@ -435,7 +441,7 @@ class TestWaveformConstructorsJAX(unittest.TestCase):
     def test_harmonic_waveform_constructor(self):
         case = build_harmonic_waveform_frequency_series(jnp)
         wf = harmonic_waveform(
-            {case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]}
+            {case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]},
         )
 
         self.assertEqual(type(wf).__name__, "HarmonicWaveform")
@@ -454,7 +460,7 @@ class TestWaveformConstructorsJAX(unittest.TestCase):
             {
                 case["mode_22"]: case["resp_22_map"],
                 case["mode_33"]: case["resp_33_map"],
-            }
+            },
         )
 
         self.assertEqual(type(wf).__name__, "HarmonicProjectedWaveform")
@@ -466,7 +472,7 @@ class TestWaveformConstructorsJAX(unittest.TestCase):
             {
                 case["mode_22"]: case["resp_22_map"],
                 case["mode_33"]: case["resp_33_map"],
-            }
+            },
         )
 
         self.assertEqual(type(wf).__name__, "HomogeneousHarmonicProjectedWaveform")

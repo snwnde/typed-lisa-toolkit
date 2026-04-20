@@ -122,7 +122,7 @@ def extend_to(
         else:
             support_slices = tuple(
                 get_subset_slice(target_g, float(g[0]), float(g[-1]))
-                for target_g, g in zip(_target_grid, _grid)
+                for target_g, g in zip(_target_grid, _grid, strict=True)
             )
         # Build full indexing tuple for canonical shape
         index = (slice(None),) * 4 + support_slices
@@ -156,7 +156,7 @@ def trim_interp(interpolator: Interpolator):
         trimmed_grid = grid[support_slice]
         if trimmed_grid.size == 0:
             log.warning("Empty array. Returning a zero interpolator.")
-            return lambda target_entries: xp.zeros_like(target_entries)
+            return xp.zeros_like
         min = float(trimmed_grid[0])
         max = float(trimmed_grid[-1])
 
@@ -165,7 +165,7 @@ def trim_interp(interpolator: Interpolator):
             target_support_slice = get_subset_slice(target_grid, min, max)
             interp_grid = target_grid[target_support_slice]
             interpolated = interpolator(grid[support_slice], entries[support_slice])(
-                interp_grid
+                interp_grid,
             )
             return extend_to(target_grid)(interp_grid, interpolated)
 

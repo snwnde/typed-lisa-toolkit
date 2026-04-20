@@ -182,7 +182,7 @@ def process_autodoc_docstring(app, what, name, obj, options, lines):
         return
 
     # Transform all private type names in all lines
-    for i, line in enumerate(lines):
+    for i, _ in enumerate(lines):
         for private_type, public_type in TYPE_NAME_MAPPING.items():
             lines[i] = lines[i].replace(private_type, public_type)
 
@@ -233,7 +233,7 @@ class TransformPrivateTypes(SphinxTransform):
             new_nodes = []
             last_end = 0
 
-            for start, end, pattern, role, display_name, reftarget in filtered_matches:
+            for start, end, _, _, display_name, reftarget in filtered_matches:
                 # Add text before the match
                 if start > last_end:
                     new_nodes.append(nodes.Text(text[last_end:start]))

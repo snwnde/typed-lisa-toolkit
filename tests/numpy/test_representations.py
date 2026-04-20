@@ -8,7 +8,6 @@ import numpy.testing as npt
 from l2d_interface.validators import (
     validate_representation,  # type: ignore[import-untyped]
 )
-from scipy.signal import freqs
 
 from tests._helpers import (
     AdvancedRepresentationMethodsMixin,
@@ -20,13 +19,11 @@ from tests._helpers import (
 from typed_lisa_toolkit import (
     build_grid2d,
     frequency_series,
-    linspace,
     phasor,
     stft,
     time_series,
     tsdata,
     utils,
-    wdm,
 )
 from typed_lisa_toolkit.types import (
     STFT,
@@ -34,9 +31,6 @@ from typed_lisa_toolkit.types import (
     Grid2DSparse,
     Linspace,
     Phasor,
-    TSData,
-    UniformFrequencySeries,
-    UniformTimeSeries,
 )
 from typed_lisa_toolkit.types.representations import (  # extra symbols for coverage tests
     _embed_entries_to_grid_2d_sparse,
@@ -247,7 +241,8 @@ class TestL2DContractNumpy(TestCanonicalShape):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features),
         )
         self.assertEqual(
-            self.entries_tf.shape[4:], (self.len_freq, self.len_time)
+            self.entries_tf.shape[4:],
+            (self.len_freq, self.len_time),
         )  # 2D grid
 
         # Verify independent grid selection along time dimension
@@ -464,7 +459,11 @@ class TestSubsetOperations(unittest.TestCase):
         # Create test series with parameterized shape
         freqs = np.linspace(0, 1, 100)
         entries = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 100
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            100,
         )
         fs = frequency_series(freqs, entries=entries)
 
@@ -497,7 +496,8 @@ class TestSubsetOperations(unittest.TestCase):
             (self.n_batches, self.n_channels, self.n_harmonics, self.n_features),
         )
         self.assertEqual(
-            tf_sub_time.entries.shape[4], self.len_grid_large
+            tf_sub_time.entries.shape[4],
+            self.len_grid_large,
         )  # frequency dimension preserved
 
         # Subset by frequency interval
@@ -507,7 +507,8 @@ class TestSubsetOperations(unittest.TestCase):
         npt.assert_array_max_ulp(freq_array[-1], 5e-2, maxulp=100)
         npt.assert_array_max_ulp(np.array(tf_sub_freq.times), self.times_ls)
         self.assertEqual(
-            tf_sub_freq.entries.shape[5], self.len_grid_large
+            tf_sub_freq.entries.shape[5],
+            self.len_grid_large,
         )  # time dimension preserved
         self.assertEqual(
             tf_sub_freq.entries.shape[0:4],
@@ -526,7 +527,11 @@ class TestEmbedOperations(unittest.TestCase):
 
         # Create canonical shape entries for small grid
         entries_small = np.random.randn(
-            2, 3, 2, 1, 31
+            2,
+            3,
+            2,
+            1,
+            31,
         )  # (batch, chan, harm, feat, grid)
 
         # Extend
@@ -539,7 +544,9 @@ class TestEmbedOperations(unittest.TestCase):
 
         # Check that subset was placed correctly
         subset_slice = utils.get_subset_slice(
-            large_grid[0], small_grid[0][0], small_grid[0][-1]
+            large_grid[0],
+            small_grid[0][0],
+            small_grid[0][-1],
         )
         npt.assert_array_equal(entries_large[:, :, :, :, subset_slice], entries_small)
 
@@ -558,7 +565,7 @@ class TestEmbedOperations(unittest.TestCase):
 
         # Create large grid that contains small grid exactly
         freqs_large = np.array(
-            [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]
+            [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
         )
 
         # Embed
@@ -732,14 +739,22 @@ class TestArithmeticOperations(unittest.TestCase):
         """Test create_like preserves grid but replaces entries."""
         freqs = Linspace(0.0, 1e-3, 200)
         entries_old = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 200
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            200,
         )
         fs_old = frequency_series(freqs, entries=entries_old)
 
         # Create new entries with same shape
         entries_new = (
             np.random.randn(
-                self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 200
+                self.n_batches,
+                self.n_channels,
+                self.n_harmonics,
+                self.n_features,
+                200,
             )
             * 10
         )
@@ -871,10 +886,20 @@ class TestArithmeticOperations(unittest.TestCase):
         times = np.linspace(0, 10, 100)
         freqs = np.linspace(0, 1, 50)
         entries1 = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 50, 100
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            50,
+            100,
         )
         entries2 = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 50, 100
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            50,
+            100,
         )
 
         tf1 = STFT(grid=(freqs, times), entries=entries1)
@@ -1045,7 +1070,11 @@ class TestComplexProperties(unittest.TestCase):
     def test_conj_property(self):
         """Test complex conjugate."""
         entries = (np.cos(self.freqs) + 1j * np.sin(self.freqs)).reshape(
-            1, 1, 1, 1, self.len_freq
+            1,
+            1,
+            1,
+            1,
+            self.len_freq,
         )
         # Expand to full canonical shape
         entries_full = np.tile(
@@ -1067,7 +1096,7 @@ class TestComplexProperties(unittest.TestCase):
         """Test absolute value (magnitude) of complex series."""
         # Create entries with known magnitude
         entries = (3 + 4j) * np.ones(
-            (1, 1, 1, 1, self.len_freq)
+            (1, 1, 1, 1, self.len_freq),
         )  # magnitude should be 5
         # Expand to full canonical shape
         entries_full = np.tile(
@@ -1085,7 +1114,7 @@ class TestComplexProperties(unittest.TestCase):
                 self.n_harmonics,
                 self.n_features,
                 self.len_freq,
-            )
+            ),
         )
         npt.assert_array_almost_equal(fs_abs.entries, expected_abs)
         npt.assert_array_equal(fs_abs.grid[0], fs.grid[0])
@@ -1249,7 +1278,11 @@ class TestGridTupleHandling(unittest.TestCase):
         """Test that non-uniform arrays are not converted to Linspace."""
         freqs = np.array([0.1, 0.2, 0.5, 1.0, 2.0])  # Non-uniform
         entries = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 5
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            5,
         )
         fs = frequency_series(freqs, entries=entries)
 
@@ -1394,7 +1427,11 @@ class TestErrorHandling(unittest.TestCase):
         """Test that empty grids are handled appropriately."""
         freqs = np.array([])
         entries = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 0
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            0,
         )
 
         # Should either raise error or create empty series
@@ -1411,7 +1448,12 @@ class TestErrorHandling(unittest.TestCase):
         times = np.linspace(0, 10, 100)
         freqs = np.linspace(0, 1, 50)
         entries = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 100, 50
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            100,
+            50,
         )
 
         # Correct structure: tuple of exactly two grids
@@ -1429,7 +1471,11 @@ class TestErrorHandling(unittest.TestCase):
     def test_invalid_subset_interval(self):
         """Test that subset intervals are handled gracefully."""
         entries = np.random.randn(
-            self.n_batches, self.n_channels, self.n_harmonics, self.n_features, 50
+            self.n_batches,
+            self.n_channels,
+            self.n_harmonics,
+            self.n_features,
+            50,
         )
         fs = frequency_series(self.freqs_short, entries=entries)
 
@@ -1454,7 +1500,8 @@ class TestHelperFunctions(HelperFunctionsMixin, unittest.TestCase):
 
 
 class TestAdvancedRepresentationMethods(
-    AdvancedRepresentationMethodsMixin, unittest.TestCase
+    AdvancedRepresentationMethodsMixin,
+    unittest.TestCase,
 ):
     """FrequencySeries/TimeSeries/STFT method tests (shared via mixin)."""
 
@@ -1494,7 +1541,8 @@ class TestArithmeticAddMethods(unittest.TestCase):
         result = fs_large.add(fs_small, full_slice, inplace=False)
         npt.assert_allclose(result.entries[0, 0, 0, 0, 30:60], 3.0)
         npt.assert_allclose(
-            fs_large.entries[0, 0, 0, 0, 30:60], 1.0
+            fs_large.entries[0, 0, 0, 0, 30:60],
+            1.0,
         )  # original unchanged
 
     def test_add_method_inplace_true(self):
@@ -1569,10 +1617,16 @@ class TestPhasor(unittest.TestCase):
         self.freqs = np.linspace(1e-4, 1e-2, 20)
         self.amps = np.ones(20, dtype=np.complex128)[None, None, None, None, :]
         self.phases = np.linspace(0, np.pi, 20, dtype=np.float64)[
-            None, None, None, None, :
+            None,
+            None,
+            None,
+            None,
+            :,
         ]
         self.phasor = phasor(
-            frequencies=self.freqs, amplitudes=self.amps, phases=self.phases
+            frequencies=self.freqs,
+            amplitudes=self.amps,
+            phases=self.phases,
         )
 
     def test_domain_and_kind(self):
@@ -1640,7 +1694,9 @@ class TestSparse2DGridRepresentations(unittest.TestCase):
         source_times = np.array([5.0, 6.0, 7.0])
         source_indices = np.array([[0, 0], [1, 2], [2, 1]], dtype=int)
         source_grid = build_grid2d(
-            source_freqs, source_times, sparse_indices=source_indices
+            source_freqs,
+            source_times,
+            sparse_indices=source_indices,
         )
         # For sparse grids, entries is 5D: (n_batch, n_channels, n_harmonics, n_features, num_sparse_points)
         source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
@@ -1684,7 +1740,9 @@ class TestSparse2DGridRepresentations(unittest.TestCase):
         source_times = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         source_indices = np.array([[0, 0], [1, 2], [2, 3], [3, 4]], dtype=int)
         source_grid = build_grid2d(
-            source_freqs, source_times, sparse_indices=source_indices
+            source_freqs,
+            source_times,
+            sparse_indices=source_indices,
         )
         source_entries = np.array([[[[[11.0, 22.0, 33.0, 44.0]]]]])
 
@@ -1709,7 +1767,9 @@ class TestSparse2DGridRepresentations(unittest.TestCase):
         source_times = np.array([5.0, 6.0, 7.0])
         source_indices = np.array([[0, 0], [1, 1], [2, 2]], dtype=int)
         source_grid = build_grid2d(
-            source_freqs, source_times, sparse_indices=source_indices
+            source_freqs,
+            source_times,
+            sparse_indices=source_indices,
         )
         source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
 

@@ -79,8 +79,9 @@ def cast_mode(mode: tuple[PosInt, PosInt, PosInt]) -> QNM: ...
 
 def cast_mode(mode: tuple[PosInt, ...]):
     """Cast a tuple of positive integers to :class:`.Harmonic` or :class:`.QNM`."""
-    if len(mode) == 2:
+    if len(mode) == 2:  # noqa: PLR2004
         return Harmonic.cast(mode)
-    if len(mode) == 3:
+    if len(mode) == 3:  # noqa: PLR2004
         return QNM.cast(mode)
-    raise ValueError(f"Invalid mode: {mode}")
+    msg = f"Invalid mode: {mode}. A mode should be a tuple of 2 or 3 positive integers."
+    raise ValueError(msg)

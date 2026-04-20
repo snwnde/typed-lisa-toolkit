@@ -175,7 +175,9 @@ class TestDenseMakerNumpy(unittest.TestCase):
         # can compute the exact slice it expects to see passed to get_interpolated.
         return np.asarray(frequencies)[
             np.searchsorted(
-                np.asarray(frequencies), phasor.f_min, side="left"
+                np.asarray(frequencies),
+                phasor.f_min,
+                side="left",
             ) : np.searchsorted(np.asarray(frequencies), phasor.f_max, side="right")
         ]
 
@@ -273,7 +275,9 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, _ = make_mock_phasor(
-            f_min=1.0, f_max=3.0, frequencies=frequencies
+            f_min=1.0,
+            f_max=3.0,
+            frequencies=frequencies,
         )
 
         out = densify_phasor(phasor, interpolator, frequencies, embed=False)
@@ -290,7 +294,9 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, embedded = make_mock_phasor(
-            f_min=1.0, f_max=3.0, frequencies=frequencies
+            f_min=1.0,
+            f_max=3.0,
+            frequencies=frequencies,
         )
 
         out = densify_phasor(phasor, interpolator, frequencies, embed=True)
@@ -306,7 +312,7 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         fake_hpw, handles = build_harmonic_projected_phasor_waveform(
-            frequencies=frequencies
+            frequencies=frequencies,
         )
         mode = fake_hpw.harmonics[0]
         wf = fake_hpw[mode]
@@ -432,7 +438,7 @@ class TestWaveformConstructorsNumpy(unittest.TestCase):
     def test_harmonic_waveform_constructor(self):
         case = build_harmonic_waveform_frequency_series(np)
         wf = harmonic_waveform(
-            {case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]}
+            {case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]},
         )
 
         self.assertEqual(type(wf).__name__, "HarmonicWaveform")
@@ -451,7 +457,7 @@ class TestWaveformConstructorsNumpy(unittest.TestCase):
             {
                 case["mode_22"]: case["resp_22_map"],
                 case["mode_33"]: case["resp_33_map"],
-            }
+            },
         )
 
         self.assertEqual(type(wf).__name__, "HarmonicProjectedWaveform")
@@ -463,7 +469,7 @@ class TestWaveformConstructorsNumpy(unittest.TestCase):
             {
                 case["mode_22"]: case["resp_22_map"],
                 case["mode_33"]: case["resp_33_map"],
-            }
+            },
         )
 
         self.assertEqual(type(wf).__name__, "HomogeneousHarmonicProjectedWaveform")

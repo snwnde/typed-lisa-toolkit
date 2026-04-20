@@ -1,3 +1,5 @@
+"""Functions for transforming data and waveforms between time-domain, frequency-domain, and time-frequency plane."""
+
 import warnings
 from types import ModuleType
 from typing import Literal, overload
@@ -14,8 +16,10 @@ def _import_wdm_transform() -> ModuleType:
 
         return wdm_transform
     except ImportError:
+        msg = "The `wdm_transform` package is required for WDM transformations."
+        "Install it with: pip install wdm-transform"
         raise ImportError(
-            "The `wdm_transform` package is required for WDM transformations. Install it with: pip install wdm-transform"
+            msg,
         ) from None
 
 
@@ -70,10 +74,9 @@ def time2freq(
     xp = td.xp
     try:
         fft = xp.fft
-    except AttributeError:
-        raise NotImplementedError(
-            f"{xp.__name__} does not support FFT operations, which are required for `time2freq`."
-        )
+    except AttributeError as e:
+        msg = f"{xp.__name__} does not support FFT operations, which are required for `time2freq`."
+        raise NotImplementedError(msg) from e
     _freqs = fft.rfftfreq(len(td.times), d=td.times.step)
     freqs = _constructors.linspace(_freqs[0], _freqs[1] - _freqs[0], len(_freqs))
     signal = fft.rfft(td.get_kernel() * td.times.step, axis=-1)
@@ -84,7 +87,10 @@ def time2freq(
         )
     else:
         fsd = _constructors.fsdata(
-            frequencies=freqs, entries=signal, channels=td.channel_names, name=td.name
+            frequencies=freqs,
+            entries=signal,
+            channels=td.channel_names,
+            name=td.name,
         )
         if keep_time:
             fsd = fsd.set_times(td.times)
@@ -97,7 +103,10 @@ def freq2time(fsd: data.FSData, /, *, times: Axis) -> data.TSData: ...
 
 @overload
 def freq2time(
-    fsd: reps.FrequencySeries[Linspace], /, *, times: Axis
+    fsd: reps.FrequencySeries[Linspace],
+    /,
+    *,
+    times: Axis,
 ) -> reps.UniformTimeSeries: ...
 
 
@@ -111,10 +120,9 @@ def freq2time(
     xp = fd.xp
     try:
         fft = xp.fft
-    except AttributeError:
-        raise NotImplementedError(
-            f"{xp.__name__} does not support FFT operations, which are required for `freq2time`."
-        )
+    except AttributeError as e:
+        msg = f"{xp.__name__} does not support FFT operations, which are required for `freq2time`."
+        raise NotImplementedError(msg) from e
     _times = Linspace.make(times)
     is_even = len(fd.frequencies) % 2 == 0
     nyquist_freq = (
@@ -124,26 +132,37 @@ def freq2time(
     )
     nyquist_dt = 1.0 / (2 * nyquist_freq)
     if _times.step < nyquist_dt and not xp.isclose(_times.step, nyquist_dt):
-        warnings.warn("The time grid is denser than the Nyquist limit.")
+        warnings.warn("The time grid is denser than the Nyquist limit.", stacklevel=2)
 
     signal = fft.irfft(fd.get_kernel() / _times.step, n=len(_times), axis=-1)
     if isinstance(fd, reps.FrequencySeries):
         return _constructors.time_series(times=_times, entries=signal)
     else:
         return _constructors.tsdata(
-            times=_times, entries=signal, channels=fd.channel_names, name=fd.name
+            times=_times,
+            entries=signal,
+            channels=fd.channel_names,
+            name=fd.name,
         )
 
 
 @overload
 def time2wdm(
-    tdata: data.TSData, /, *, Nt: int, Nf: int
+    tdata: data.TSData,
+    /,
+    *,
+    Nt: int,
+    Nf: int,
 ) -> data.WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
 @overload
 def time2wdm(
-    tseries: reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int
+    tseries: reps.TimeSeries[Linspace],
+    /,
+    *,
+    Nt: int,
+    Nf: int,
 ) -> reps.WDM[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
@@ -184,17 +203,18 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
             {key: time2wdm(val, Nt=Nt, Nf=Nf) for (key, val) in tthing.items()},
             name=tthing.name,
         )
-    assert isinstance(tthing, reps.TimeSeries)
+    assert isinstance(tthing, reps.TimeSeries)  # noqa: S101
     tseries = tthing
 
     if Nt * Nf > tseries.times.num:
-        raise ValueError(f"Time series too small for given Nf and Nt")
+        msg = "Time series too small for given Nf and Nt"
+        raise ValueError(msg)
 
     tseries = tseries[: Nt * Nf]
     _entries = tseries.entries.squeeze()
-    assert _entries.ndim == 1, (
-        "Currently only single-batch time series are supported by time2wdm."
-    )
+    if not _entries.ndim == 1:
+        msg = "Currently only single-channel time series are supported by time2wdm."
+        raise ValueError(msg)
     coeffs = _forward_wdm(
         _entries,
         nt=Nt,
@@ -203,7 +223,9 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
         d=DEFAULT_WINDOW_D,
         dt=tseries.times.step,
     ).T
-    assert coeffs.shape == (Nf + 1, Nt), "Unexpected shape of WDM coefficients."
+    if not coeffs.shape == (Nf + 1, Nt):
+        msg = "Unexpected shape of WDM coefficients."
+        raise ValueError(msg)
 
     dT = Nf * tseries.times.step
     dF = 0.5 / dT
@@ -211,19 +233,23 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
     fgrid = Linspace(start=0, step=dF, num=Nf + 1)
 
     return _constructors.wdm(
-        times=tgrid, frequencies=fgrid, entries=_conventionaize(coeffs)
+        times=tgrid,
+        frequencies=fgrid,
+        entries=_conventionaize(coeffs),
     )
 
 
 @overload
 def wdm2time(
-    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]], /
+    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    /,
 ) -> data.TSData: ...
 
 
 @overload
 def wdm2time(
-    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]], /
+    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]],
+    /,
 ) -> reps.UniformTimeSeries: ...
 
 
@@ -251,17 +277,21 @@ def wdm2time(
 
     if isinstance(wdmthing, data.WDMData):
         return _constructors.tsdata(
-            {key: wdm2time(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
+            {key: wdm2time(val) for (key, val) in wdmthing.items()},
+            name=wdmthing.name,
         )
-    assert isinstance(wdmthing, reps.WDM)
+    assert isinstance(wdmthing, reps.WDM)  # noqa: S101
     wdm = wdmthing
     _coeffs = wdm.entries.squeeze()
-    assert _coeffs.ndim == 2, (
-        "Currently only single-batch WDMs are supported by wdm2time."
-    )
+    if not _coeffs.ndim == 2:  # noqa: PLR2004
+        msg = "Currently only single-batch WDMs are supported by wdm2time."
+        raise ValueError(msg)
 
     entries = _inverse_wdm(
-        coeffs=_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D
+        coeffs=_coeffs.T,
+        dt=wdm.dt,
+        a=DEFAULT_WINDOW_A,
+        d=DEFAULT_WINDOW_D,
     )
     tgrid = Linspace(wdm.times.start, wdm.dt, wdm.ND)
     return _constructors.time_series(tgrid, _conventionaize(entries))
@@ -269,13 +299,23 @@ def wdm2time(
 
 @overload
 def freq2wdm(
-    fseries: reps.FrequencySeries[Linspace], /, *, Nt: int, Nf: int, t0: float = 0.0
+    fseries: reps.FrequencySeries[Linspace],
+    /,
+    *,
+    Nt: int,
+    Nf: int,
+    t0: float = 0.0,
 ) -> reps.WDM[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
 @overload
 def freq2wdm(
-    fdata: data.FSData, /, *, Nt: int, Nf: int, t0: float = 0.0
+    fdata: data.FSData,
+    /,
+    *,
+    Nt: int,
+    Nf: int,
+    t0: float = 0.0,
 ) -> data.WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
 
 
@@ -310,7 +350,7 @@ def freq2wdm(
             {key: freq2wdm(val, Nt=Nt, Nf=Nf, t0=t0) for (key, val) in fthing.items()},
             name=fthing.name,
         )
-    assert isinstance(fthing, reps.FrequencySeries), (
+    assert isinstance(fthing, reps.FrequencySeries), (  # noqa: S101
         f"Expected a FrequencySeries input, got {type(fthing)}"
     )
     fseries = fthing
@@ -325,13 +365,15 @@ def freq2wdm(
 
 @overload
 def wdm2freq(
-    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]], /
+    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    /,
 ) -> data.FSData: ...
 
 
 @overload
 def wdm2freq(
-    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]], /
+    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]],
+    /,
 ) -> reps.UniformFrequencySeries: ...
 
 
@@ -352,14 +394,15 @@ def wdm2freq(
 
     if isinstance(wdmthing, data.WDMData):
         return _constructors.fsdata(
-            {key: wdm2freq(val) for (key, val) in wdmthing.items()}, name=wdmthing.name
+            {key: wdm2freq(val) for (key, val) in wdmthing.items()},
+            name=wdmthing.name,
         )
-    assert isinstance(wdmthing, reps.WDM)
+    assert isinstance(wdmthing, reps.WDM)  # noqa: S101
     wdm = wdmthing
     _coeffs = wdm.entries.squeeze()
-    assert _coeffs.ndim == 2, (
-        "Currently only single-batch WDMs are supported by wdm2freq."
-    )
+    if not _coeffs.ndim == 2:  # noqa: PLR2004
+        msg = "Currently only single-batch WDMs are supported by wdm2freq."
+        raise ValueError(msg)
 
     wtfs = _frequency_wdm(_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
     # wtfs is on a grid from fftfreq but we want rfftfreq

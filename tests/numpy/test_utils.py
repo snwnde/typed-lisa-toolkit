@@ -42,7 +42,7 @@ class TestUtilsNumpy(unittest.TestCase):
         self.assertEqual(extended.shape, (1, 1, 1, 1, 10))
         self.assertTrue((extended[..., 3:8] == entries).all())
         self.assertTrue(
-            (extended[..., :3] == 0).all() and (extended[..., 8:] == 0).all()
+            (extended[..., :3] == 0).all() and (extended[..., 8:] == 0).all(),
         )
 
     def test_trim_interp_decorator(self):

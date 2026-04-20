@@ -18,9 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-wdm = [
-    "wdm-transform>=0.1.1",
-]
+wdm = ["wdm-transform>=0.1.1"]
 jax = ["jax"]
 quadax = ["quadax"]
 mojito = [
@@ -88,15 +86,33 @@ build-backend = "hatchling.build"
 
 
 [tool.ruff.lint]
-# select = ["D", "PL", "F"]
-select = ["D"]
-ignore = ["D100", "D104", "PLC0415"]
+select = [
+    "D",
+    "PL",
+    "F",
+    "S",
+    "FBT",
+    "B",
+    "COM",
+    "DTZ",
+    "T10",
+    "ISC",
+    "EM",
+    "ICN",
+    "LOG",
+    "G",
+    "INP",
+    "PIE",
+    "PYI",
+]
+ignore = ["D104", "PLC0415", "PLR0913", "COM812"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "PL", "DOC"]
+"tests/**" = ["D", "PL", "DOC", "INP"]
+"docs/**" = ["D", "PL", "DOC", "INP"]
 
 [tool.coverage.report]
 omit = [

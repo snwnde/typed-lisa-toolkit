@@ -5,7 +5,7 @@ import warnings
 
 import jax
 
-jax.config.update("jax_enable_x64", True)
+jax.config.update("jax_enable_x64", val=True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -19,9 +19,11 @@ def _require_wdm_transform():
     try:
         import wdm_transform  # noqa: F401
     except ImportError as exc:
-        raise unittest.SkipTest(
-            "wdm_transform is required for WDM conversion tests"
-        ) from exc
+        msg = (
+            "The wdm_transform package is required for WDM conversion tests. "
+            "Please install it with `pip install wdm_transform`."
+        )
+        raise unittest.SkipTest(msg) from exc
 
 
 def _build_timeseries_jax(n: int = 8):
@@ -42,7 +44,7 @@ def _build_tsdata_jax(n: int = 8):
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
-        }
+        },
     )
     return times, tsd
 
@@ -77,7 +79,9 @@ class TestTransformsJax(unittest.TestCase):
 
         self.assertIsInstance(recovered, reps.UniformTimeSeries)
         npt.assert_allclose(
-            np.asarray(recovered.entries).squeeze(), np.asarray(entries), atol=1e-12
+            np.asarray(recovered.entries).squeeze(),
+            np.asarray(entries),
+            atol=1e-12,
         )
 
     def test_freq2time_fsdata_returns_tsdata(self):
@@ -90,7 +94,9 @@ class TestTransformsJax(unittest.TestCase):
         self.assertEqual(recovered.channel_names, tsd.channel_names)
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(times))
         npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(tsd.get_kernel()), atol=1e-12
+            np.asarray(recovered.get_kernel()),
+            np.asarray(tsd.get_kernel()),
+            atol=1e-12,
         )
 
     def test_freq2time_warns_for_denser_than_nyquist_times(self):
@@ -98,14 +104,18 @@ class TestTransformsJax(unittest.TestCase):
         fs = shop.time2freq(ts)
 
         dense_times = np.linspace(
-            float(ts.times.start), float(ts.times.stop), 2 * len(ts.times) - 1
+            float(ts.times.start),
+            float(ts.times.stop),
+            2 * len(ts.times) - 1,
         )
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             _ = shop.freq2time(fs, times=dense_times)
 
         self.assertTrue(
-            any("denser than the Nyquist limit" in str(item.message) for item in caught)
+            any(
+                "denser than the Nyquist limit" in str(item.message) for item in caught
+            ),
         )
 
     def test_time2wdm_roundtrip_timeseries(self):
@@ -119,7 +129,9 @@ class TestTransformsJax(unittest.TestCase):
         self.assertIsInstance(recovered, reps.UniformTimeSeries)
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(ts.times))
         npt.assert_allclose(
-            np.asarray(recovered.entries).squeeze(), np.asarray(entries), atol=1e-12
+            np.asarray(recovered.entries).squeeze(),
+            np.asarray(entries),
+            atol=1e-12,
         )
 
     def test_time2wdm_roundtrip_tsdata(self):
@@ -134,7 +146,9 @@ class TestTransformsJax(unittest.TestCase):
         self.assertEqual(recovered.channel_names, tsd.channel_names)
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(times))
         npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(tsd.get_kernel()), atol=1e-12
+            np.asarray(recovered.get_kernel()),
+            np.asarray(tsd.get_kernel()),
+            atol=1e-12,
         )
 
     def test_freq2wdm_roundtrip_frequencyseries(self):
@@ -149,7 +163,8 @@ class TestTransformsJax(unittest.TestCase):
         self.assertIsInstance(recovered, reps.UniformFrequencySeries)
         npt.assert_allclose(np.asarray(recovered.entries), np.asarray(fs.entries))
         npt.assert_allclose(
-            np.asarray(recovered.frequencies), np.asarray(fs.frequencies)
+            np.asarray(recovered.frequencies),
+            np.asarray(fs.frequencies),
         )
 
     def test_freq2wdm_roundtrip_fsdata(self):
@@ -164,10 +179,12 @@ class TestTransformsJax(unittest.TestCase):
         self.assertIsInstance(recovered, FSData)
         self.assertEqual(recovered.channel_names, fsd.channel_names)
         npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(fsd.get_kernel())
+            np.asarray(recovered.get_kernel()),
+            np.asarray(fsd.get_kernel()),
         )
         npt.assert_allclose(
-            np.asarray(recovered.frequencies), np.asarray(fsd.frequencies)
+            np.asarray(recovered.frequencies),
+            np.asarray(fsd.frequencies),
         )
 
 

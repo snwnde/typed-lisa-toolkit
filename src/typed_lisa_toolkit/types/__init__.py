@@ -255,7 +255,7 @@ STFT = ShortTimeFourierTransform
 WDM = WilsonDaubechiesMeyer
 """Alias for :class:`.WilsonDaubechiesMeyer`."""
 
-IntegrationMethod = IntegrationMethod
+IntegrationMethod = IntegrationMethod  # noqa: PLW0127
 """Name of the numerical integration method."""
 
 __all__ = [

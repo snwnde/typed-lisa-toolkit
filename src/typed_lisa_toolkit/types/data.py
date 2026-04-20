@@ -80,7 +80,7 @@ def _attr_int(attrs: Any, key: str) -> int:
     return int(attrs[key])
 
 
-def _attr_bool(attrs: Any, key: str, default: bool = False) -> bool:
+def _attr_bool(attrs: Any, key: str, *, default: bool = False) -> bool:
     return bool(attrs.get(key, default))
 
 
@@ -116,7 +116,7 @@ def _save_grid(grp: h5py.Group, grid: "AnyGrid") -> None:
         grp.attrs["dim"] = 1
         _save_axis(grp, "axis0", grid[0])
         return
-    if len(grid) == 2:
+    if len(grid) == 2:  # noqa: PLR2004
         grp.attrs["sparse"] = False
         grp.attrs["dim"] = 2
         _save_axis(grp, "axis0", grid[0])
@@ -135,21 +135,25 @@ def _load_grid(node: h5py.Group | h5py.Dataset) -> "AnyGrid":
     if not sparse and dim == 1:
         axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
         return (axis0,)
-    if not sparse and dim == 2:
+    if not sparse and dim == 2:  # noqa: PLR2004
         axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
         axis1 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis1"]))
         return (axis0, axis1)
-    if sparse and dim == 2:
+    if sparse and dim == 2:  # noqa: PLR2004
         axis0 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis0"]))
         axis1 = _load_axis(cast(h5py.Group | h5py.Dataset, node["axis1"]))
         sparse_indices = cast(h5py.Dataset, node["sparse_indices"])[()]
         return Grid2DSparse(axis0, axis1, sparse_indices=sparse_indices)
 
-    raise ValueError(f"Unknown grid serialization format with attributes: {node.attrs}")
+    msg = f"Unknown grid serialization format with attributes: {node.attrs}"
+    raise ValueError(msg)
 
 
 def _load_data[DataT: "Data[AnyReps]"](
-    cls: type[DataT], file_path: str | pathlib.Path, legacy: bool = False
+    cls: type[DataT],
+    file_path: str | pathlib.Path,
+    *,
+    legacy: bool = False,
 ) -> DataT:
     """Load data from an HDF5 file."""
     if legacy:
@@ -167,7 +171,10 @@ def _load_data[DataT: "Data[AnyReps]"](
 
 class _1DSubsetMixin[RepT: _1DSubsettableRep](_mixins.ChannelMapping[RepT], abc.ABC):
     def get_subset(
-        self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
+        self,
+        *,
+        interval: tuple[float, float] | None = None,
+        slice: slice | None = None,
     ) -> Self:
         """Return the subset as a new instance."""
         subset_dict = {
@@ -192,12 +199,14 @@ class _1DSubsetMixin[RepT: _1DSubsettableRep](_mixins.ChannelMapping[RepT], abc.
         if compare_to is None:
             return plotter(self.get_subset(interval=interval)).draw(**kwargs)
         return plotter(self.get_subset(interval=interval)).compare(
-            plotter(compare_to.get_subset(interval=interval)), **kwargs
+            plotter(compare_to.get_subset(interval=interval)),
+            **kwargs,
         )
 
     def _get_plotter(self) -> type[Any]:
         """Return the plotter class."""
-        raise NotImplementedError("The method must be implemented in the subclass.")
+        msg = "The method _get_plotter() must be implemented in the subclass."
+        raise NotImplementedError(msg)
 
 
 class _2DSubsetMixin[RepT: _2DSubsettableRep](_mixins.ChannelMapping[RepT], abc.ABC):
@@ -238,23 +247,26 @@ class _2DSubsetMixin[RepT: _2DSubsettableRep](_mixins.ChannelMapping[RepT], abc.
         if compare_to is None:
             return plotter(
                 self.get_subset(
-                    time_interval=time_interval, freq_interval=freq_interval
-                )
+                    time_interval=time_interval,
+                    freq_interval=freq_interval,
+                ),
             ).draw(**kwargs)
         return plotter(
-            self.get_subset(time_interval=time_interval, freq_interval=freq_interval)
+            self.get_subset(time_interval=time_interval, freq_interval=freq_interval),
         ).compare(
             plotter(
                 compare_to.get_subset(
-                    time_interval=time_interval, freq_interval=freq_interval
-                )
+                    time_interval=time_interval,
+                    freq_interval=freq_interval,
+                ),
             ),
             **kwargs,
         )
 
     def _get_plotter(self) -> type[Any]:
         """Return the plotter class."""
-        raise NotImplementedError("The method must be implemented in the subclass.")
+        msg = "The method _get_plotter() must be implemented in the subclass."
+        raise NotImplementedError(msg)
 
 
 class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
@@ -314,7 +326,7 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
         return cls.from_dict(dict_, **additions)
 
     @classmethod
-    def load(cls, file_path: str | pathlib.Path, legacy: bool = False):
+    def load(cls, file_path: str | pathlib.Path, *, legacy: bool = False):
         """Load the data from an HDF5 file (*Deprecated*).
 
         Warning
@@ -330,7 +342,9 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
 
 
 class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](  # pyright: ignore[reportUnsafeMultipleInheritance]
-    Data[RepT], _1DSubsetMixin[RepT], abc.ABC
+    Data[RepT],
+    _1DSubsetMixin[RepT],
+    abc.ABC,
 ):
     def get_embedded(
         self,
@@ -346,7 +360,10 @@ class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](  
             known_slices=known_slices,
         )
         return type(self)(
-            grid=grid, entries=entries, channels=self.channel_names, name=self.name
+            grid=grid,
+            entries=entries,
+            channels=self.channel_names,
+            name=self.name,
         )
 
 
@@ -551,7 +568,10 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     def set_times(self, times: "Axis") -> TimedFSData:
         """Return a :class:`.TimedFSData` with the time grid set."""
         return TimedFSData(
-            self.grid, self.entries, channels=self.channel_names, name=self.name
+            self.grid,
+            self.entries,
+            channels=self.channel_names,
+            name=self.name,
         ).set_times(times)
 
     def to_tsdata(
@@ -650,7 +670,7 @@ class TimedFSData(FSData):
 
 
 class _2DGridData[  # pyright: ignore[reportUnsafeMultipleInheritance]
-    RepT: reps.STFT[Grid2D[Linspace, Linspace]] | reps.WDM[Grid2D[Linspace, Linspace]]
+    RepT: reps.STFT[Grid2D[Linspace, Linspace]] | reps.WDM[Grid2D[Linspace, Linspace]],
 ](
     Data[RepT],
     _2DSubsetMixin[RepT],
@@ -716,9 +736,8 @@ def _enforce_uniform(ary: Axis, /) -> Linspace:
     try:
         return Linspace.make(ary)
     except ValueError as e:
-        raise ValueError(
-            "To construct data objects, the grid axes must be uniform"
-        ) from e
+        msg = "To construct data objects, the grid axes must be uniform"
+        raise ValueError(msg) from e
 
 
 def _validate_rep_shape(mapping: Mapping[Any, "AnyReps"], /):
@@ -730,13 +749,16 @@ def _validate_rep_shape(mapping: Mapping[Any, "AnyReps"], /):
 
 _func_deprecation_msg = (
     "The factory function `{deprecated_func_name}` is deprecated and will be removed in 0.8.0;"
-    + " use the factory function {func_name} instead."
+    " use the factory function {func_name} instead."
 )
 
 
 @overload
 def tsdata(
-    mapping: Mapping[str, reps.TimeSeries[Linspace]], /, *, name: str | None = None
+    mapping: Mapping[str, reps.TimeSeries[Linspace]],
+    /,
+    *,
+    name: str | None = None,
 ) -> TSData: ...
 
 
@@ -796,20 +818,25 @@ def tsdata(
     if mapping is not None:
         _msg_from_mapping = (
             "Cannot specify `times`, `entries`, or `channels` "
-            + "when using `mapping` to construct TSData."
+            "when using `mapping` to construct TSData."
         )
-        assert all(arg is None for arg in (times, entries, channels)), _msg_from_mapping
+        if not all(arg is None for arg in (times, entries, channels)):
+            raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
         return TSData.from_dict(mapping, name=name)
     _msg = (
         "Must specify `times`, `entries`, and `channels`"
-        + "when not using `mapping` to construct TSData."
+        "when not using `mapping` to construct TSData."
     )
-    assert times is not None and entries is not None and channels is not None, _msg
+    if not (times is not None and entries is not None and channels is not None):
+        raise ValueError(_msg)
     times = _enforce_uniform(times)
     return TSData.from_entries(
-        times=times, entries=entries, channels=channels, name=name
+        times=times,
+        entries=entries,
+        channels=channels,
+        name=name,
     )
 
 
@@ -825,7 +852,10 @@ def fsdata(
 
 @overload
 def fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]], /, *, name: str | None = None
+    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
+    /,
+    *,
+    name: str | None = None,
 ) -> FSData: ...
 
 
@@ -914,17 +944,17 @@ def fsdata(
     """
     if mapping is not None:
         _msg_from_mapping = "Cannot specify `frequencies`, `entries`, or `channels` when using `mapping` to construct FSData."
-        assert all(arg is None for arg in (frequencies, entries, channels)), (
-            _msg_from_mapping
-        )
+        if not all(arg is None for arg in (frequencies, entries, channels)):
+            raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
         _fsdata = FSData.from_dict(mapping, name=name)
     else:
         _msg = "Must specify `frequencies`, `entries`, and `channels` when not using `mapping` to construct FSData."
-        assert (
+        if not (
             frequencies is not None and entries is not None and channels is not None
-        ), _msg
+        ):
+            raise ValueError(_msg)
         frequencies = _enforce_uniform(frequencies)
         _fsdata = FSData.from_entries(
             frequencies=frequencies,
@@ -951,7 +981,8 @@ def timed_fsdata(
     use the :func:`.fsdata` function with the `times` argument instead.
     """
     _warn_msg = _func_deprecation_msg.format(
-        deprecated_func_name="timed_fsdata", func_name="`fsdata` with `times` argument"
+        deprecated_func_name="timed_fsdata",
+        func_name="`fsdata` with `times` argument",
     )
     warnings.warn(
         _warn_msg,
@@ -1053,25 +1084,27 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
     if mapping is not None:
         _msg_from_mapping = (
             "Cannot specify `frequencies`, `times`, `entries`, `channels`, "
-            + "or `sparse_indices` when using `mapping` to construct STFTData."
+            "or `sparse_indices` when using `mapping` to construct STFTData."
         )
-        assert all(
+        if not all(
             arg is None
             for arg in (frequencies, times, entries, channels, sparse_indices)
-        ), _msg_from_mapping
+        ):
+            raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
         return STFTData[GridT].from_dict(mapping, name=name)
     _msg = (
         "Must specify `frequencies`, `times`, `entries`, and `channels` "
-        + "when not using `mapping` to construct STFTData."
+        "when not using `mapping` to construct STFTData."
     )
-    assert (
+    if not (
         frequencies is not None
         and times is not None
         and entries is not None
         and channels is not None
-    ), _msg
+    ):
+        raise ValueError(_msg)
     frequencies = _enforce_uniform(frequencies)
     times = _enforce_uniform(times)
     if sparse_indices is None:
@@ -1185,25 +1218,27 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
     if mapping is not None:
         _msg_from_mapping = (
             "Cannot specify `frequencies`, `times`, `entries`, `channels`, "
-            + "or `sparse_indices` when using `mapping` to construct WDMData."
+            "or `sparse_indices` when using `mapping` to construct WDMData."
         )
-        assert all(
+        if not all(
             arg is None
             for arg in (frequencies, times, entries, channels, sparse_indices)
-        ), _msg_from_mapping
+        ):
+            raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
         return WDMData[GridT].from_dict(mapping, name=name)
     _msg = (
         "Must specify `frequencies`, `times`, `entries`, and `channels` "
-        + "when not using `mapping` to construct WDMData."
+        "when not using `mapping` to construct WDMData."
     )
-    assert (
+    if not (
         frequencies is not None
         and times is not None
         and entries is not None
         and channels is not None
-    ), _msg
+    ):
+        raise ValueError(_msg)
     frequencies = _enforce_uniform(frequencies)
     times = _enforce_uniform(times)
     if sparse_indices is None:
@@ -1672,57 +1707,72 @@ def load_data(
             return _load_data(FSData, file_path, legacy=legacy)
         if data_type == "TimedFSData":
             return _load_data(TimedFSData, file_path, legacy=legacy)
-        raise ValueError(f"Unsupported data type: {data_type}")
+        _msg = (
+            f"Unsupported data type in legacy mode: {data_type}. "
+            "Only TSData, FSData, and TimedFSData are supported in legacy mode."
+        )
+        raise ValueError(_msg)
     with h5py.File(str(file_path), "r") as f:
         domain_attr = str(f.attrs["domain"])
         kind_attr = str(f.attrs["kind"])
         expected_kind = str(kind)
         if domain is None:
+            _msg = (
+                "The `domain` argument of `load_data` is not provided. "
+                "From 0.8.0, this argument will be required. "
+                "Currently, it is inferred from the data, but this behavior is deprecated."
+            )
             warnings.warn(
-                "The `domain` argument of `load_data` is not provided. From 0.8.0,"
-                + " the `domain` argument will be required.",
+                _msg,
                 FutureWarning,
                 stacklevel=2,
             )
         elif domain_attr != domain:
-            raise ValueError(
-                f"The domain of the data does not match the provided `domain` argument. "
-                + f"The data has domain {domain_attr}, but `domain` is {domain}."
+            _msg = (
+                "The domain of the data does not match the provided `domain` argument. "
             )
+            f"The data has domain {domain_attr}, but `domain` is {domain}."
+            raise ValueError(_msg)
         if kind_attr != expected_kind:
-            raise ValueError(
-                f"The kind of the data does not match the provided `kind` argument. "
-                + f"The data has kind {kind_attr}, but `kind` is {kind}."
-            )
-        if domain_attr == "time" or domain_attr == "frequency":
+            _msg = "The kind of the data does not match the provided `kind` argument. "
+            f"The data has kind {kind_attr}, but `kind` is {kind}."
+            raise ValueError(_msg)
+        if domain_attr in {"time", "frequency"}:
             if sparse:
-                raise ValueError(
-                    f"Sparse grid is not supported for domain {domain_attr}."
-                )
-    if domain_attr == "time":
-        return _load_data(TSData, file_path)
-    if domain_attr == "frequency":
-        if kind_attr == "timed":
-            return _load_data(TimedFSData, file_path)
-        return _load_data(FSData, file_path)
-    if domain_attr == "time-frequency":
-        if kind_attr == "stft":
-            if sparse:
-                return _load_data(STFTData[Grid2DSparse[Linspace, Linspace]], file_path)
-            return _load_data(STFTData[Grid2DCartesian[Linspace, Linspace]], file_path)
-        if kind_attr == "wdm":
-            if sparse:
-                return _load_data(WDMData[Grid2DSparse[Linspace, Linspace]], file_path)
-            return _load_data(WDMData[Grid2DCartesian[Linspace, Linspace]], file_path)
-    raise ValueError(
-        f"Unsupported combination of domain and kind: domain={domain_attr}, kind={kind_attr}."
-    )
+                _msg = f"Sparse grid is not supported for domain {domain_attr}."
+                raise ValueError(_msg)
+
+    classes = {
+        ("time", "None", False): TSData,
+        ("frequency", "None", False): FSData,
+        ("frequency", "timed", False): TimedFSData,
+        ("time-frequency", "stft", False): STFTData[
+            Grid2DCartesian[Linspace, Linspace]
+        ],
+        ("time-frequency", "stft", True): STFTData[Grid2DSparse[Linspace, Linspace]],
+        ("time-frequency", "wdm", False): WDMData[Grid2DCartesian[Linspace, Linspace]],
+        ("time-frequency", "wdm", True): WDMData[Grid2DSparse[Linspace, Linspace]],
+    }
+    cls = classes.get((domain_attr, kind_attr, sparse))
+    if cls is None:
+        _msg = (
+            f"Unsupported combination of domain, kind, and sparse: domain={domain_attr}, "
+            f"kind={kind_attr}, sparse={sparse}. "
+            "Supported combinations are: "
+            f"{', '.join(str(key) for key in classes.keys())}."
+        )
+        raise ValueError(_msg)
+    return _load_data(cls, file_path)
 
 
 def load_sangria(
     file_path: str | pathlib.Path,
     name: Literal[
-        "obs/tdi", "sky/mbhb/tdi", "sky/igb/tdi", "sky/vgb/tdi", "sky/dgb/tdi"
+        "obs/tdi",
+        "sky/mbhb/tdi",
+        "sky/igb/tdi",
+        "sky/vgb/tdi",
+        "sky/dgb/tdi",
     ] = "obs/tdi",
     channels: Literal["AE", "AET", "XYZ"] = "AE",
 ) -> TSData:
@@ -1737,9 +1787,11 @@ def load_sangria(
             return aet2xyz(data).pick(channel_names)
         if set(channel_names).issubset(("A", "E", "T")):
             return xyz2aet(data).pick(channel_names)
-        raise ValueError(
-            f"The data does not have the expected channels. The data has {data.channel_names}."
+        msg = (
+            f"Cannot transform the channels to the requested ones. The data has channels {data.channel_names}, "
+            f"but the requested channels are {channel_names}."
         )
+        raise ValueError(msg)
 
     with h5py.File(str(file_path), "r") as fid:
         dataset = np.array(fid[name])
@@ -1756,10 +1808,11 @@ def load_sangria(
                         entries=dataset[chnname].squeeze()[None, None, None, None, :],
                     )
                     for chnname in channel_names
-                }
+                },
             )
             return transform_channels(tsdata)
-    raise ValueError("The dataset does not have the expected structure.")
+    msg = "The dataset does not have the expected structure."
+    raise ValueError(msg)
 
 
 def load_ldc_data(file_path: str | pathlib.Path, **kwargs: Any) -> TSData:
@@ -1774,7 +1827,8 @@ def load_mojito(processed_data: SignalProcessor):
     _data = cast(dict[str, "Array"], processed_data.data)
     _mapping = {
         chnname: reps.time_series(
-            processed_data.t, _data[chnname][None, None, None, None, :]
+            processed_data.t,
+            _data[chnname][None, None, None, None, :],
         )
         for chnname in channel_names
     }

@@ -66,7 +66,8 @@ class Linspace:
 
     def __init__(self, start: float, step: float, num: int):
         if num <= 0:
-            raise ValueError("num must be at least 1")
+            msg = "num must be at least 1"
+            raise ValueError(msg)
         num = int(num)
         # The float conversion is necessary to avoid issues with JAX scalars
         self._start = float(start)
@@ -100,10 +101,15 @@ class Linspace:
         """The last point of the array."""
         return self._stop
 
+    def __hash__(self) -> int:
+        """Return the hash."""
+        return hash((self.start, self.step, self.num))
+
     def __eq__(self, other: object) -> bool:
         """Check if two Linspace instances are equal."""
         if not isinstance(other, LinspaceLike):
-            raise TypeError(f"Cannot compare Linspace with {type(other)}.")
+            msg = f"Cannot compare Linspace with {type(other)}."
+            raise TypeError(msg)
         if not self.start == other.start:
             return False
         if not self.step == other.step:
@@ -121,7 +127,10 @@ class Linspace:
         return f"Linspace(start={self.start}, step={self.step}, num={self.num})"
 
     def __array__(
-        self, dtype: "npt.DTypeLike | None" = None, copy: bool | None = None
+        self,
+        dtype: "npt.DTypeLike | None" = None,
+        *,
+        copy: bool | None = None,
     ) -> "npt.NDArray[np.floating]":
         """Return the grid as a numpy array."""
         grid = self.start + self.step * np.arange(self.num, dtype=dtype)
@@ -132,7 +141,8 @@ class Linspace:
     def __getitem__(self, slice: object) -> Self:
         """Return a subset of the array."""
         if not isinstance(slice, _slice):
-            raise TypeError(f"Invalid index type: expected slice, got {type(slice)}.")
+            msg = f"Invalid index type: expected slice, got {type(slice)}."
+            raise TypeError(msg)
         slice_idx = slice.indices(self.num)
         start = self.start + self.step * slice_idx[0]
         step = self.step * slice_idx[2]
@@ -181,13 +191,16 @@ def linspace(start: float, step: float, num: int) -> Linspace:
 
 def linspace_from_array(array: ArrayLike) -> Linspace:
     """Create a :class:`~types.Linspace` instance from an array."""
+    MIN_SIZE = 2
     xp = xpc.get_namespace(array)
     _array = xp.asarray(array)
-    if len(_array) < 2:
-        raise ValueError("Array must have at least two elements to create Linspace.")
+    if len(_array) < MIN_SIZE:
+        msg = f"Array must have at least {MIN_SIZE} elements to create Linspace."
+        raise ValueError(msg)
     diff = xp.diff(_array)
     if not xp.allclose(diff, diff[0], rtol=1e-8, atol=0):
-        raise ValueError("Array must have uniform spacing to create Linspace.")
+        msg = "Array must have uniform spacing to create Linspace."
+        raise ValueError(msg)
     return linspace(start=float(_array[0]), step=float(diff[0]), num=len(_array))
 
 
@@ -232,7 +245,8 @@ class Grid2DSparse[Axis0: Axis, Axis1: Axis]:
         elif idx == 1:
             return self.axis1
         else:
-            raise IndexError(f"Invalid index {idx} for Grid2DSparse.")
+            msg = f"Invalid index {idx} for Grid2DSparse."
+            raise IndexError(msg)
 
     def __len__(self):
         """Return the number of axes."""
@@ -269,18 +283,30 @@ Domain = Literal["time", "frequency", "time-frequency"]
 
 @overload
 def build_grid2d[Axis0: Axis, Axis1: Axis](
-    axis0: Axis0, axis1: Axis1, /, *, sparse_indices: None = None
+    axis0: Axis0,
+    axis1: Axis1,
+    /,
+    *,
+    sparse_indices: None = None,
 ) -> Grid2DCartesian[Axis0, Axis1]: ...
 
 
 @overload
 def build_grid2d[Axis0: Axis, Axis1: Axis](
-    axis0: Axis0, axis1: Axis1, /, *, sparse_indices: Array
+    axis0: Axis0,
+    axis1: Axis1,
+    /,
+    *,
+    sparse_indices: Array,
 ) -> Grid2DSparse[Axis0, Axis1]: ...
 
 
 def build_grid2d[Axis0: Axis, Axis1: Axis](
-    axis0: Axis0, axis1: Axis1, /, *, sparse_indices: Array | None = None
+    axis0: Axis0,
+    axis1: Axis1,
+    /,
+    *,
+    sparse_indices: Array | None = None,
 ) -> Grid2DCartesian[Axis0, Axis1] | Grid2DSparse[Axis0, Axis1]:
     """Build a :class:`~typed_lisa_toolkit.types.misc.Grid2D`, either :class:`dense <typed_lisa_toolkit.types.misc.Grid2DCartesian>` or :class:`sparse <typed_lisa_toolkit.types.misc.Grid2DSparse>`."""
     if sparse_indices is None:

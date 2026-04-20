@@ -1,3 +1,5 @@
+"""Functions for converting data and waveforms between XYZ and AET channels."""
+
 from collections.abc import Mapping
 from types import ModuleType
 from typing import Any, Literal, cast, overload
@@ -74,9 +76,9 @@ def _aet2xyz[VT: Array | ConvertibleReps](A: VT, E: VT, T: VT) -> tuple[VT, VT, 
 def _get_type_error_msg(original: Mapping[str, ConvertibleReps], /) -> str:
     return (
         "Expected a mapping to :class:`~typed_lisa_toolkit.types.FrequencySeries`,"
-        + " :class:`~typed_lisa_toolkit.types.TimeSeries`,"
-        + ":class:`~typed_lisa_toolkit.types.WDM`, or :class:`~typed_lisa_toolkit.types.STFT`,"
-        + f" got {type(original).__name__}. "
+        " :class:`~typed_lisa_toolkit.types.TimeSeries`,"
+        ":class:`~typed_lisa_toolkit.types.WDM`, or :class:`~typed_lisa_toolkit.types.STFT`,"
+        f" got {type(original).__name__}. "
     )
 
 
@@ -88,7 +90,10 @@ def _get_kwargs(original: Mapping[str, ConvertibleReps], /) -> dict[str, object]
 
 
 def _convert_mapping[MapT: Mapping[str, ConvertibleReps]](
-    original: MapT, /, *, direction: Literal["xyz2aet", "aet2xyz"]
+    original: MapT,
+    /,
+    *,
+    direction: Literal["xyz2aet", "aet2xyz"],
 ) -> MapT:
     """Convert :ref:`data <data_types>` or :ref:`waveforms <waveform_types>` in XYZ channels to AET channels.
 
@@ -110,7 +115,10 @@ def _convert_mapping[MapT: Mapping[str, ConvertibleReps]](
 
 
 def _convert_spectral_density[SDT: SpectralDensity | EvolutionarySpectralDensity](
-    original: SDT, /, *, direction: Literal["xyz2aet", "aet2xyz"]
+    original: SDT,
+    /,
+    *,
+    direction: Literal["xyz2aet", "aet2xyz"],
 ) -> SDT:
     _kernel = original.get_kernel()
     # If original is of type SpectralDensity, the kernel shape is (n_freqs, n_channels, n_channels);
@@ -119,15 +127,15 @@ def _convert_spectral_density[SDT: SpectralDensity | EvolutionarySpectralDensity
     xp = xpc.get_namespace(_kernel)
     if direction == "xyz2aet":
         convert_matrix = get_xyz2aet_matrix(xp)
-        assert orig_channel_order == ("X", "Y", "Z"), (
-            f"Expected original channel order to be ('X', 'Y', 'Z'), got {orig_channel_order}."
-        )
+        if not orig_channel_order == ("X", "Y", "Z"):
+            msg = f"Expected original channel order to be ('X', 'Y', 'Z'), got {orig_channel_order}."
+            raise ValueError(msg)
         new_channel_order = "A", "E", "T"
     else:
         convert_matrix = get_aet2xyz_matrix(xp)
-        assert orig_channel_order == ("A", "E", "T"), (
-            f"Expected original channel order to be ('A', 'E', 'T'), got {orig_channel_order}."
-        )
+        if not orig_channel_order == ("A", "E", "T"):
+            msg = f"Expected original channel order to be ('A', 'E', 'T'), got {orig_channel_order}."
+            raise ValueError(msg)
         new_channel_order = "X", "Y", "Z"
     converted_kernel = xp.einsum(
         "ij,...jk,kl->...il",
@@ -154,16 +162,17 @@ def _convert_spectral_density[SDT: SpectralDensity | EvolutionarySpectralDensity
 
 def _convert_array(xyz: Array, /, *, direction: Literal["xyz2aet", "aet2xyz"]) -> Array:
     xp = xpc.get_namespace(xyz)
+    NUM_CHANNELS = 3
     if direction == "xyz2aet":
         convert_matrix = get_xyz2aet_matrix(xp)
-        assert xyz.shape[-1] == 3, (
-            f"Expected last dimension of input array to be 3, got {xyz.shape[-1]}."
-        )
+        if not xyz.shape[-1] == NUM_CHANNELS:
+            msg = f"Expected last dimension of input array to be {NUM_CHANNELS}, got {xyz.shape[-1]}."
+            raise ValueError(msg)
     else:
         convert_matrix = get_aet2xyz_matrix(xp)
-        assert xyz.shape[-1] == 3, (
-            f"Expected last dimension of input array to be 3, got {xyz.shape[-1]}."
-        )
+        if not xyz.shape[-1] == NUM_CHANNELS:
+            msg = f"Expected last dimension of input array to be {NUM_CHANNELS}, got {xyz.shape[-1]}."
+            raise ValueError(msg)
     return xp.einsum("ij,...j->...i", convert_matrix, xyz)
 
 
@@ -214,7 +223,8 @@ def xyz2aet(
     """
     if xyz is not None:
         if any(arg is not None for arg in (X, Y, Z)):
-            raise ValueError("Cannot specify both xyz and X, Y, Z.")
+            msg = "Cannot specify both xyz and X, Y, Z."
+            raise ValueError(msg)
         if isinstance(xyz, (SpectralDensity, EvolutionarySpectralDensity)):
             return _convert_spectral_density(xyz, direction="xyz2aet")
         if isinstance(xyz, Mapping):
@@ -223,7 +233,8 @@ def xyz2aet(
 
     if X is not None and Y is not None and Z is not None:
         return _xyz2aet(X, Y, Z)
-    raise ValueError("Must specify either xyz or all of X, Y, Z.")
+    msg = "Must specify either xyz or all of X, Y, Z."
+    raise ValueError(msg)
 
 
 @overload
@@ -265,7 +276,8 @@ def aet2xyz(
     """
     if aet is not None:
         if any(arg is not None for arg in (A, E, T)):
-            raise ValueError("Cannot specify both aet and A, E, T.")
+            msg = "Cannot specify both aet and A, E, T."
+            raise ValueError(msg)
         if isinstance(aet, (SpectralDensity, EvolutionarySpectralDensity)):
             return _convert_spectral_density(aet, direction="aet2xyz")
         if isinstance(aet, Mapping):
@@ -274,4 +286,5 @@ def aet2xyz(
 
     if A is not None and E is not None and T is not None:
         return _aet2xyz(A, E, T)
-    raise ValueError("Must specify either aet or all of A, E, T.")
+    msg = "Must specify either aet or all of A, E, T."
+    raise ValueError(msg)

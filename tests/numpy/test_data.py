@@ -4,7 +4,6 @@
 import tempfile
 import unittest
 import warnings
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import h5py
@@ -53,7 +52,7 @@ def _build_tsdata_numpy():
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
-        }
+        },
     )
     return times, x, y, data
 
@@ -138,14 +137,14 @@ class TestDataContainersNumpy(unittest.TestCase):
                 str(item.message)
                 == "Passing `tapering` positionally to `rfft` is deprecated and will be removed in 0.7.0; pass it as a keyword argument instead."
                 for item in caught
-            )
+            ),
         )
         self.assertTrue(
             any(
                 str(item.message)
                 == "The method `UniformTimeSeries.rfft` is deprecated and will be removed in 0.8.0; use `shop.time2freq` instead."
                 for item in caught
-            )
+            ),
         )
         npt.assert_allclose(
             np.asarray(fs_from_ts_pos.entries),
@@ -160,14 +159,14 @@ class TestDataContainersNumpy(unittest.TestCase):
                 str(item.message)
                 == "Passing `tapering` positionally to `irfft` is deprecated and will be removed in 0.7.0; pass it as a keyword argument instead."
                 for item in caught
-            )
+            ),
         )
         self.assertTrue(
             any(
                 str(item.message)
                 == "The method `UniformFrequencySeries.irfft` is deprecated and will be removed in 0.8.0; use `shop.freq2time` instead."
                 for item in caught
-            )
+            ),
         )
         npt.assert_allclose(
             np.asarray(ts_from_fs_pos.entries),
@@ -198,7 +197,9 @@ class TestDataContainersNumpy(unittest.TestCase):
         times = np.linspace(0.0, 1.0, 4)
         bad_entries = np.ones((1, 2, 2, 1, 4))
         built = self._assert_construct_tsdata_deprecation(
-            times=times, entries=bad_entries, channels=("X", "Y")
+            times=times,
+            entries=bad_entries,
+            channels=("X", "Y"),
         )
 
         self.assertEqual(built.channel_names, ("X", "Y"))
@@ -234,7 +235,8 @@ class TestDataContainersNumpy(unittest.TestCase):
         self.assertIsInstance(fsdata, TimedFSData)
         npt.assert_allclose(np.asarray(fsdata.times), times)
         npt.assert_allclose(
-            np.asarray(fsdata.frequencies), np.fft.rfftfreq(len(times), fsdata.dt)
+            np.asarray(fsdata.frequencies),
+            np.fft.rfftfreq(len(times), fsdata.dt),
         )
 
     def test_from_waveform_preserves_entries_and_channels(self):
@@ -327,7 +329,8 @@ class TestDataContainersNumpy(unittest.TestCase):
             loaded = load_data(handle.name, domain="time", kind=None)
         self.assertIsInstance(loaded, TSData)
         npt.assert_allclose(
-            np.asarray(loaded.get_kernel()), np.asarray(tsdata.get_kernel())
+            np.asarray(loaded.get_kernel()),
+            np.asarray(tsdata.get_kernel()),
         )
 
     def test_channel_mapping_set_name(self):
@@ -372,7 +375,7 @@ class TestDataContainersNumpy(unittest.TestCase):
         times = np.linspace(0.0, 7.0, 8)
         timed = fdata.set_times(times)
         sub = timed.get_subset(
-            interval=(float(fdata.frequencies.start), float(fdata.frequencies.stop))
+            interval=(float(fdata.frequencies.start), float(fdata.frequencies.stop)),
         )
         self.assertIsInstance(sub, TimedFSData)
         with self.assertRaises(AttributeError):
@@ -408,7 +411,8 @@ class TestDataContainersNumpy(unittest.TestCase):
         self.assertEqual(left.domain, first.domain)
         self.assertEqual(left.kind, first.kind)
         npt.assert_allclose(
-            np.asarray(left.get_kernel()), np.asarray(left.get_kernel())
+            np.asarray(left.get_kernel()),
+            np.asarray(left.get_kernel()),
         )
 
         picked = left.pick("X")
@@ -426,7 +430,8 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         absolute = abs(left)
         npt.assert_allclose(
-            np.asarray(absolute.get_kernel()), np.abs(np.asarray(left.get_kernel()))
+            np.asarray(absolute.get_kernel()),
+            np.abs(np.asarray(left.get_kernel())),
         )
 
         with self.assertRaises((ValueError, TypeError)):
@@ -475,14 +480,16 @@ class TestDataContainersNumpy(unittest.TestCase):
 
         self.assertIsInstance(loaded, FSData)
         npt.assert_allclose(
-            np.asarray(loaded.get_kernel()), np.asarray(fsdata.get_kernel())
+            np.asarray(loaded.get_kernel()),
+            np.asarray(fsdata.get_kernel()),
         )
 
     def test_load_ldc_data_aet_to_xyz(self):
         n = 16
         t = np.linspace(0.0, 1.0, n)
         dataset = np.zeros(
-            n, dtype=[("t", "f8"), ("A", "f8"), ("E", "f8"), ("T", "f8")]
+            n,
+            dtype=[("t", "f8"), ("A", "f8"), ("E", "f8"), ("T", "f8")],
         )
         dataset["t"] = t
         dataset["A"] = np.sin(2 * np.pi * t)
@@ -502,7 +509,8 @@ class TestDataContainersNumpy(unittest.TestCase):
         n = 16
         t = np.linspace(0.0, 1.0, n)
         dataset = np.zeros(
-            n, dtype=[("t", "f8"), ("X", "f8"), ("Y", "f8"), ("Z", "f8")]
+            n,
+            dtype=[("t", "f8"), ("X", "f8"), ("Y", "f8"), ("Z", "f8")],
         )
         dataset["t"] = t
         dataset["X"] = np.sin(2 * np.pi * t)
@@ -689,7 +697,9 @@ class TestDataContainersNumpy(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
             with self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"):
                 _ = construct_tsdata(
-                    times=times, entries=ts_entries, channels=("X", "Y")
+                    times=times,
+                    entries=ts_entries,
+                    channels=("X", "Y"),
                 )
 
         with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
@@ -776,7 +786,8 @@ class TestDataLoadValidationBranches(unittest.TestCase):
     def test_load_data_kind_mismatch_raises(self):
         _, _, _, tsdata = _build_tsdata_numpy()
         with self.assertWarnsRegex(
-            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+            DeprecationWarning,
+            r"The 'to_fsdata' method is deprecated",
         ):
             fsd = tsdata.to_fsdata(keep_times=False)
 
@@ -850,13 +861,15 @@ class TestDataLoadValidationBranches(unittest.TestCase):
     def test_timedfsdata_to_tsdata_ignores_explicit_times_argument(self):
         times, _, _, tsdata = _build_tsdata_numpy()
         with self.assertWarnsRegex(
-            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+            DeprecationWarning,
+            r"The 'to_fsdata' method is deprecated",
         ):
             timed = tsdata.to_fsdata(keep_times=True)
         alt_times = np.linspace(100.0, 103.5, len(times))
 
         with self.assertWarnsRegex(
-            DeprecationWarning, r"The 'to_tsdata' method is deprecated"
+            DeprecationWarning,
+            r"The 'to_tsdata' method is deprecated",
         ):
             recovered = timed.to_tsdata(alt_times)
 

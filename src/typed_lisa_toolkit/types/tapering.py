@@ -53,7 +53,7 @@ P = ParamSpec("P")
 class Tapering(Protocol):
     """Protocol for tapering functions."""
 
-    def __call__(self, __array: "Array") -> "Array":
+    def __call__(self, __array: "Array") -> "Array":  # noqa: PYI063
         """Return the tapering window to apply on the array."""
         ...
 
@@ -62,7 +62,10 @@ class LenWindow(Protocol, Generic[P]):
     """Protocol for window functions with a length argument."""
 
     def __call__(  # noqa: D102
-        self, __len: int, *args: P.args, **kwargs: P.kwargs
+        self,
+        __len: int,  # noqa: PYI063
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> "Array": ...
 
 
@@ -173,6 +176,8 @@ def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwa
     >>> tapering_func2 = get_tapering_func("hann", sym=False)
 
     """
+    _msg = "Unknown window type: {window}. "
+    "Supported window types are those in `scipy.signal.windows`."
     if not isinstance(window, str):
         return lambda x: window(len(x), *args, **kwargs)  # type: ignore
     try:
@@ -181,7 +186,9 @@ def get_tapering_func(window: LenWindow[P] | str, *args: P.args, **kwargs: P.kwa
         try:
             winfunc = _windows._WIN_FUNCS[window][0]  # type: ignore
         except KeyError as e:
-            raise ValueError("Unknown window type.") from e
+            msg = _msg.format(window=window)
+            raise ValueError(msg) from e
     except KeyError as e:
-        raise ValueError("Unknown window type.") from e
+        msg = _msg.format(window=window)
+        raise ValueError(msg) from e
     return get_tapering_func(winfunc, *args, **kwargs)  # type: ignore

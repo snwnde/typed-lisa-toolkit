@@ -1,6 +1,6 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -18,13 +18,13 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import (
     STFT,
     WDM,
+    Axis,
     HarmonicProjectedWaveform,
     HarmonicWaveform,
     HomogeneousHarmonicProjectedWaveform,
     Linspace,
     ProjectedWaveform,
     TimeSeries,
-    TSData,
     UniformFrequencySeries,
     UniformTimeSeries,
     data,
@@ -37,9 +37,6 @@ from typed_lisa_toolkit.types.representations import (
     _check_entry_grid_compatibility,
     _take_subset,
 )
-
-if TYPE_CHECKING:
-    from typed_lisa_toolkit.types import Axis
 
 SEED = 11324214
 rng = np.random.default_rng(SEED)
@@ -88,7 +85,7 @@ def _build_fsdata(frequencies, channel_entries):
         {
             name: frequency_series(frequencies, entries)
             for name, entries in channel_entries.items()
-        }
+        },
     )
 
 
@@ -97,7 +94,7 @@ def _build_wdmdata(times, frequencies, channel_entries):
         {
             name: wdm(frequencies=frequencies, times=times, entries=entries)
             for name, entries in channel_entries.items()
-        }
+        },
     )
 
 
@@ -160,13 +157,15 @@ def build_canonical_representations(
     }
 
 
-def build_freq_series(xp, uniform=True):
+def build_freq_series(xp, *, uniform=True):
     if uniform:
         frequencies = _build_uniform_frequencies(xp)
     else:
         frequencies = _build_frequencies(xp)
     _entries = _build_complex_entries(
-        xp, [1.0 + 0.5j, -1.0j, 2.0 + 0.0j], random_scale=True
+        xp,
+        [1.0 + 0.5j, -1.0j, 2.0 + 0.0j],
+        random_scale=True,
     )
     return {
         "fs": frequency_series(frequencies, _entries),
@@ -450,7 +449,8 @@ class HelperFunctionsMixin:
         xp = self.xp
         non_uniform = xp.asarray(np.array([0.0, 1.0, 3.0, 7.0]))
         ts = UniformTimeSeries(
-            grid=(non_uniform,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4)))
+            grid=(non_uniform,),
+            entries=xp.asarray(np.ones((1, 1, 1, 1, 4))),
         )
         self.assertNotIsInstance(ts.grid[0], Linspace)
 
@@ -458,7 +458,8 @@ class HelperFunctionsMixin:
         xp = self.xp
         freqs = xp.asarray(np.array([0.01, 0.02, 0.03, 0.04]))
         fs = UniformFrequencySeries(
-            grid=(freqs,), entries=xp.asarray(np.ones((1, 1, 1, 1, 4)))
+            grid=(freqs,),
+            entries=xp.asarray(np.ones((1, 1, 1, 1, 4))),
         )
         self.assertAlmostEqual(fs.f_min, 0.01)
         self.assertAlmostEqual(fs.f_max, 0.04)
@@ -478,7 +479,11 @@ class AdvancedRepresentationMethodsMixin:
         n, dt = 32, 1.0 / 128
         freqs = xp.asarray(np.fft.rfftfreq(n, d=dt))
         entries_fs = xp.asarray(np.fft.rfft(np.sin(2 * np.pi * np.arange(n) * dt)))[
-            None, None, None, None, :
+            None,
+            None,
+            None,
+            None,
+            :,
         ]
         fs = UniformFrequencySeries(grid=(freqs,), entries=entries_fs)
         shifted = fs.get_time_shifted(2 * dt)
@@ -489,7 +494,11 @@ class AdvancedRepresentationMethodsMixin:
         xp = self.xp
         freqs = xp.asarray(np.linspace(1e-4, 1e-2, 10))
         z = xp.asarray(np.exp(1j * np.linspace(0, 4 * np.pi, 10)))[
-            None, None, None, None, :
+            None,
+            None,
+            None,
+            None,
+            :,
         ]
         fs = UniformFrequencySeries(grid=(freqs,), entries=z)
         angles = fs.angle()
@@ -573,15 +582,15 @@ class DataAbstractBranchesMixin:
     """
 
     def test_data_base_get_plotter_notimplemented(self):
-        class Dummy(data.Data[TimeSeries["Axis"]]):
-            _REP_TYPE = TimeSeries["Axis"]
+        class Dummy(data.Data[TimeSeries[Axis]]):
+            _REP_TYPE = TimeSeries[Axis]
 
             @property
             def kind(self):
                 return None
 
         times = np.linspace(0.0, 1.0, 4)
-        representation = TimeSeries["Axis"]((times,), np.ones((1, 1, 1, 1, 4)))
+        representation = TimeSeries[Axis]((times,), np.ones((1, 1, 1, 1, 4)))
         dummy = Dummy.from_dict({"X": representation})
 
         with self.assertRaises(AttributeError):  # type: ignore[attr-defined]
@@ -651,7 +660,8 @@ def make_mock_phasor(*, f_min: float, f_max: float, frequencies: Any = None):
     phasor.f_max = f_max
 
     interpolated = make_valid_mock_representation(
-        name="interpolated", frequencies=frequencies
+        name="interpolated",
+        frequencies=frequencies,
     )
     embedded = make_valid_mock_representation(name="embedded", frequencies=frequencies)
 
@@ -679,7 +689,7 @@ def build_harmonic_projected_phasor_waveform(*, frequencies: Any = None):
         {
             mode_22: FakeResponse({"X": p22x, "Y": p22y}),
             mode_33: FakeResponse({"X": p33x, "Y": p33y}),
-        }
+        },
     )
 
     handles = {

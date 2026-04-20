@@ -36,7 +36,8 @@ def _validate_maps_to_pws(mapping: Mapping[Any, ProjectedWaveform[AnyReps]]):
         try:
             _ = _mixins.validate_maps_to_reps(pw)
         except ValueError as error:
-            raise ValueError(f"Invalid projected waveform for key {key!r}.") from error
+            msg = f"Invalid projected waveform for key {key!r}. "
+            raise ValueError(msg) from error
 
 
 class HarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](_mixins.ModeMapping[ModeT, RepT]):
@@ -50,7 +51,7 @@ class HarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](_mixins.ModeMapping[ModeT, 
 
 
 class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](
-    HarmonicWaveform[ModeT, RepT]
+    HarmonicWaveform[ModeT, RepT],
 ):
     """Multi-mode waveform where all modes share the same grid.
 
@@ -68,7 +69,8 @@ class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](
         """
         xp = self.__xp__()
         return xp.concat(
-            [self[harmonic].entries for harmonic in self.harmonics], axis=2
+            [self[harmonic].entries for harmonic in self.harmonics],
+            axis=2,
         )
 
 
@@ -123,7 +125,7 @@ class ProjectedWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
 
 
 class HarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
-    _mixins.ModeMapping[ModeT, ProjectedWaveform[RepT]]
+    _mixins.ModeMapping[ModeT, ProjectedWaveform[RepT]],
 ):
     """Multi-mode waveform projected onto the detector response in different channels.
 
@@ -145,7 +147,7 @@ class HarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
 
 
 class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
-    HarmonicProjectedWaveform[ModeT, RepT]
+    HarmonicProjectedWaveform[ModeT, RepT],
 ):
     """Multi-mode waveform where all modes share the same grid, projected onto the detector response in different channels.
 
@@ -164,7 +166,8 @@ class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
         """
         xp = xpc.get_namespace(self._first.get_kernel())
         return xp.concat(
-            [self[harmonic].get_kernel() for harmonic in self.harmonics], axis=2
+            [self[harmonic].get_kernel() for harmonic in self.harmonics],
+            axis=2,
         )
 
 
@@ -291,6 +294,7 @@ def densify_phasor_hw[ModeT: Mode, AxisT: "Axis"](
     wf: HarmonicWaveform[ModeT, reps.Phasor["Axis"]],
     interpolator: Interpolator,
     frequencies: AxisT,
+    *,
     embed: bool = False,
 ) -> HomogeneousHarmonicWaveform[ModeT, reps.Phasor[AxisT]]:
     """Densify :class:`~types.HarmonicWaveform` with sparse :class:`~types.Phasor` by interpolation.
@@ -308,9 +312,9 @@ def densify_phasor_hw[ModeT: Mode, AxisT: "Axis"](
     """
     return homogeneous_harmonic_waveform(
         {
-            mode: reps.densify_phasor(wf[mode], interpolator, frequencies, embed)
+            mode: reps.densify_phasor(wf[mode], interpolator, frequencies, embed=embed)
             for mode in wf
-        }
+        },
     )
 
 
@@ -318,6 +322,7 @@ def densify_phasor_pw[RepT: reps.Phasor["Axis"], AxisT: "Axis"](
     wf: ProjectedWaveform[RepT],
     interpolator: Interpolator,
     frequencies: AxisT,
+    *,
     embed: bool = False,
 ) -> ProjectedWaveform[reps.Phasor[AxisT]]:
     """Densify :class:`~types.ProjectedWaveform` with sparse :class:`~types.Phasor` representations by interpolation.
@@ -335,9 +340,14 @@ def densify_phasor_pw[RepT: reps.Phasor["Axis"], AxisT: "Axis"](
     """
     return projected_waveform(
         {
-            chnname: reps.densify_phasor(wf[chnname], interpolator, frequencies, embed)
+            chnname: reps.densify_phasor(
+                wf[chnname],
+                interpolator,
+                frequencies,
+                embed=embed,
+            )
             for chnname in wf.channel_names
-        }
+        },
     )
 
 
@@ -345,14 +355,15 @@ def densify_phasor_hpw[ModeT: Mode, AxisT: "Axis"](
     wf: HarmonicProjectedWaveform[ModeT, reps.Phasor["Axis"]],
     interpolator: Interpolator,
     frequencies: AxisT,
+    *,
     embed: bool = False,
 ) -> HomogeneousHarmonicProjectedWaveform[ModeT, reps.Phasor[AxisT]]:
     """Densify :class:`~types.HarmonicProjectedWaveform` with sparse :class:`~types.Phasor` representations by interpolation."""
     return homogeneous_harmonic_projected_waveform(
         {
-            mode: densify_phasor_pw(wf[mode], interpolator, frequencies, embed)
+            mode: densify_phasor_pw(wf[mode], interpolator, frequencies, embed=embed)
             for mode in wf
-        }
+        },
     )
 
 
@@ -408,7 +419,7 @@ def phasor_to_fs_pw[AxisT: "Axis"](
 ):
     """Convert :class:`~types.Phasor`-valued :class:`~types.ProjectedWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.ProjectedWaveform`."""
     return projected_waveform(
-        {chnname: wf[chnname].to_frequency_series() for chnname in wf.channel_names}
+        {chnname: wf[chnname].to_frequency_series() for chnname in wf.channel_names},
     )
 
 
@@ -467,6 +478,7 @@ def get_dense_maker(
 
     def make[MT: Mode, AxisT: "Axis"](
         frequencies: AxisT,
+        *,
         embed: bool = False,
     ) -> Callable[
         [HarmonicProjectedWaveform[MT, reps.Phasor["Axis"]]],
@@ -488,12 +500,12 @@ def get_dense_maker(
 
         def do_response(resp: ProjectedWaveform[reps.Phasor["Axis"]]):
             return ProjectedWaveform[reps.Phasor[AxisT]].from_dict(
-                {chnname: do_phasor(resp[chnname]) for chnname in resp.channel_names}
+                {chnname: do_phasor(resp[chnname]) for chnname in resp.channel_names},
             )
 
         def do[ModeT: Mode](wf: HarmonicProjectedWaveform[ModeT, reps.Phasor["Axis"]]):
             return HarmonicProjectedWaveform[ModeT, reps.Phasor[AxisT]](
-                {mode: do_response(wf[mode]) for mode in wf.harmonics}
+                {mode: do_response(wf[mode]) for mode in wf.harmonics},
             )
 
         return do
