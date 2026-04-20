@@ -62,6 +62,22 @@ def _build_tsdata_jax():
 
 
 class TestDataContainersJAX(unittest.TestCase):
+    def _assert_construct_tsdata_deprecation(self, **kwargs):
+        with self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"):
+            return construct_tsdata(**kwargs)
+
+    def _assert_construct_fsdata_deprecation(self, **kwargs):
+        with self.assertWarnsRegex(DeprecationWarning, r"construct_fsdata"):
+            return construct_fsdata(**kwargs)
+
+    def _assert_construct_stftdata_deprecation(self, **kwargs):
+        with self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"):
+            return construct_stftdata(**kwargs)
+
+    def _assert_construct_wdmdata_deprecation(self, **kwargs):
+        with self.assertWarnsRegex(DeprecationWarning, r"construct_wdmdata"):
+            return construct_wdmdata(**kwargs)
+
     def _assert_to_fsdata_deprecation(self, tsdata: TSData, *, keep_times: bool):
         with self.assertWarnsRegex(
             DeprecationWarning,
@@ -118,7 +134,9 @@ class TestDataContainersJAX(unittest.TestCase):
     def test_init_rejects_non_unit_harmonic_dimension(self):
         times = jnp.linspace(0.0, 1.0, 4, dtype=jnp.float64)
         bad_entries = jnp.ones((1, 2, 2, 1, 4), dtype=jnp.float64)
-        built = construct_tsdata(times=times, entries=bad_entries, channels=("X", "Y"))
+        built = self._assert_construct_tsdata_deprecation(
+            times=times, entries=bad_entries, channels=("X", "Y")
+        )
 
         self.assertEqual(built.channel_names, ("X", "Y"))
         npt.assert_allclose(np.asarray(built.get_kernel()), np.asarray(bad_entries))
@@ -385,7 +403,7 @@ class TestDataContainersJAX(unittest.TestCase):
     def test_data_unary_op_and_mismatched_binary_op(self):
         case = build_fd_pair(jnp)
         left = case["left"]
-        right = construct_fsdata(
+        right = self._assert_construct_fsdata_deprecation(
             frequencies=np.asarray(left.frequencies) + 10.0,
             entries=np.asarray(left.get_kernel()),
             channels=("A", "B"),
@@ -570,13 +588,13 @@ class TestDataContainersJAX(unittest.TestCase):
         stft_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
         wdm_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
 
-        ts = construct_tsdata(
+        ts = self._assert_construct_tsdata_deprecation(
             times=times,
             entries=ts_entries,
             channels=("X", "Y"),
             name="ts",
         )
-        fs = construct_fsdata(
+        fs = self._assert_construct_fsdata_deprecation(
             frequencies=freqs,
             entries=fs_entries,
             channels=("X", "Y"),
@@ -591,14 +609,14 @@ class TestDataContainersJAX(unittest.TestCase):
                 times=times,
                 name="tfs",
             )
-        stft_data = construct_stftdata(
+        stft_data = self._assert_construct_stftdata_deprecation(
             frequencies=freqs,
             times=times,
             entries=stft_entries,
             channels=("X", "Y"),
             name="stft",
         )
-        wdm_data = construct_wdmdata(
+        wdm_data = self._assert_construct_wdmdata_deprecation(
             frequencies=freqs,
             times=times,
             entries=wdm_entries,
@@ -666,15 +684,19 @@ class TestDataContainersJAX(unittest.TestCase):
         stft_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
 
         with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
-            _ = construct_tsdata(times=times, entries=ts_entries, channels=("X", "Y"))
+            with self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"):
+                _ = construct_tsdata(
+                    times=times, entries=ts_entries, channels=("X", "Y")
+                )
 
         with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
-            _ = construct_stftdata(
-                frequencies=freqs,
-                times=times,
-                entries=stft_entries,
-                channels=("X", "Y"),
-            )
+            with self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"):
+                _ = construct_stftdata(
+                    frequencies=freqs,
+                    times=times,
+                    entries=stft_entries,
+                    channels=("X", "Y"),
+                )
 
     def test_fsdata_legacy_load(self):
         freqs = np.array([1.0, 2.0, 3.0], dtype=np.float64)
@@ -774,13 +796,14 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
         sparse_indices = np.array([[0, 0], [1, 2], [2, 4]], dtype=int)
 
         stft_entries = jnp.ones((1, 2, 1, 1, len(sparse_indices)), dtype=jnp.float64)
-        stft_data = construct_stftdata(
-            frequencies=freqs,
-            times=times,
-            entries=stft_entries,
-            channels=("X", "Y"),
-            sparse_indices=sparse_indices,
-        )
+        with self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"):
+            stft_data = construct_stftdata(
+                frequencies=freqs,
+                times=times,
+                entries=stft_entries,
+                channels=("X", "Y"),
+                sparse_indices=sparse_indices,
+            )
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             stft_data.save(handle.name)
@@ -798,12 +821,13 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
         )
 
         wdm_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
-        wdm_data = construct_wdmdata(
-            frequencies=freqs,
-            times=times,
-            entries=wdm_entries,
-            channels=("X", "Y"),
-        )
+        with self.assertWarnsRegex(DeprecationWarning, r"construct_wdmdata"):
+            wdm_data = construct_wdmdata(
+                frequencies=freqs,
+                times=times,
+                entries=wdm_entries,
+                channels=("X", "Y"),
+            )
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             wdm_data.save(handle.name)

@@ -503,7 +503,7 @@ class FDNoiseModel(
             norm="forward",
             axis=-1,
         )
-        return dm.construct_tsdata(
+        return dm.tsdata(
             times=left.times,
             entries=cross_correlation,
             channels=left.channel_names,

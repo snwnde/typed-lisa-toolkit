@@ -83,7 +83,7 @@ def time2freq(
             entries=signal,
         )
     else:
-        fsd = _constructors.construct_fsdata(
+        fsd = _constructors.fsdata(
             frequencies=freqs, entries=signal, channels=td.channel_names, name=td.name
         )
         if keep_time:
@@ -130,7 +130,7 @@ def freq2time(
     if isinstance(fd, reps.FrequencySeries):
         return _constructors.time_series(times=_times, entries=signal)
     else:
-        return _constructors.construct_tsdata(
+        return _constructors.tsdata(
             times=_times, entries=signal, channels=fd.channel_names, name=fd.name
         )
 
