@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 from tests._helpers import (
     build_harmonic_projected_frequency_waveform,
@@ -42,10 +43,10 @@ class TestHarmonicWaveformNumpy(unittest.TestCase):
         case = build_harmonic_waveform_frequency_series(np)
         wf = case["wf"]
 
-        self.assertEqual(wf.domain, "frequency")
+        assert wf.domain == "frequency"
 
         picked = wf.pick(case["mode_22"])
-        self.assertEqual(tuple(picked.keys()), (case["mode_22"],))
+        assert tuple(picked.keys()) == (case["mode_22"],)
         npt.assert_allclose(
             np.asarray(picked[case["mode_22"]].entries),
             np.asarray(case["wf_22"].entries),
@@ -55,7 +56,7 @@ class TestHarmonicWaveformNumpy(unittest.TestCase):
         case = build_harmonic_waveform_frequency_series(np)
         wf = case["wf"]
 
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             wf.pick(modes.Harmonic(9, 9))
 
     def test_pick_tuple_preserves_requested_order(self):
@@ -64,17 +65,17 @@ class TestHarmonicWaveformNumpy(unittest.TestCase):
 
         picked = wf.pick((case["mode_33"], case["mode_22"]))
 
-        self.assertEqual(tuple(picked.keys()), (case["mode_33"], case["mode_22"]))
+        assert tuple(picked.keys()) == (case["mode_33"], case["mode_22"])
 
     def test_repr_does_not_recurse(self):
         case = build_harmonic_waveform_frequency_series(np)
         rep = repr(case["wf"])
-        self.assertIn("HarmonicWaveform", rep)
+        assert "HarmonicWaveform" in rep
 
     def test_xp_namespace_for_harmonic_waveform(self):
         case = build_harmonic_waveform_frequency_series(np)
         xp = case["wf"].__xp__()
-        self.assertEqual(xp.__name__, "array_api_compat.numpy")
+        assert xp.__name__ == "array_api_compat.numpy"
 
 
 class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
@@ -82,10 +83,10 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
         case = build_harmonic_projected_frequency_waveform(np)
         wf = case["wf"]
 
-        self.assertEqual(wf.channel_names, ("X", "Y"))
+        assert wf.channel_names == ("X", "Y")
 
         kernel = np.asarray(wf.get_kernel())
-        self.assertEqual(kernel.shape, (1, 2, 2, 1, 3))
+        assert kernel.shape == (1, 2, 2, 1, 3)
 
         expected = np.concatenate(
             [
@@ -105,14 +106,14 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
 
         manual = np.asarray(wf.get_kernel()).sum(axis=2, keepdims=True)
 
-        self.assertEqual(summed.channel_names, ("X", "Y"))
-        self.assertEqual(got.shape, (1, 2, 1, 1, 3))
+        assert summed.channel_names == ("X", "Y")
+        assert got.shape == (1, 2, 1, 1, 3)
         npt.assert_allclose(got, manual)
 
     def test_xp_namespace_for_harmonic_projected_waveform(self):
         case = build_harmonic_projected_frequency_waveform(np)
         xp = case["wf"].__xp__()
-        self.assertEqual(xp.__name__, "array_api_compat.numpy")
+        assert xp.__name__ == "array_api_compat.numpy"
 
     def test_pick_tuple_preserves_requested_order(self):
         case = build_harmonic_projected_frequency_waveform(np)
@@ -120,7 +121,7 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
 
         picked = wf.pick((case["mode_33"], case["mode_22"]))
 
-        self.assertEqual(tuple(picked.keys()), (case["mode_33"], case["mode_22"]))
+        assert tuple(picked.keys()) == (case["mode_33"], case["mode_22"])
 
     def test_mode_channels_ops_scalar_and_unary(self):
         case = build_harmonic_projected_frequency_waveform(np)
@@ -131,7 +132,7 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
         reflected = 2.0 + wf
         negated = -wf
 
-        self.assertIsInstance(shifted, type(wf))
+        assert isinstance(shifted, type(wf))
         npt.assert_allclose(np.asarray(shifted.get_kernel()), kernel + 2.0)
         npt.assert_allclose(np.asarray(reflected.get_kernel()), 2.0 + kernel)
         npt.assert_allclose(np.asarray(negated.get_kernel()), -kernel)
@@ -158,7 +159,7 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
         left = case["wf"]
         mismatched = harmonic_projected_waveform({case["mode_22"]: case["resp_22"]})
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError, match=r".+"):
             _ = left + mismatched
 
 
@@ -175,7 +176,9 @@ class TestDenseMakerNumpy(unittest.TestCase):
         # can compute the exact slice it expects to see passed to get_interpolated.
         return np.asarray(frequencies)[
             np.searchsorted(
-                np.asarray(frequencies), phasor.f_min, side="left"
+                np.asarray(frequencies),
+                phasor.f_min,
+                side="left",
             ) : np.searchsorted(np.asarray(frequencies), phasor.f_max, side="right")
         ]
 
@@ -206,24 +209,24 @@ class TestDenseMakerNumpy(unittest.TestCase):
             out = fn(wf)
 
         # from_dict must be called once per harmonic (2 modes → 2 calls).
-        self.assertEqual(type(out).__name__, "HarmonicProjectedWaveform")
-        self.assertEqual(from_dict_mock.call_count, 2)
+        assert type(out).__name__ == "HarmonicProjectedWaveform"
+        assert from_dict_mock.call_count == 2
         # Output preserves harmonic and channel key order.
-        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
+        assert tuple(out.keys()) == tuple(wf.keys())
 
         for harmonic in wf.harmonics:
-            self.assertEqual(tuple(out[harmonic].keys()), tuple(wf[harmonic].keys()))
+            assert tuple(out[harmonic].keys()) == tuple(wf[harmonic].keys())
             for channel in wf[harmonic].channel_names:
                 phasor, interpolated, _ = handles[harmonic][channel]
                 # get_interpolated must be called exactly once with the per-phasor
                 # windowed slice (not the full grid) and the bound interpolator.
                 phasor.get_interpolated.assert_called_once()
                 args, kwargs = phasor.get_interpolated.call_args
-                self.assertEqual(kwargs, {})
+                assert kwargs == {}
                 npt.assert_allclose(args[0], self._windowed(frequencies, phasor))
-                self.assertIs(args[1], interpolator)
+                assert args[1] is interpolator
                 # embed=False: output is the interpolated mock, not the embedded one.
-                self.assertIs(out[harmonic][channel], interpolated)
+                assert out[harmonic][channel] is interpolated
                 interpolated.get_embedded.assert_not_called()
 
     def test_dense_maker_embed_true_calls_embedded(self):
@@ -241,31 +244,31 @@ class TestDenseMakerNumpy(unittest.TestCase):
         ) as from_dict_mock:
             out = fn(wf)
 
-        self.assertEqual(type(out).__name__, "HarmonicProjectedWaveform")
-        self.assertEqual(from_dict_mock.call_count, 2)
-        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
+        assert type(out).__name__ == "HarmonicProjectedWaveform"
+        assert from_dict_mock.call_count == 2
+        assert tuple(out.keys()) == tuple(wf.keys())
 
         for harmonic in wf.harmonics:
-            self.assertEqual(tuple(out[harmonic].keys()), tuple(wf[harmonic].keys()))
+            assert tuple(out[harmonic].keys()) == tuple(wf[harmonic].keys())
             for channel in wf[harmonic].channel_names:
                 phasor, interpolated, embedded = handles[harmonic][channel]
                 # Still windowed before interpolation, same as embed=False.
                 phasor.get_interpolated.assert_called_once()
                 args, _ = phasor.get_interpolated.call_args
                 npt.assert_allclose(args[0], self._windowed(frequencies, phasor))
-                self.assertIs(args[1], interpolator)
+                assert args[1] is interpolator
 
                 # embed=True: get_embedded is called on the interpolated result
                 # with the *full* frequency grid to zero-pad outside the phasor range.
                 interpolated.get_embedded.assert_called_once()
                 args, kwargs = interpolated.get_embedded.call_args
-                self.assertIsInstance(args[0], tuple)
-                self.assertEqual(len(args[0]), 1)
-                self.assertIs(args[0][0], frequencies)
-                self.assertIn("known_slices", kwargs)
-                self.assertEqual(len(kwargs["known_slices"]), 1)
+                assert isinstance(args[0], tuple)
+                assert len(args[0]) == 1
+                assert args[0][0] is frequencies
+                assert "known_slices" in kwargs
+                assert len(kwargs["known_slices"]) == 1
                 # Output is the embedded mock, not the raw interpolated one.
-                self.assertIs(out[harmonic][channel], embedded)
+                assert out[harmonic][channel] is embedded
 
 
 class TestDensifyHelpersNumpy(unittest.TestCase):
@@ -273,54 +276,58 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, _ = make_mock_phasor(
-            f_min=1.0, f_max=3.0, frequencies=frequencies
+            f_min=1.0,
+            f_max=3.0,
+            frequencies=frequencies,
         )
 
         out = densify_phasor(phasor, interpolator, frequencies, embed=False)
 
         phasor.get_interpolated.assert_called_once()
         args, kwargs = phasor.get_interpolated.call_args
-        self.assertEqual(kwargs, {})
+        assert kwargs == {}
         npt.assert_allclose(args[0], np.array([1.0, 2.0, 3.0]))
-        self.assertIs(args[1], interpolator)
+        assert args[1] is interpolator
         interpolated.get_embedded.assert_not_called()
-        self.assertIs(out, interpolated)
+        assert out is interpolated
 
     def test_densify_phasor_embed_true(self):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, embedded = make_mock_phasor(
-            f_min=1.0, f_max=3.0, frequencies=frequencies
+            f_min=1.0,
+            f_max=3.0,
+            frequencies=frequencies,
         )
 
         out = densify_phasor(phasor, interpolator, frequencies, embed=True)
 
         interpolated.get_embedded.assert_called_once()
         args, kwargs = interpolated.get_embedded.call_args
-        self.assertIs(args[0][0], frequencies)
-        self.assertIn("known_slices", kwargs)
-        self.assertEqual(len(kwargs["known_slices"]), 1)
-        self.assertIs(out, embedded)
+        assert args[0][0] is frequencies
+        assert "known_slices" in kwargs
+        assert len(kwargs["known_slices"]) == 1
+        assert out is embedded
 
     def test_densify_phasor_pw_preserves_channels(self):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
         fake_hpw, handles = build_harmonic_projected_phasor_waveform(
-            frequencies=frequencies
+            frequencies=frequencies,
         )
         mode = fake_hpw.harmonics[0]
         wf = fake_hpw[mode]
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = densify_phasor_pw(wf, interpolator, frequencies, embed=False)
 
-        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
+        assert tuple(out.keys()) == tuple(wf.keys())
         for channel in wf.channel_names:
             _, interpolated, _ = handles[mode][channel]
-            self.assertIs(out[channel], interpolated)
+            assert out[channel] is interpolated
 
     def test_densify_phasor_hw_preserves_harmonics(self):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
@@ -333,10 +340,10 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
 
         out = densify_phasor_hw(wf, interpolator, frequencies, embed=False)
 
-        self.assertEqual(type(out).__name__, "HomogeneousHarmonicWaveform")
-        self.assertEqual(tuple(out.keys()), (mode_22, mode_33))
-        self.assertIs(out[mode_22], i22)
-        self.assertIs(out[mode_33], i33)
+        assert type(out).__name__ == "HomogeneousHarmonicWaveform"
+        assert tuple(out.keys()) == (mode_22, mode_33)
+        assert out[mode_22] is i22
+        assert out[mode_33] is i33
 
     def test_densify_phasor_hpw_returns_homogeneous_container(self):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
@@ -345,17 +352,17 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = densify_phasor_hpw(wf, interpolator, frequencies, embed=False)
 
-        self.assertEqual(type(out).__name__, "HomogeneousHarmonicProjectedWaveform")
-        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
-        self.assertEqual(out.channel_names, ("X", "Y"))
+        assert type(out).__name__ == "HomogeneousHarmonicProjectedWaveform"
+        assert tuple(out.keys()) == tuple(wf.keys())
+        assert out.channel_names == ("X", "Y")
         for mode in wf.harmonics:
             for channel in wf[mode].channel_names:
                 _, interpolated, _ = handles[mode][channel]
-                self.assertIs(out[mode][channel], interpolated)
+                assert out[mode][channel] is interpolated
 
 
 class TestCombineHelpersNumpy(unittest.TestCase):
@@ -372,9 +379,9 @@ class TestCombineHelpersNumpy(unittest.TestCase):
 
         out = phasor_to_fs_hw(wf)
 
-        self.assertEqual(type(out).__name__, "HarmonicWaveform")
-        self.assertIs(out[mode_22], fs22)
-        self.assertIs(out[mode_33], fs33)
+        assert type(out).__name__ == "HarmonicWaveform"
+        assert out[mode_22] is fs22
+        assert out[mode_33] is fs33
 
     def test_phasor_to_fs_pw_converts_each_channel(self):
         p_x = make_valid_mock_representation(name="p_x")
@@ -390,13 +397,13 @@ class TestCombineHelpersNumpy(unittest.TestCase):
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = phasor_to_fs_pw(wf)
 
-        self.assertEqual(tuple(out.keys()), ("X", "Y"))
-        self.assertIs(out["X"], fs_x)
-        self.assertIs(out["Y"], fs_y)
+        assert tuple(out.keys()) == ("X", "Y")
+        assert out["X"] is fs_x
+        assert out["Y"] is fs_y
 
     def test_phasor_to_fs_hpw_converts_nested_leaves(self):
         wf, _ = build_harmonic_projected_phasor_waveform()
@@ -411,39 +418,39 @@ class TestCombineHelpersNumpy(unittest.TestCase):
 
         with patch(
             "typed_lisa_toolkit.types.ProjectedWaveform.from_dict",
-            side_effect=lambda d: d,  # type: ignore
+            side_effect=lambda d: d,
         ):
             out = phasor_to_fs_hpw(wf)
 
-        self.assertEqual(type(out).__name__, "HarmonicProjectedWaveform")
-        self.assertEqual(tuple(out.keys()), tuple(wf.keys()))
+        assert type(out).__name__ == "HarmonicProjectedWaveform"
+        assert tuple(out.keys()) == tuple(wf.keys())
         for mode in wf.harmonics:
             for channel in wf[mode].channel_names:
-                self.assertIs(out[mode][channel], expected[mode][channel])
+                assert out[mode][channel] is expected[mode][channel]
 
 
 class TestWaveformConstructorsNumpy(unittest.TestCase):
     def test_constructor_aliases(self):
-        self.assertIs(hw, harmonic_waveform)
-        self.assertIs(pw, projected_waveform)
-        self.assertIs(hpw, harmonic_projected_waveform)
-        self.assertIs(hhpw, homogeneous_harmonic_projected_waveform)
+        assert hw is harmonic_waveform
+        assert pw is projected_waveform
+        assert hpw is harmonic_projected_waveform
+        assert hhpw is homogeneous_harmonic_projected_waveform
 
     def test_harmonic_waveform_constructor(self):
         case = build_harmonic_waveform_frequency_series(np)
         wf = harmonic_waveform(
-            {case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]}
+            {case["mode_22"]: case["wf_22"], case["mode_33"]: case["wf_33"]},
         )
 
-        self.assertEqual(type(wf).__name__, "HarmonicWaveform")
-        self.assertEqual(tuple(wf.keys()), (case["mode_22"], case["mode_33"]))
+        assert type(wf).__name__ == "HarmonicWaveform"
+        assert tuple(wf.keys()) == (case["mode_22"], case["mode_33"])
 
     def test_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(np)
         resp = projected_waveform(case["resp_22_map"])
 
-        self.assertEqual(type(resp).__name__, "ProjectedWaveform")
-        self.assertEqual(resp.channel_names, ("X", "Y"))
+        assert type(resp).__name__ == "ProjectedWaveform"
+        assert resp.channel_names == ("X", "Y")
 
     def test_harmonic_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(np)
@@ -451,11 +458,11 @@ class TestWaveformConstructorsNumpy(unittest.TestCase):
             {
                 case["mode_22"]: case["resp_22_map"],
                 case["mode_33"]: case["resp_33_map"],
-            }
+            },
         )
 
-        self.assertEqual(type(wf).__name__, "HarmonicProjectedWaveform")
-        self.assertEqual(tuple(wf.keys()), (case["mode_22"], case["mode_33"]))
+        assert type(wf).__name__ == "HarmonicProjectedWaveform"
+        assert tuple(wf.keys()) == (case["mode_22"], case["mode_33"])
 
     def test_homogeneous_harmonic_projected_waveform_constructor(self):
         case = build_harmonic_projected_frequency_waveform(np)
@@ -463,8 +470,8 @@ class TestWaveformConstructorsNumpy(unittest.TestCase):
             {
                 case["mode_22"]: case["resp_22_map"],
                 case["mode_33"]: case["resp_33_map"],
-            }
+            },
         )
 
-        self.assertEqual(type(wf).__name__, "HomogeneousHarmonicProjectedWaveform")
-        self.assertEqual(wf.channel_names, ("X", "Y"))
+        assert type(wf).__name__ == "HomogeneousHarmonicProjectedWaveform"
+        assert wf.channel_names == ("X", "Y")

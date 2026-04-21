@@ -4,7 +4,6 @@ import unittest
 
 import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
-    build_grid2d,
     cast_mode,
     construct_fsdata,
     construct_stftdata,
@@ -29,8 +28,6 @@ from typed_lisa_toolkit import (
     linspace,
     load_data,
     load_ldc_data,
-    make_sdm,
-    noise_model,
     phasor,
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
@@ -45,64 +42,63 @@ from typed_lisa_toolkit import (
     tsdata,
     wdm,
     wdmdata,
-    whittle,
 )
 from typed_lisa_toolkit.types import FrequencySeries, TSData
 
 
 class TestPublicApi(unittest.TestCase):
     def test_module_reexports_are_available(self):
-        self.assertIsNotNone(tlt.types)
-        self.assertIsNotNone(tlt.shop)
-        self.assertIsNotNone(tlt.viz)
-        self.assertIsNotNone(tlt.utils)
+        assert tlt.types is not None
+        assert tlt.shop is not None
+        assert tlt.viz is not None
+        assert tlt.utils is not None
 
     def test_common_symbols_are_reexported(self):
-        self.assertIs(tlt.frequency_series, frequency_series)
-        self.assertIs(tlt.time_series, time_series)
-        self.assertIs(tlt.phasor, phasor)
-        self.assertIs(tlt.stft, stft)
-        self.assertIs(tlt.wdm, wdm)
-        self.assertIs(tlt.sum_harmonics, sum_harmonics)
-        self.assertIs(tlt.load_data, load_data)
-        self.assertIs(tlt.load_ldc_data, load_ldc_data)
-        self.assertIs(tlt.tsdata, tsdata)
-        self.assertIs(tlt.fsdata, fsdata)
-        self.assertIs(tlt.stftdata, stftdata)
-        self.assertIs(tlt.wdmdata, wdmdata)
-        self.assertIs(tlt.timed_fsdata, timed_fsdata)
-        self.assertIs(tlt.linspace, linspace)
-        self.assertIs(tlt.cast_mode, cast_mode)
-        self.assertIs(tlt.densify_phasor, densify_phasor)
-        self.assertIs(tlt.densify_phasor_hw, densify_phasor_hw)
-        self.assertIs(tlt.densify_phasor_pw, densify_phasor_pw)
-        self.assertIs(tlt.densify_phasor_hpw, densify_phasor_hpw)
-        self.assertIs(tlt.phasor_to_fs_hw, phasor_to_fs_hw)
-        self.assertIs(tlt.phasor_to_fs_pw, phasor_to_fs_pw)
-        self.assertIs(tlt.phasor_to_fs_hpw, phasor_to_fs_hpw)
-        self.assertIs(tlt.get_dense_maker, get_dense_maker)
-        self.assertIs(tlt.harmonic_waveform, harmonic_waveform)
-        self.assertIs(tlt.homogeneous_harmonic_waveform, homogeneous_harmonic_waveform)
-        self.assertIs(tlt.projected_waveform, projected_waveform)
-        self.assertIs(tlt.harmonic_projected_waveform, harmonic_projected_waveform)
-        self.assertIs(
-            tlt.homogeneous_harmonic_projected_waveform,
-            homogeneous_harmonic_projected_waveform,
+        assert tlt.frequency_series is frequency_series
+        assert tlt.time_series is time_series
+        assert tlt.phasor is phasor
+        assert tlt.stft is stft
+        assert tlt.wdm is wdm
+        assert tlt.sum_harmonics is sum_harmonics
+        assert tlt.load_data is load_data
+        assert tlt.load_ldc_data is load_ldc_data
+        assert tlt.tsdata is tsdata
+        assert tlt.fsdata is fsdata
+        assert tlt.stftdata is stftdata
+        assert tlt.wdmdata is wdmdata
+        assert tlt.timed_fsdata is timed_fsdata
+        assert tlt.linspace is linspace
+        assert tlt.cast_mode is cast_mode
+        assert tlt.densify_phasor is densify_phasor
+        assert tlt.densify_phasor_hw is densify_phasor_hw
+        assert tlt.densify_phasor_pw is densify_phasor_pw
+        assert tlt.densify_phasor_hpw is densify_phasor_hpw
+        assert tlt.phasor_to_fs_hw is phasor_to_fs_hw
+        assert tlt.phasor_to_fs_pw is phasor_to_fs_pw
+        assert tlt.phasor_to_fs_hpw is phasor_to_fs_hpw
+        assert tlt.get_dense_maker is get_dense_maker
+        assert tlt.harmonic_waveform is harmonic_waveform
+        assert tlt.homogeneous_harmonic_waveform is homogeneous_harmonic_waveform
+        assert tlt.projected_waveform is projected_waveform
+        assert tlt.harmonic_projected_waveform is harmonic_projected_waveform
+        assert (
+            tlt.homogeneous_harmonic_projected_waveform
+            is homogeneous_harmonic_projected_waveform
         )
-        self.assertIs(tlt.hw, hw)
-        self.assertIs(tlt.hhw, hhw)
-        self.assertIs(tlt.pw, pw)
-        self.assertIs(tlt.hpw, hpw)
-        self.assertIs(tlt.hhpw, hhpw)
-        self.assertIs(tlt.construct_fsdata, construct_fsdata)
-        self.assertIs(tlt.construct_stftdata, construct_stftdata)
-        self.assertIs(tlt.construct_timed_fsdata, construct_timed_fsdata)
-        self.assertIs(tlt.construct_tsdata, construct_tsdata)
-        self.assertIs(tlt.construct_wdmdata, construct_wdmdata)
+        assert tlt.hw is hw
+        assert tlt.hhw is hhw
+        assert tlt.pw is pw
+        assert tlt.hpw is hpw
+        assert tlt.hhpw is hhpw
+        assert tlt.construct_fsdata is construct_fsdata
+        assert tlt.construct_stftdata is construct_stftdata
+        assert tlt.construct_timed_fsdata is construct_timed_fsdata
+        assert tlt.construct_tsdata is construct_tsdata
+        assert tlt.construct_wdmdata is construct_wdmdata
 
     def test_types_namespace_exports_are_available(self):
-        self.assertIs(tlt.types.TSData, TSData)
-        self.assertIs(tlt.types.FrequencySeries, FrequencySeries)
+        assert tlt.types.TSData is TSData
+        assert tlt.types.FrequencySeries is FrequencySeries
 
     def test_top_level_public_names_are_listed(self):
         for name in (
@@ -153,7 +149,7 @@ class TestPublicApi(unittest.TestCase):
             "noise_model",
             "whittle",
         ):
-            self.assertIn(name, tlt.__all__)
+            assert name in tlt.__all__
 
 
 if __name__ == "__main__":

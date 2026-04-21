@@ -30,14 +30,14 @@ def _build_fsdata(freqs, x_values, y_values):
         {
             "X": frequency_series(freqs, x_values[None, None, None, None, :]),
             "Y": frequency_series(freqs, y_values[None, None, None, None, :]),
-        }
+        },
     )
 
 
 class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
     def test_classmethod_formulas(self):
-        self.assertEqual(FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0), 4.0)
-        self.assertEqual(FDWhittleLikelihood.log_likelihood(4.0, 2.0), 3.0)
+        assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0
+        assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0
 
     def test_cross_product_and_template_square_match_noise_model(self):
         case = build_fd_pair(np)
@@ -95,7 +95,7 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
 
         got = np.asarray(likelihood.get_cross_product(case["wf"]))
         expected = np.asarray(
-            model.reset().get_scalar_product(data, fsdata(sum_harmonics(case["wf"])))
+            model.reset().get_scalar_product(data, fsdata(sum_harmonics(case["wf"]))),
         )
 
         npt.assert_allclose(got, expected)
@@ -110,7 +110,7 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
         template = left.get_subset(interval=(1.0, 3.0))
         kernel = np.broadcast_to(np.eye(2), (len(freqs), 2, 2)).copy()
         model = noise_model(
-            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y"))
+            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y")),
         )
         likelihood = whittle(left, model)
 
@@ -121,8 +121,8 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
                     kernel[1:4],
                     frequencies=np.asarray(template.frequencies),
                     channel_names=("X", "Y"),
-                )
-            ).get_scalar_product(left.get_subset(interval=(1.0, 3.0)), template)
+                ),
+            ).get_scalar_product(left.get_subset(interval=(1.0, 3.0)), template),
         )
 
         npt.assert_allclose(got, expected)
@@ -134,9 +134,9 @@ class TestFDWhittleLikelihoodNumpy(unittest.TestCase):
                 dense_kernel_2ch(np),
                 frequencies=case["frequencies"],
                 channel_names=("X", "Y"),
-            )
+            ),
         )
 
         likelihood = whittle(case["left"], model)
 
-        self.assertIsInstance(likelihood, FDWhittleLikelihood)
+        assert isinstance(likelihood, FDWhittleLikelihood)

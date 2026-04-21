@@ -2,11 +2,14 @@ r"""
 Types provided by TLT.
 
 .. note::
-    To create instances of these types, use the factory functions provided at the :mod:`top level <typed_lisa_toolkit>`.
-    For example, use :func:`~typed_lisa_toolkit.time_series` to construct a :class:`TimeSeries` object.
+    To create instances of these types, use the factory functions provided
+    at the :mod:`top level <typed_lisa_toolkit>`.
+    For example, use :func:`~typed_lisa_toolkit.time_series`
+    to construct a :class:`TimeSeries` object.
 
 .. warning::
-    The `__init__` methods of these classes are **not** part of the public API, and may change without deprecation.
+    The `__init__` methods of these classes are **not** part of the public API,
+    and may change without deprecation.
 
 .. _representation_types:
 
@@ -85,10 +88,12 @@ Waveforms
 
 Similar to data objects, waveform objects group multiple representations together.
 Waveform objects are meant to represent modeled signals, and as such, they can carry
-theoretical information such as harmonic content, which is not the case for data objects.
+theoretical information such as harmonic content,
+which is not the case for data objects.
 
 In the nomenclature of the project, "raw" waveforms are detector-independent strains,
-such as the two polarizations (:math:`h_+` and :math:`h_\times`) or the spherical harmonic
+such as the two polarizations (:math:`h_+` and :math:`h_\times`)
+or the spherical harmonic
 decomposition (:math:`h_{lm}`); "projected" waveforms depend on LISA's response,
 and are typically TDI channel signals.
 
@@ -255,7 +260,7 @@ STFT = ShortTimeFourierTransform
 WDM = WilsonDaubechiesMeyer
 """Alias for :class:`.WilsonDaubechiesMeyer`."""
 
-IntegrationMethod = IntegrationMethod
+IntegrationMethod = IntegrationMethod  # noqa: PLW0127
 """Name of the numerical integration method."""
 
 __all__ = [

@@ -39,11 +39,10 @@ TYPE_XREF_MAPPING = [
         "ProjectedWaveform",
         "typed_lisa_toolkit.types.ProjectedWaveform",
     ),
-    # (r"reps\.Phasor\b", "class", "Phasor", "typed_lisa_toolkit.types.Phasor"),
-    # (r"reps\.FrequencySeries\b", "class", "FrequencySeries", "typed_lisa_toolkit.types.FrequencySeries"),
 ]
 
-# Derive simple name mapping from xref patterns (for str.replace() in signatures/docstrings)
+# Derive simple name mapping from xref patterns
+# (for str.replace() in signatures/docstrings)
 TYPE_NAME_MAPPING = {
     pattern.replace(r"\.", ".").replace(r"\b", ""): display_name
     for pattern, _, display_name, _ in TYPE_XREF_MAPPING
@@ -127,7 +126,8 @@ def process_autodoc_signature(
     signature,
     return_annotation,
 ):
-    """Conditionally strip type annotations and transform private types in signatures."""
+    """Conditionally strip type annotations and transform private types in signatures."""  # noqa: E501
+    del app, name, options  # Unused
     if signature is None or what not in {"function", "method", "class"}:
         return None
 
@@ -178,22 +178,24 @@ def process_autodoc_signature(
 
 def process_autodoc_docstring(app, what, name, obj, options, lines):
     """Transform private type names to public types in generated docstrings."""
+    del app, name, obj, options  # Unused
     if what not in {"function", "method", "class"}:
         return
 
     # Transform all private type names in all lines
-    for i, line in enumerate(lines):
+    for i, _ in enumerate(lines):
         for private_type, public_type in TYPE_NAME_MAPPING.items():
             lines[i] = lines[i].replace(private_type, public_type)
 
 
 class TransformPrivateTypes(SphinxTransform):
-    """Transform private type names to reference nodes for public types in the doctree."""
+    """Transform private type names to reference nodes for public types in the doctree."""  # noqa: E501
 
     default_priority = 0  # Run very early so xref resolution can process our nodes
 
     def apply(self, **kwargs):
         """Walk the doctree and replace private type names with reference nodes."""
+        del kwargs  # Unused
         for node in list(self.document.traverse(nodes.Text)):
             text = node.astext()
 
@@ -233,7 +235,7 @@ class TransformPrivateTypes(SphinxTransform):
             new_nodes = []
             last_end = 0
 
-            for start, end, pattern, role, display_name, reftarget in filtered_matches:
+            for start, end, _, _, display_name, reftarget in filtered_matches:
                 # Add text before the match
                 if start > last_end:
                     new_nodes.append(nodes.Text(text[last_end:start]))

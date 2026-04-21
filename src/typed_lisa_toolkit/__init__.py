@@ -6,7 +6,8 @@ Typed LISA Toolkit has a top-level module, ``typed_lisa_toolkit``, with function
 loading data and constructing objects. It also has two submodules:
 
 - :mod:`typed_lisa_toolkit.types` for core typed objects.
-- :mod:`typed_lisa_toolkit.shop` for utility functions acting on those objects (conversions, transforms, etc.). Shop for what you need in this module.
+- :mod:`typed_lisa_toolkit.shop` for utility functions acting on those objects
+(conversions, transforms, etc.). Shop for what you need in this module.
 
 This page focuses on the top-level module.
 
@@ -54,7 +55,8 @@ semantic subsetting and embedding.
    stft
    wdm
 
-The following functions construct new representations by processing existing representations:
+The following functions construct new representations
+by processing existing representations:
 
 .. autosummary::
    :toctree: _generated
@@ -93,10 +95,12 @@ Waveforms
 
 Similar to data objects, waveform objects group multiple representations together.
 Waveform objects are meant to represent modeled signals, and as such, they can carry
-theoretical information such as harmonic content, which is not the case for data objects.
+theoretical information such as harmonic content,
+which is not the case for data objects.
 
 In the nomenclature of the project, "raw" waveforms are detector-independent strains,
-such as the two polarizations (:math:`h_+` and :math:`h_\times`) or the spherical harmonic
+such as the two polarizations (:math:`h_+` and :math:`h_\times`)
+or the spherical harmonic
 decomposition (:math:`h_{lm}`); "projected" waveforms depend on LISA's response,
 and are typically TDI channel signals.
 

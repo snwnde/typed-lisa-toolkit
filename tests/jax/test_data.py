@@ -6,13 +6,12 @@ import unittest
 import warnings
 from unittest.mock import MagicMock, patch
 
-import jax
-
-jax.config.update("jax_enable_x64", True)
 import h5py
+import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 from tests._helpers import (
     DataAbstractBranchesMixin,
@@ -47,6 +46,8 @@ from typed_lisa_toolkit.types import (
 )
 from typed_lisa_toolkit.types.data import load_mojito
 
+jax.config.update("jax_enable_x64", val=True)
+
 
 def _build_tsdata_jax():
     times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
@@ -56,7 +57,7 @@ def _build_tsdata_jax():
         {
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
-        }
+        },
     )
     return times, data
 
@@ -102,7 +103,7 @@ class TestDataContainersJAX(unittest.TestCase):
         times, tsdata = _build_tsdata_jax()
 
         npt.assert_allclose(np.asarray(tsdata.times), np.asarray(times))
-        self.assertAlmostEqual(tsdata.dt, float(times[1] - times[0]))
+        assert tsdata.dt == pytest.approx(float(times[1] - times[0]))
         npt.assert_allclose(
             np.asarray(tsdata.get_frequencies()),
             np.asarray(jnp.fft.rfftfreq(len(times), tsdata.dt)),
@@ -117,15 +118,15 @@ class TestDataContainersJAX(unittest.TestCase):
             frequencies,
             np.asarray(jnp.fft.rfftfreq(len(times), tsdata.dt)),
         )
-        self.assertAlmostEqual(float(fsdata.df), float(frequencies[1] - frequencies[0]))
+        assert float(fsdata.df) == pytest.approx(float(frequencies[1] - frequencies[0]))
 
     def test_pick_preserves_requested_order(self):
         case = build_fdata(jnp)
 
         picked = case.pick(("Y", "X"))
 
-        self.assertEqual(picked.channel_names, ("Y", "X"))
-        self.assertEqual(np.asarray(picked["Y"].entries).shape[1], 1)
+        assert picked.channel_names == ("Y", "X")
+        assert np.asarray(picked["Y"].entries).shape[1] == 1
         npt.assert_allclose(
             np.asarray(picked["Y"].entries),
             np.asarray(case["Y"].entries),
@@ -135,10 +136,12 @@ class TestDataContainersJAX(unittest.TestCase):
         times = jnp.linspace(0.0, 1.0, 4, dtype=jnp.float64)
         bad_entries = jnp.ones((1, 2, 2, 1, 4), dtype=jnp.float64)
         built = self._assert_construct_tsdata_deprecation(
-            times=times, entries=bad_entries, channels=("X", "Y")
+            times=times,
+            entries=bad_entries,
+            channels=("X", "Y"),
         )
 
-        self.assertEqual(built.channel_names, ("X", "Y"))
+        assert built.channel_names == ("X", "Y")
         npt.assert_allclose(np.asarray(built.get_kernel()), np.asarray(bad_entries))
 
     def test_tsdata_to_fsdata_keep_times_returns_timedfsdata(self):
@@ -146,7 +149,7 @@ class TestDataContainersJAX(unittest.TestCase):
 
         fsdata = self._assert_to_fsdata_deprecation(tsdata, keep_times=True)
 
-        self.assertIsInstance(fsdata, TimedFSData)
+        assert isinstance(fsdata, TimedFSData)
         npt.assert_allclose(np.asarray(fsdata.times), np.asarray(times))
         npt.assert_allclose(
             np.asarray(fsdata.frequencies),
@@ -162,19 +165,14 @@ class TestDataContainersJAX(unittest.TestCase):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             fs_from_ts_pos = ts_rep.rfft(None)
-        self.assertTrue(
-            any(
-                str(item.message)
-                == "Passing `tapering` positionally to `rfft` is deprecated and will be removed in 0.7.0; pass it as a keyword argument instead."
-                for item in caught
-            )
+        assert any(
+            "Passing `tapering` positionally to `rfft` is deprecated"
+            in str(item.message)
+            for item in caught
         )
-        self.assertTrue(
-            any(
-                str(item.message)
-                == "The method `UniformTimeSeries.rfft` is deprecated and will be removed in 0.8.0; use `shop.time2freq` instead."
-                for item in caught
-            )
+        assert any(
+            "The method `UniformTimeSeries.rfft` is deprecated" in str(item.message)
+            for item in caught
         )
         npt.assert_allclose(
             np.asarray(fs_from_ts_pos.entries),
@@ -184,19 +182,15 @@ class TestDataContainersJAX(unittest.TestCase):
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             ts_from_fs_pos = fs_rep.irfft(np.asarray(times), None)
-        self.assertTrue(
-            any(
-                str(item.message)
-                == "Passing `tapering` positionally to `irfft` is deprecated and will be removed in 0.7.0; pass it as a keyword argument instead."
-                for item in caught
-            )
+        assert any(
+            "Passing `tapering` positionally to `irfft` is deprecated"
+            in str(item.message)
+            for item in caught
         )
-        self.assertTrue(
-            any(
-                str(item.message)
-                == "The method `UniformFrequencySeries.irfft` is deprecated and will be removed in 0.8.0; use `shop.freq2time` instead."
-                for item in caught
-            )
+        assert any(
+            "The method `UniformFrequencySeries.irfft` is deprecated"
+            in str(item.message)
+            for item in caught
         )
         npt.assert_allclose(
             np.asarray(ts_from_fs_pos.entries),
@@ -208,7 +202,7 @@ class TestDataContainersJAX(unittest.TestCase):
 
         data = fsdata(case["resp_22_map"])
 
-        self.assertEqual(data.channel_names, tuple(case["resp_22_map"].keys()))
+        assert data.channel_names == tuple(case["resp_22_map"].keys())
         npt.assert_allclose(
             np.asarray(data.get_kernel()),
             np.asarray(case["resp_22"].get_kernel()),
@@ -222,7 +216,7 @@ class TestDataContainersJAX(unittest.TestCase):
         got = np.asarray(embedded.get_kernel())
         source = np.asarray(case.get_kernel())
 
-        self.assertEqual(np.asarray(embedded.frequencies).shape[0], 6)
+        assert np.asarray(embedded.frequencies).shape[0] == 6
         npt.assert_allclose(got[..., 1:4], source)
         npt.assert_allclose(got[..., 0], 0.0)
         npt.assert_allclose(got[..., -1], 0.0)
@@ -233,8 +227,8 @@ class TestDataContainersJAX(unittest.TestCase):
 
         timed = fsdata.set_times(np.asarray(times))
 
-        self.assertIsInstance(timed, TimedFSData)
-        self.assertIsInstance(timed.drop_times(), FSData)
+        assert isinstance(timed, TimedFSData)
+        assert isinstance(timed.drop_times(), FSData)
         npt.assert_allclose(np.asarray(timed.times), np.asarray(times))
 
     def test_fsdata_set_times_drop_times_and_to_tsdata(self):
@@ -244,9 +238,9 @@ class TestDataContainersJAX(unittest.TestCase):
         timed = case.set_times(times)
         recovered = self._assert_to_tsdata_deprecation(timed)
 
-        self.assertIsInstance(timed, TimedFSData)
-        self.assertIsInstance(timed.drop_times(), FSData)
-        self.assertEqual(recovered.channel_names, case.channel_names)
+        assert isinstance(timed, TimedFSData)
+        assert isinstance(timed.drop_times(), FSData)
+        assert recovered.channel_names == case.channel_names
         npt.assert_allclose(np.asarray(recovered.times), times)
 
     def test_save_and_load_dispatches_by_type(self):
@@ -256,28 +250,28 @@ class TestDataContainersJAX(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             timed.save(handle.name)
-            with self.assertRaises(TypeError):
+            with pytest.raises(TypeError):
                 _ = load_data(handle.name, domain="frequency", kind="timed")
 
     def test_tsdata_t_start_and_t_end(self):
         times, tsdata = _build_tsdata_jax()
-        self.assertAlmostEqual(tsdata.t_start, float(times[0]))
-        self.assertAlmostEqual(tsdata.t_end, float(times[-1]))
+        assert tsdata.t_start == pytest.approx(float(times[0]))
+        assert tsdata.t_end == pytest.approx(float(times[-1]))
 
     def test_fsdata_f_min_and_f_max(self):
         _, tsdata = _build_tsdata_jax()
         fsdata = self._assert_to_fsdata_deprecation(tsdata, keep_times=False)
         freqs = np.asarray(fsdata.frequencies)
-        self.assertAlmostEqual(float(fsdata.f_min), float(freqs[0]))
-        self.assertAlmostEqual(float(fsdata.f_max), float(freqs[-1]))
+        assert float(fsdata.f_min) == pytest.approx(float(freqs[0]))
+        assert float(fsdata.f_max) == pytest.approx(float(freqs[-1]))
 
     def test_fsdata_to_tsdata_explicit_times(self):
         times, tsdata = _build_tsdata_jax()
         fsdata = self._assert_to_fsdata_deprecation(tsdata, keep_times=False)
         recovered = self._assert_to_tsdata_deprecation(fsdata, np.asarray(times))
-        self.assertIsInstance(recovered, TSData)
-        self.assertEqual(recovered.channel_names, fsdata.channel_names)
-        self.assertEqual(np.asarray(recovered.times).shape[0], len(times))
+        assert isinstance(recovered, TSData)
+        assert recovered.channel_names == fsdata.channel_names
+        assert np.asarray(recovered.times).shape[0] == len(times)
 
     # def test_tsdata_to_stftdata(self):
     #     _, tsdata = _build_tsdata_jax()
@@ -304,45 +298,46 @@ class TestDataContainersJAX(unittest.TestCase):
         times_arr = np.array(wdmdata["X"].times)
         t_mid = float(times_arr[len(times_arr) // 2])
         sub = wdmdata.get_subset(time_interval=(float(times_arr[0]), t_mid))
-        self.assertIsInstance(sub, WDMData)
-        self.assertEqual(sub.channel_names, wdmdata.channel_names)
+        assert isinstance(sub, WDMData)
+        assert sub.channel_names == wdmdata.channel_names
 
     def test_load_data_dispatches_tsdata_and_fsdata(self):
         _, tsdata = _build_tsdata_jax()
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             tsdata.save(handle.name)
             loaded = load_data(handle.name, domain="time", kind=None)
-        self.assertIsInstance(loaded, TSData)
+        assert isinstance(loaded, TSData)
         npt.assert_allclose(
-            np.asarray(loaded.get_kernel()), np.asarray(tsdata.get_kernel())
+            np.asarray(loaded.get_kernel()),
+            np.asarray(tsdata.get_kernel()),
         )
 
     def test_channel_mapping_set_name(self):
         case = build_fdata(jnp)
         result = case.set_name("my_data")
-        self.assertIs(result, case)
-        self.assertEqual(case.name, "my_data")
+        assert result is case
+        assert case.name == "my_data"
 
     def test_channel_mapping_create_like(self):
         case = build_fdata(jnp)
         new_entries = jnp.zeros_like(case.get_kernel())
         new_data = case.create_like(new_entries)
-        self.assertIsInstance(new_data, FSData)
+        assert isinstance(new_data, FSData)
         npt.assert_allclose(np.asarray(new_data.get_kernel()), 0.0)
 
     def test_channel_mapping_repr_includes_class_name(self):
         case = build_fdata(jnp)
         r = repr(case)
-        self.assertIn("FSData", r)
+        assert "FSData" in r
 
     def test_channel_mapping_repr_with_name_includes_name(self):
         case = build_fdata(jnp)
         case.set_name("named")
         r = repr(case)
-        self.assertIn("name='named'", r)
+        assert "name='named'" in r
 
     def test_from_dict_empty_raises(self):
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError, match=r".+"):
             fsdata({})
 
     def test_timedfsdata_set_times_updates_in_place(self):
@@ -351,7 +346,7 @@ class TestDataContainersJAX(unittest.TestCase):
         times_new = np.linspace(0.0, 14.0, 8)
         timed = case.set_times(times_orig)
         result = timed.set_times(times_new)
-        self.assertIs(result, timed)
+        assert result is timed
         npt.assert_allclose(np.asarray(timed.times), times_new)
 
     def test_timedfsdata_get_subset_creates_new(self):
@@ -359,10 +354,10 @@ class TestDataContainersJAX(unittest.TestCase):
         times = np.linspace(0.0, 7.0, 8)
         timed = fdata.set_times(times)
         sub = timed.get_subset(
-            interval=(float(fdata.frequencies.start), float(fdata.frequencies.stop))
+            interval=(float(fdata.frequencies.start), float(fdata.frequencies.stop)),
         )
-        self.assertIsInstance(sub, TimedFSData)
-        with self.assertRaises(AttributeError):
+        assert isinstance(sub, TimedFSData)
+        with pytest.raises(AttributeError):
             _ = sub.times
 
     def test_data_arithmetic_inplace_and_reflected(self):
@@ -388,17 +383,18 @@ class TestDataContainersJAX(unittest.TestCase):
         left = case
         first = left[left.channel_names[0]]
 
-        self.assertIs(left.xp, left.__xp__())
-        self.assertEqual(left.grid, first.grid)
-        self.assertEqual(left.domain, first.domain)
-        self.assertEqual(left.kind, first.kind)
+        assert left.xp is left.__xp__()
+        assert left.grid == first.grid
+        assert left.domain == first.domain
+        assert left.kind == first.kind
         npt.assert_allclose(
-            np.asarray(left.get_kernel()), np.asarray(left.get_kernel())
+            np.asarray(left.get_kernel()),
+            np.asarray(left.get_kernel()),
         )
 
         picked = left.pick("X")
-        self.assertEqual(picked.channel_names, ("X",))
-        self.assertEqual(np.asarray(picked.get_kernel()).shape[1], 1)
+        assert picked.channel_names == ("X",)
+        assert np.asarray(picked.get_kernel()).shape[1] == 1
 
     def test_data_unary_op_and_mismatched_binary_op(self):
         case = build_fd_pair(jnp)
@@ -411,26 +407,27 @@ class TestDataContainersJAX(unittest.TestCase):
 
         absolute = abs(left)
         npt.assert_allclose(
-            np.asarray(absolute.get_kernel()), np.abs(np.asarray(left.get_kernel()))
+            np.asarray(absolute.get_kernel()),
+            np.abs(np.asarray(left.get_kernel())),
         )
 
-        with self.assertRaises((ValueError, TypeError)):
+        with pytest.raises((ValueError, TypeError)):
             _ = left + right
 
     def test_timedfsdata_requires_times(self):
         case = build_fdata(jnp)
         timed = TimedFSData(case.grid, case.entries, channels=case.channel_names)
-        with self.assertRaises(AttributeError):
+        with pytest.raises(AttributeError):
             _ = timed.times
 
     def test_tsdata_get_zero_padded(self):
         _, tsdata = _build_tsdata_jax()
         padded = tsdata.get_zero_padded((tsdata.dt, 2 * tsdata.dt))
 
-        self.assertIsInstance(padded, TSData)
-        self.assertEqual(
-            np.asarray(padded.get_kernel()).shape[-1],
-            np.asarray(tsdata.get_kernel()).shape[-1] + 3,
+        assert isinstance(padded, TSData)
+        assert (
+            np.asarray(padded.get_kernel()).shape[-1]
+            == np.asarray(tsdata.get_kernel()).shape[-1] + 3
         )
         npt.assert_allclose(
             np.asarray(padded.get_kernel())[..., 1:-2],
@@ -443,12 +440,14 @@ class TestDataContainersJAX(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             with h5py.File(handle.name, "w") as f:
                 f.attrs["type"] = "UnknownData"
-            with self.assertRaises(ValueError):
-                with self.assertWarnsRegex(
+            with (
+                pytest.raises(ValueError, match=r".+"),
+                self.assertWarnsRegex(
                     DeprecationWarning,
                     "load_data",
-                ):
-                    load_data(handle.name, legacy=True)
+                ),
+            ):
+                load_data(handle.name, legacy=True)
 
     def test_load_data_dispatches_fsdata(self):
         _, tsdata = _build_tsdata_jax()
@@ -458,16 +457,18 @@ class TestDataContainersJAX(unittest.TestCase):
             fsdata.save(handle.name)
             loaded = load_data(handle.name, domain="frequency", kind=None)
 
-        self.assertIsInstance(loaded, FSData)
+        assert isinstance(loaded, FSData)
         npt.assert_allclose(
-            np.asarray(loaded.get_kernel()), np.asarray(fsdata.get_kernel())
+            np.asarray(loaded.get_kernel()),
+            np.asarray(fsdata.get_kernel()),
         )
 
     def test_load_ldc_data_aet_to_xyz(self):
         n = 16
         t = np.linspace(0.0, 1.0, n)
         dataset = np.zeros(
-            n, dtype=[("t", "f8"), ("A", "f8"), ("E", "f8"), ("T", "f8")]
+            n,
+            dtype=[("t", "f8"), ("A", "f8"), ("E", "f8"), ("T", "f8")],
         )
         dataset["t"] = t
         dataset["A"] = np.sin(2 * np.pi * t)
@@ -479,15 +480,16 @@ class TestDataContainersJAX(unittest.TestCase):
                 f.create_dataset("obs/tdi", data=dataset)
             loaded = load_ldc_data(handle.name, name="obs/tdi", channels="XYZ")
 
-        self.assertIsInstance(loaded, TSData)
-        self.assertEqual(loaded.channel_names, ("X", "Y", "Z"))
-        self.assertEqual(np.asarray(loaded.get_kernel()).shape[-1], n)
+        assert isinstance(loaded, TSData)
+        assert loaded.channel_names == ("X", "Y", "Z")
+        assert np.asarray(loaded.get_kernel()).shape[-1] == n
 
     def test_load_ldc_data_xyz_to_ae(self):
         n = 16
         t = np.linspace(0.0, 1.0, n)
         dataset = np.zeros(
-            n, dtype=[("t", "f8"), ("X", "f8"), ("Y", "f8"), ("Z", "f8")]
+            n,
+            dtype=[("t", "f8"), ("X", "f8"), ("Y", "f8"), ("Z", "f8")],
         )
         dataset["t"] = t
         dataset["X"] = np.sin(2 * np.pi * t)
@@ -499,9 +501,9 @@ class TestDataContainersJAX(unittest.TestCase):
                 f.create_dataset("obs/tdi", data=dataset)
             loaded = load_ldc_data(handle.name, name="obs/tdi", channels="AE")
 
-        self.assertIsInstance(loaded, TSData)
-        self.assertEqual(loaded.channel_names, ("A", "E"))
-        self.assertEqual(np.asarray(loaded.get_kernel()).shape[-1], n)
+        assert isinstance(loaded, TSData)
+        assert loaded.channel_names == ("A", "E")
+        assert np.asarray(loaded.get_kernel()).shape[-1] == n
 
     def test_load_ldc_data_direct_pick_branch(self):
         n = 16
@@ -516,7 +518,7 @@ class TestDataContainersJAX(unittest.TestCase):
                 f.create_dataset("obs/tdi", data=dataset)
             loaded = load_ldc_data(handle.name, name="obs/tdi", channels="AE")
 
-        self.assertEqual(loaded.channel_names, ("A", "E"))
+        assert loaded.channel_names == ("A", "E")
 
     def test_load_ldc_data_invalid_requested_channels_raises(self):
         n = 8
@@ -527,14 +529,14 @@ class TestDataContainersJAX(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             with h5py.File(handle.name, "w") as f:
                 f.create_dataset("obs/tdi", data=dataset)
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError, match=r".+"):
                 load_ldc_data(handle.name, name="obs/tdi", channels="Q")  # type: ignore[arg-type]
 
     def test_load_ldc_data_invalid_structure_raises(self):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             with h5py.File(handle.name, "w") as f:
                 f.create_dataset("obs/tdi", data=np.arange(8.0))
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError, match=r".+"):
                 load_ldc_data(handle.name, name="obs/tdi", channels="AE")
 
     def test_tsdata_draw_uses_ts_plotter(self):
@@ -547,7 +549,7 @@ class TestDataContainersJAX(unittest.TestCase):
 
             result = tsdata.draw(interval=(0.0, 1.0))
 
-        self.assertEqual(result, "drawn")
+        assert result == "drawn"
         plotter.draw.assert_called_once()
 
     def test_fsdata_draw_compare_uses_fs_plotter_compare(self):
@@ -563,7 +565,7 @@ class TestDataContainersJAX(unittest.TestCase):
 
             result = left.draw(compare_to=right, interval=(1.0, 3.0))
 
-        self.assertEqual(result, "compared")
+        assert result == "compared"
         left_plotter.compare.assert_called_once_with(right_plotter)
 
     def test_wdmdata_draw_uses_tf_plotter(self):
@@ -576,7 +578,7 @@ class TestDataContainersJAX(unittest.TestCase):
 
             result = wdmdata.draw()
 
-        self.assertEqual(result, "tf-drawn")
+        assert result == "tf-drawn"
         plotter.draw.assert_called_once()
 
     def test_factory_constructors_build_expected_types(self):
@@ -624,16 +626,16 @@ class TestDataContainersJAX(unittest.TestCase):
             name="wdm",
         )
 
-        self.assertIsInstance(ts, TSData)
-        self.assertIsInstance(fs, FSData)
-        self.assertIsInstance(tfs, TimedFSData)
-        self.assertIsInstance(stft_data, STFTData)
-        self.assertIsInstance(wdm_data, WDMData)
-        self.assertEqual(ts.channel_names, ("X", "Y"))
-        self.assertEqual(fs.channel_names, ("X", "Y"))
-        self.assertEqual(tfs.channel_names, ("X", "Y"))
-        self.assertEqual(stft_data.channel_names, ("X", "Y"))
-        self.assertEqual(wdm_data.channel_names, ("X", "Y"))
+        assert isinstance(ts, TSData)
+        assert isinstance(fs, FSData)
+        assert isinstance(tfs, TimedFSData)
+        assert isinstance(stft_data, STFTData)
+        assert isinstance(wdm_data, WDMData)
+        assert ts.channel_names == ("X", "Y")
+        assert fs.channel_names == ("X", "Y")
+        assert tfs.channel_names == ("X", "Y")
+        assert stft_data.channel_names == ("X", "Y")
+        assert wdm_data.channel_names == ("X", "Y")
 
     def test_stftdata_and_wdmdata_mapping_factories(self):
         times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
@@ -656,14 +658,16 @@ class TestDataContainersJAX(unittest.TestCase):
                 frequencies=freqs,
                 times=times,
                 entries=jnp.ones(
-                    (1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64
+                    (1, 1, 1, 1, len(freqs), len(times)),
+                    dtype=jnp.float64,
                 ),
             ),
             "Y": wdm(
                 frequencies=freqs,
                 times=times,
                 entries=jnp.ones(
-                    (1, 1, 1, 1, len(freqs), len(times)), dtype=jnp.float64
+                    (1, 1, 1, 1, len(freqs), len(times)),
+                    dtype=jnp.float64,
                 ),
             ),
         }
@@ -671,10 +675,10 @@ class TestDataContainersJAX(unittest.TestCase):
         stft_data = stftdata(stft_mapping)
         wdm_data = wdmdata(wdm_mapping)
 
-        self.assertIsInstance(stft_data, STFTData)
-        self.assertIsInstance(wdm_data, WDMData)
-        self.assertEqual(stft_data.channel_names, ("X", "Y"))
-        self.assertEqual(wdm_data.channel_names, ("X", "Y"))
+        assert isinstance(stft_data, STFTData)
+        assert isinstance(wdm_data, WDMData)
+        assert stft_data.channel_names == ("X", "Y")
+        assert wdm_data.channel_names == ("X", "Y")
 
     def test_factory_constructors_reject_non_uniform_axes(self):
         times = jnp.array([0.0, 1.0, 3.0, 6.0], dtype=jnp.float64)
@@ -683,20 +687,26 @@ class TestDataContainersJAX(unittest.TestCase):
         ts_entries = jnp.ones((1, 2, 1, 1, len(times)), dtype=jnp.float64)
         stft_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
 
-        with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
-            with self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"):
-                _ = construct_tsdata(
-                    times=times, entries=ts_entries, channels=("X", "Y")
-                )
+        with (
+            pytest.raises(ValueError, match="grid axes must be uniform"),
+            self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"),
+        ):
+            _ = construct_tsdata(
+                times=times,
+                entries=ts_entries,
+                channels=("X", "Y"),
+            )
 
-        with self.assertRaisesRegex(ValueError, "grid axes must be uniform"):
-            with self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"):
-                _ = construct_stftdata(
-                    frequencies=freqs,
-                    times=times,
-                    entries=stft_entries,
-                    channels=("X", "Y"),
-                )
+        with (
+            pytest.raises(ValueError, match="grid axes must be uniform"),
+            self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"),
+        ):
+            _ = construct_stftdata(
+                frequencies=freqs,
+                times=times,
+                entries=stft_entries,
+                channels=("X", "Y"),
+            )
 
     def test_fsdata_legacy_load(self):
         freqs = np.array([1.0, 2.0, 3.0], dtype=np.float64)
@@ -716,8 +726,8 @@ class TestDataContainersJAX(unittest.TestCase):
             ):
                 loaded = FSData.load(handle.name, legacy=True)
 
-        self.assertIsInstance(loaded, FSData)
-        self.assertEqual(loaded.channel_names, ("X", "Y"))
+        assert isinstance(loaded, FSData)
+        assert loaded.channel_names == ("X", "Y")
         npt.assert_allclose(np.asarray(loaded["X"].entries).squeeze(), x)
         npt.assert_allclose(np.asarray(loaded["Y"].entries).squeeze(), y)
 
@@ -727,7 +737,7 @@ class TestDataContainersJAX(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             with h5py.File(handle.name, "w") as f:
                 f.create_dataset("obs/tdi", data=dataset)
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError, match=r".+"):
                 load_ldc_data(handle.name, name="obs/tdi", channels="AE")
 
     def test_load_mojito_builds_tsdata(self):
@@ -742,9 +752,9 @@ class TestDataContainersJAX(unittest.TestCase):
 
         loaded = load_mojito(processor)
 
-        self.assertIsInstance(loaded, TSData)
-        self.assertEqual(loaded.channel_names, ("X", "Y"))
-        self.assertEqual(np.asarray(loaded.get_kernel()).shape[-1], len(t))
+        assert isinstance(loaded, TSData)
+        assert loaded.channel_names == ("X", "Y")
+        assert np.asarray(loaded.get_kernel()).shape[-1] == len(t)
 
 
 class TestDataInternalAbstractBranchesJAX(DataAbstractBranchesMixin, unittest.TestCase):
@@ -760,26 +770,27 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
             with self.assertWarns(FutureWarning):
                 loaded = load_data(handle.name, kind=None)
 
-        self.assertIsInstance(loaded, TSData)
+        assert isinstance(loaded, TSData)
 
     def test_load_data_domain_mismatch_raises(self):
         _, tsdata = _build_tsdata_jax()
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             tsdata.save(handle.name)
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError, match=r".+"):
                 load_data(handle.name, domain="frequency", kind=None)
 
     def test_load_data_kind_mismatch_raises(self):
         _, tsdata = _build_tsdata_jax()
         with self.assertWarnsRegex(
-            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+            DeprecationWarning,
+            r"The 'to_fsdata' method is deprecated",
         ):
             fsd = tsdata.to_fsdata(keep_times=False)
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             fsd.save(handle.name)
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError, match=r".+"):
                 load_data(handle.name, domain="frequency", kind="timed")
 
     def test_load_data_sparse_not_supported_for_time_or_frequency(self):
@@ -787,7 +798,7 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             tsdata.save(handle.name)
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError, match=r".+"):
                 load_data(handle.name, domain="time", kind=None, sparse=True)
 
     def test_load_data_dispatches_sparse_stft_and_dense_wdm(self):
@@ -814,7 +825,7 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
                 sparse=True,
             )
 
-        self.assertIsInstance(loaded_stft, STFTData)
+        assert isinstance(loaded_stft, STFTData)
         npt.assert_allclose(
             np.asarray(loaded_stft.get_kernel()),
             np.asarray(stft_data.get_kernel()),
@@ -838,7 +849,7 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
                 sparse=False,
             )
 
-        self.assertIsInstance(loaded_wdm, WDMData)
+        assert isinstance(loaded_wdm, WDMData)
         npt.assert_allclose(
             np.asarray(loaded_wdm.get_kernel()),
             np.asarray(wdm_data.get_kernel()),
@@ -847,15 +858,17 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
     def test_timedfsdata_to_tsdata_ignores_explicit_times_argument(self):
         times, tsdata = _build_tsdata_jax()
         with self.assertWarnsRegex(
-            DeprecationWarning, r"The 'to_fsdata' method is deprecated"
+            DeprecationWarning,
+            r"The 'to_fsdata' method is deprecated",
         ):
             timed = tsdata.to_fsdata(keep_times=True)
         alt_times = np.linspace(100.0, 103.5, len(times))
 
         with self.assertWarnsRegex(
-            DeprecationWarning, r"The 'to_tsdata' method is deprecated"
+            DeprecationWarning,
+            r"The 'to_tsdata' method is deprecated",
         ):
             recovered = timed.to_tsdata(alt_times)
 
-        self.assertIsInstance(recovered, TSData)
-        self.assertEqual(np.asarray(recovered.times).shape[0], len(times))
+        assert isinstance(recovered, TSData)
+        assert np.asarray(recovered.times).shape[0] == len(times)

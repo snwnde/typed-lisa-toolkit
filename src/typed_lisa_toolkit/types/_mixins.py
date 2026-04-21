@@ -1,4 +1,3 @@
-# ruff: noqa
 """Module for mixins.
 
 .. currentmodule:: typed_lisa_toolkit.lib.mixins
@@ -11,22 +10,20 @@ Classes
 """
 
 import abc
-from types import ModuleType
 import logging
 import operator
 from collections.abc import Callable, Iterator, Mapping
-from typing import TYPE_CHECKING, Any, Self, cast, Protocol
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 import array_api_compat as xpc
 import l2d_interface.validators as l2dv
+import numpy as np
 from l2d_interface.contract import LinspaceLike
 
-import numpy as np
-
-from .misc import AnyGrid, Array, Domain, Linspace, Axis
-from . import modes
 from .. import utils
-
+from . import modes
+from .misc import AnyGrid, Array, Axis, Domain, Linspace
 
 Mode = modes.Harmonic | modes.QNM
 
@@ -43,7 +40,7 @@ log = logging.getLogger(__name__)
 __all__ = ["NDArrayMixin"]
 
 
-class NDArrayMixin(abc.ABC):
+class NDArrayMixin(abc.ABC):  # noqa: PLW1641
     """Mixin class to enable array ufuncs on subclasses.
 
     The class exposes small abstract hooks that concrete subclasses must
@@ -62,6 +59,7 @@ class NDArrayMixin(abc.ABC):
         other: object,
         op: Any,
         /,
+        *,
         reflected: bool = False,
         inplace: bool = False,
         **kwargs: Any,
@@ -262,6 +260,7 @@ class BinaryUnaryOpMixin(NDArrayMixin, abc.ABC):
         other: object,
         op: Callable[[Any, Any], Any],
         /,
+        *,
         reflected: bool = False,
         inplace: bool = False,
         **kwargs: Any,
@@ -282,7 +281,7 @@ class BinaryUnaryOpMixin(NDArrayMixin, abc.ABC):
         return self.create_like(entries)
 
     def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
-        out_arg = kwargs.get("out", None)
+        out_arg = kwargs.get("out")
         if out_arg is not None:
             kwargs["out"] = self._unwrap(out_arg)
         entries = op(self.entries, **kwargs)
@@ -292,7 +291,7 @@ class BinaryUnaryOpMixin(NDArrayMixin, abc.ABC):
 def check_grid_compatibility(grid1: "AnyGrid", grid2: "AnyGrid") -> bool:
     if len(grid1) != len(grid2):
         return False
-    for g1, g2 in zip(grid1, grid2):
+    for g1, g2 in zip(grid1, grid2, strict=True):
         if isinstance(g1, Linspace) and isinstance(g2, Linspace):
             if g1 != g2:
                 return False
@@ -330,37 +329,47 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
         _rep_type: type["AnyReps"] | None = None,
     ):
         if _mapping is None:
-            assert grid is not None and entries is not None and channels is not None, (
-                "Must provide grid, entries, and channels when not initializing from an existing mapping."
+            msg = (
+                "Must provide grid, entries, and channels "
+                "when not initializing from an existing mapping."
             )
-            self._grid: "AnyGrid" = grid
-            self.entries: "Array" = entries
-            self._channel_names: tuple[str, ...] = tuple(channels)
+            if grid is None or entries is None or channels is None:
+                raise ValueError(msg)
+            self._grid: AnyGrid = grid
+            self.entries: Array = entries
+            self._channel_names: tuple[str, ...] = tuple[str, ...](channels)
             try:
                 self._rep_type: type[RepT] = self._REP_TYPE
-            except AttributeError:
+            except AttributeError as e:
                 if _rep_type is None:
-                    raise ValueError(
-                        "Must provide _rep_type when not initializing from an existing mapping and _REP_TYPE is not defined."
+                    _msg = (
+                        "Must provide _rep_type when not initializing from "
+                        "an existing mapping and _REP_TYPE is not defined."
                     )
-                self._rep_type = cast(type[RepT], _rep_type)
+                    raise ValueError(_msg) from e
+                self._rep_type = cast("type[RepT]", _rep_type)
         else:
-            assert grid is None and entries is None and channels is None, (
-                "Must not provide grid, entries, or channels when initializing from an existing mapping."
-            )
+            if not (grid is None and entries is None and channels is None):
+                msg = (
+                    "Must not provide grid, entries, or channels "
+                    "when initializing from an existing mapping."
+                )
+                raise ValueError(msg)
             if len(_mapping) == 0:
-                raise ValueError("Cannot initialize from an empty mapping.")
+                _msg = "Cannot initialize from an empty mapping."
+                raise ValueError(_msg)
             self._grid = next(iter(_mapping.values())).grid
             self._channel_names = tuple(_mapping.keys())
             xp = xpc.get_namespace(
                 *(_mapping[chn].entries for chn in self._channel_names)
             )
-            # Concatenate entries along the channel dimension (canonical shape: n_batches, n_channels, ...)
+            # Concatenate entries along the channel dimension
+            # (canonical shape: n_batches, n_channels, ...)
             self.entries = xp.concatenate(
                 [_mapping[chn].entries for chn in self._channel_names], axis=1
             )
             self._rep_type = type(
-                next(iter(cast(Mapping[str, RepT], _mapping).values()))
+                next(iter(cast("Mapping[str, RepT]", _mapping).values()))
             )
         self._channel_to_idx: dict[str, int] = {
             chn: i for i, chn in enumerate(self._channel_names)
@@ -388,10 +397,11 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
 
     def _unwrap(self, other: object):
         if hasattr(other, "grid") and hasattr(other, "entries"):
-            other = cast(ChannelMapping["AnyReps"], other)
+            other = cast("ChannelMapping[AnyReps]", other)
             if check_grid_compatibility(self.grid, other.grid):
                 return other.entries
-            raise ValueError(f"Grid mismatch: expected {self.grid}, got {other.grid}.")
+            msg = f"Grid mismatch: expected {self.grid}, got {other.grid}."
+            raise ValueError(msg)
         return other
 
     def _binary_op(
@@ -399,6 +409,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
         other: object,
         op: Callable[[Any, Any], Any],
         /,
+        *,
         reflected: bool = False,
         inplace: bool = False,
         **kwargs: Any,
@@ -420,13 +431,14 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
             channels = (channels,)
 
         indices = tuple([self._channel_to_idx[chn] for chn in channels])
-        # Slice entries to pick only these channels (canonical shape: n_batches, n_channels, ...)
+        # Slice entries to pick only these channels
+        # (canonical shape: n_batches, n_channels, ...)
         picked_entries = self.xp.asarray(self.entries)[:, indices, ...]
         return type(self)(self.grid, picked_entries, channels, name=self.name)
 
     @classmethod
     def from_dict(cls, data_dict: Mapping[str, "AnyReps"], /, **kwargs: Any) -> Self:
-        """Create a new instance from a dictionary of channel names to representations."""
+        """Create a new instance from a dictionary of channel names to representations."""  # noqa: E501
         return cls(_mapping=data_dict, **kwargs)
 
     def set_name(self, name: str | None) -> Self:
@@ -492,7 +504,8 @@ def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"], /):
         try:
             l2dv.validate_representation(rep)
         except ValueError as error:
-            raise ValueError(f"Invalid representation for key {key!r}.") from error
+            msg = f"Invalid representation for key {key!r}"
+            raise ValueError(msg) from error
 
 
 def to_array(ary: "Axis", xp: ModuleType = np) -> "Array":
@@ -581,6 +594,7 @@ class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayM
         other: object,
         op: Callable[[Any, Any], Any],
         /,
+        *,
         reflected: bool = False,
         inplace: bool = False,
         **kwargs: Any,
@@ -588,11 +602,11 @@ class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayM
         del kwargs  # Unused
 
         if isinstance(other, ModeMapping):
-            _other_harmonics = cast(ModeMapping[ModeT, Any], other).harmonics
+            _other_harmonics = cast("ModeMapping[ModeT, Any]", other).harmonics
             if set(self.harmonics) != set(_other_harmonics):
-                raise ValueError(
-                    f"Harmonic mode mismatch: expected {self.harmonics}, got {_other_harmonics}."
-                )
+                msg = "Harmonic mode mismatch: "
+                f"expected {self.harmonics}, got {_other_harmonics}."
+                raise ValueError(msg)
             if not reflected:
                 _mapping = {
                     mode: op(self[mode], other[mode]) for mode in self.harmonics
@@ -601,11 +615,10 @@ class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayM
                 _mapping = {
                     mode: op(other[mode], self[mode]) for mode in self.harmonics
                 }
+        elif not reflected:
+            _mapping = {mode: op(self[mode], other) for mode in self.harmonics}
         else:
-            if not reflected:
-                _mapping = {mode: op(self[mode], other) for mode in self.harmonics}
-            else:
-                _mapping = {mode: op(other, self[mode]) for mode in self.harmonics}
+            _mapping = {mode: op(other, self[mode]) for mode in self.harmonics}
 
         if inplace:
             self.__init__(_mapping)

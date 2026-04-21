@@ -3,11 +3,10 @@
 import unittest
 
 import jax
-
-jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import (
@@ -15,6 +14,8 @@ from typed_lisa_toolkit.types import (
     SpectralDensity,
     TSData,
 )
+
+jax.config.update("jax_enable_x64", val=True)
 
 
 def _build_xyz_tsdata_jax(n: int = 8) -> TSData:
@@ -27,7 +28,7 @@ def _build_xyz_tsdata_jax(n: int = 8) -> TSData:
             "X": time_series(times, x[None, None, None, None, :]),
             "Y": time_series(times, y[None, None, None, None, :]),
             "Z": time_series(times, z[None, None, None, None, :]),
-        }
+        },
     )
 
 
@@ -53,7 +54,10 @@ def _build_xyz_evolutionary_spectral_density_jax() -> EvolutionarySpectralDensit
     scales = jnp.array([[1.0, 1.05], [1.1, 1.15]], dtype=jnp.float64)
     inverse_esdm = scales[:, :, None, None] * base[None, None, :, :]
     return EvolutionarySpectralDensity(
-        frequencies, times, inverse_esdm, ["X", "Y", "Z"]
+        frequencies,
+        times,
+        inverse_esdm,
+        ["X", "Y", "Z"],
     )
 
 
@@ -64,11 +68,13 @@ class TestConversionsJax(unittest.TestCase):
         aet = shop.xyz2aet(xyz)
         recovered = shop.aet2xyz(aet)
 
-        self.assertEqual(aet.channel_names, ("A", "E", "T"))
-        self.assertEqual(recovered.channel_names, xyz.channel_names)
+        assert aet.channel_names == ("A", "E", "T")
+        assert recovered.channel_names == xyz.channel_names
         npt.assert_allclose(np.asarray(recovered.times), np.asarray(xyz.times))
         npt.assert_allclose(
-            np.asarray(recovered.get_kernel()), np.asarray(xyz.get_kernel()), atol=1e-12
+            np.asarray(recovered.get_kernel()),
+            np.asarray(xyz.get_kernel()),
+            atol=1e-12,
         )
 
     def test_xyz_aet_roundtrip_spectral_density(self):
@@ -77,8 +83,8 @@ class TestConversionsJax(unittest.TestCase):
         aet_sdm = shop.xyz2aet(xyz_sdm)
         recovered = shop.aet2xyz(aet_sdm)
 
-        self.assertEqual(aet_sdm.channel_order, ("A", "E", "T"))
-        self.assertEqual(recovered.channel_order, xyz_sdm.channel_order)
+        assert aet_sdm.channel_order == ("A", "E", "T")
+        assert recovered.channel_order == xyz_sdm.channel_order
         npt.assert_allclose(
             np.asarray(recovered.get_kernel()),
             np.asarray(xyz_sdm.get_kernel()),
@@ -91,8 +97,8 @@ class TestConversionsJax(unittest.TestCase):
         aet_esdm = shop.xyz2aet(xyz_esdm)
         recovered = shop.aet2xyz(aet_esdm)
 
-        self.assertEqual(aet_esdm.channel_order, ("A", "E", "T"))
-        self.assertEqual(recovered.channel_order, xyz_esdm.channel_order)
+        assert aet_esdm.channel_order == ("A", "E", "T")
+        assert recovered.channel_order == xyz_esdm.channel_order
         npt.assert_allclose(
             np.asarray(recovered.get_kernel()),
             np.asarray(xyz_esdm.get_kernel()),
@@ -101,7 +107,7 @@ class TestConversionsJax(unittest.TestCase):
 
     def test_xyz2aet_with_xyz_and_xyz_components_raises(self):
         xyz = _build_xyz_tsdata_jax()
-        with self.assertRaisesRegex(ValueError, "Cannot specify both xyz and X, Y, Z"):
+        with pytest.raises(ValueError, match="Cannot specify both xyz and X, Y, Z"):
             shop.xyz2aet(
                 xyz,
                 X=jnp.array([1.0], dtype=jnp.float64),
@@ -111,7 +117,7 @@ class TestConversionsJax(unittest.TestCase):
 
     def test_aet2xyz_with_aet_and_aet_components_raises(self):
         aet = shop.xyz2aet(_build_xyz_tsdata_jax())
-        with self.assertRaisesRegex(ValueError, "Cannot specify both aet and A, E, T"):
+        with pytest.raises(ValueError, match="Cannot specify both aet and A, E, T"):
             shop.aet2xyz(
                 aet,
                 A=jnp.array([1.0], dtype=jnp.float64),
@@ -120,14 +126,14 @@ class TestConversionsJax(unittest.TestCase):
             )
 
     def test_xyz2aet_without_inputs_raises(self):
-        with self.assertRaisesRegex(
-            ValueError, "Must specify either xyz or all of X, Y, Z"
+        with pytest.raises(
+            ValueError, match="Must specify either xyz or all of X, Y, Z"
         ):
             shop.xyz2aet()
 
     def test_aet2xyz_without_inputs_raises(self):
-        with self.assertRaisesRegex(
-            ValueError, "Must specify either aet or all of A, E, T"
+        with pytest.raises(
+            ValueError, match="Must specify either aet or all of A, E, T"
         ):
             shop.aet2xyz()
 
@@ -149,7 +155,7 @@ class TestConversionsJax(unittest.TestCase):
             "Y": jnp.array([0.0, 3.0], dtype=jnp.float64),
             "Z": jnp.array([-1.0, 4.0], dtype=jnp.float64),
         }
-        with self.assertRaisesRegex(TypeError, "got dict"):
+        with pytest.raises(TypeError, match="got dict"):
             shop.xyz2aet(bad_mapping)
 
     def test_spectral_density_channel_order_assertions(self):
@@ -157,23 +163,23 @@ class TestConversionsJax(unittest.TestCase):
         kernel = jnp.broadcast_to(jnp.eye(3, dtype=jnp.float64), (2, 3, 3))
 
         wrong_xyz_input = SpectralDensity(freqs, kernel, ["A", "E", "T"])
-        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+        with pytest.raises(ValueError, match="Expected original channel order"):
             shop.xyz2aet(wrong_xyz_input)
 
         wrong_aet_input = SpectralDensity(freqs, kernel, ["X", "Y", "Z"])
-        with self.assertRaisesRegex(AssertionError, "Expected original channel order"):
+        with pytest.raises(ValueError, match="Expected original channel order"):
             shop.aet2xyz(wrong_aet_input)
 
     def test_array_last_dimension_assertions(self):
         wrong_shape = jnp.ones((4, 2), dtype=jnp.float64)
 
-        with self.assertRaisesRegex(
-            AssertionError, "Expected last dimension of input array to be 3"
+        with pytest.raises(
+            ValueError, match="Expected last dimension of input array to be"
         ):
             shop.xyz2aet(wrong_shape)
 
-        with self.assertRaisesRegex(
-            AssertionError, "Expected last dimension of input array to be 3"
+        with pytest.raises(
+            ValueError, match="Expected last dimension of input array to be"
         ):
             shop.aet2xyz(wrong_shape)
 

@@ -85,7 +85,8 @@ def extend_to(
     ---------
     target_grid: The grid to which the entries should be extended. Can be a tuple
         of arrays or a single array (for 1D grid).
-    known_slices: Optional tuple of slices for the support of the input grid in the target grid.
+    known_slices: Optional tuple of slices for
+        the support of the input grid in the target grid.
         If provided, it will be used directly instead of computing the
         support slices from the input grid.
 
@@ -113,7 +114,8 @@ def extend_to(
     ) -> Array:
         _grid = grid if isinstance(grid, tuple) else (grid,)
         xp = xpc.get_namespace(entries)
-        # Handle canonical shape: (n_batches, n_channels, n_harmonics, n_features, *grid_dims)
+        # Handle canonical shape:
+        # (n_batches, n_channels, n_harmonics, n_features, *grid_dims)
         # Create extended array with target_grid lengths in the grid dimensions
         extended_shape = entries.shape[:4] + tuple(len(g) for g in _target_grid)
         extended_entries = xp.zeros(extended_shape, dtype=entries.dtype)
@@ -122,7 +124,7 @@ def extend_to(
         else:
             support_slices = tuple(
                 get_subset_slice(target_g, float(g[0]), float(g[-1]))
-                for target_g, g in zip(_target_grid, _grid)
+                for target_g, g in zip(_target_grid, _grid, strict=True)
             )
         # Build full indexing tuple for canonical shape
         index = (slice(None),) * 4 + support_slices
@@ -156,16 +158,16 @@ def trim_interp(interpolator: Interpolator):
         trimmed_grid = grid[support_slice]
         if trimmed_grid.size == 0:
             log.warning("Empty array. Returning a zero interpolator.")
-            return lambda target_entries: xp.zeros_like(target_entries)
+            return xp.zeros_like
         min = float(trimmed_grid[0])
         max = float(trimmed_grid[-1])
 
         def _interpolated(target_grid: Array) -> Array:
-            """Return the interpolated entries at the target grid, zero outside support."""
+            """Return the interpolated entries at the target grid, zero outside support."""  # noqa: E501
             target_support_slice = get_subset_slice(target_grid, min, max)
             interp_grid = target_grid[target_support_slice]
             interpolated = interpolator(grid[support_slice], entries[support_slice])(
-                interp_grid
+                interp_grid,
             )
             return extend_to(target_grid)(interp_grid, interpolated)
 

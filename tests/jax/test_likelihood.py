@@ -4,8 +4,6 @@
 import unittest
 
 import jax
-
-jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
@@ -28,20 +26,22 @@ from typed_lisa_toolkit.types import (
     FDWhittleLikelihood,
 )
 
+jax.config.update("jax_enable_x64", val=True)
+
 
 def _build_fsdata(freqs, x_values, y_values):
     return fsdata(
         {
             "X": frequency_series(freqs, x_values[None, None, None, None, :]),
             "Y": frequency_series(freqs, y_values[None, None, None, None, :]),
-        }
+        },
     )
 
 
 class TestFDWhittleLikelihoodJAX(unittest.TestCase):
     def test_classmethod_formulas(self):
-        self.assertEqual(FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0), 4.0)
-        self.assertEqual(FDWhittleLikelihood.log_likelihood(4.0, 2.0), 3.0)
+        assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0
+        assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0
 
     def test_cross_product_and_template_square_match_noise_model(self):
         case = build_fd_pair(jnp)
@@ -102,7 +102,7 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
             model.reset().get_scalar_product(
                 data,
                 fsdata(sum_harmonics(case["wf"])),
-            )
+            ),
         )
 
         npt.assert_allclose(got, expected)
@@ -123,7 +123,7 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
         template = left.get_subset(interval=(1.0, 3.0))
         kernel = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(freqs), 2, 2))
         model = noise_model(
-            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y"))
+            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y")),
         )
         likelihood = whittle(left, model)
 
@@ -134,8 +134,8 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
                     kernel[1:4],
                     frequencies=template.frequencies.asarray(jnp),
                     channel_names=("X", "Y"),
-                )
-            ).get_scalar_product(left.get_subset(interval=(1.0, 3.0)), template)
+                ),
+            ).get_scalar_product(left.get_subset(interval=(1.0, 3.0)), template),
         )
 
         npt.assert_allclose(got, expected)
@@ -147,9 +147,9 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
                 dense_kernel_2ch(jnp),
                 frequencies=case["frequencies"],
                 channel_names=("X", "Y"),
-            )
+            ),
         )
 
         likelihood = whittle(case["left"], model)
 
-        self.assertIsInstance(likelihood, FDWhittleLikelihood)
+        assert isinstance(likelihood, FDWhittleLikelihood)

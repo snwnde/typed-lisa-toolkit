@@ -18,9 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-wdm = [
-    "wdm-transform>=0.1.1",
-]
+wdm = ["wdm-transform>=0.1.1"]
 jax = ["jax"]
 quadax = ["quadax"]
 mojito = [
@@ -88,15 +86,69 @@ build-backend = "hatchling.build"
 
 
 [tool.ruff.lint]
-# select = ["D", "PL", "F"]
-select = ["D"]
-ignore = ["D100", "D104", "PLC0415"]
+select = [
+    "D",
+    "PL",
+    "F",
+    "S",
+    "FBT",
+    "B",
+    "COM",
+    "DTZ",
+    "T10",
+    "ISC",
+    "EM",
+    "ICN",
+    "LOG",
+    "G",
+    "INP",
+    "PIE",
+    "PYI",
+    "PT",
+    "Q",
+    "RSE",
+    "RET",
+    "SIM",
+    "SLOT",
+    "TID",
+    "TD",
+    "TC",
+    "ARG",
+    "PTH",
+    "FLY",
+    "I",
+    "C90",
+    "NPY",
+    "PD",
+    "N",
+    "PERF",
+    "E",
+    "W",
+    "PGH",
+    "UP",
+    "FURB",
+    "RUF",
+    "TRY",
+]
+ignore = [
+    "D104",
+    "PLC0415",
+    "PLR0913",
+    "COM812",
+    "SLF001",
+    "TID252",
+    "TC001",
+    "TC002",
+    "TC003",
+    "TC004",
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "PL", "DOC"]
+"tests/**" = ["D", "PL", "DOC", "INP", "S101", "N802"]
+"docs/**" = ["D", "PL", "DOC", "INP", "RET504", "C901", "N806", "PERF", "E402"]
 
 [tool.coverage.report]
 omit = [
