@@ -486,7 +486,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         self,
         pad_time: tuple[float, float],
         tapering: tapering.Tapering | None = None,
-    ) -> Self:
+    ) -> TSData:
         """Return the zero-padded data."""
         xp = xpc.get_namespace(self.get_kernel())
         _times = xp.asarray(self.times)
@@ -509,7 +509,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             ((0, 0), (0, 0), (0, 0), (0, 0), pad_width),
             mode="constant",
         )
-        return type(self).from_entries(
+        return tsdata(
             times=padded_time,
             entries=padded_signal,
             channels=self.channel_names,

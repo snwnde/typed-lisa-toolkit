@@ -434,7 +434,13 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
         # Slice entries to pick only these channels
         # (canonical shape: n_batches, n_channels, ...)
         picked_entries = self.xp.asarray(self.entries)[:, indices, ...]
-        return type(self)(self.grid, picked_entries, channels, name=self.name)
+        return type(self)(
+            self.grid,
+            picked_entries,
+            channels,
+            name=self.name,
+            _rep_type=self._rep_type,
+        )
 
     @classmethod
     def from_dict(cls, data_dict: Mapping[str, "AnyReps"], /, **kwargs: Any) -> Self:
