@@ -1082,12 +1082,12 @@ class Phasor[AxisT: "Axis"](
     @property
     def phases(self) -> Array:
         """The phases of the phasors."""
-        return self.entries[..., slice(1, 2), :]
+        return self.entries[..., slice(1, 2), :].real
 
     @property
     def amplitudes(self) -> Array:
         """The amplitudes of the phasors."""
-        return self.entries[..., slice(0, 1), :]
+        return self.entries[..., slice(0, 1), :].real
 
     @property
     def frequencies(self) -> Axis | Linspace:
@@ -1161,11 +1161,7 @@ class Phasor[AxisT: "Axis"](
             embedding_grid,
             known_slices=known_slices,
         )
-        return Phasor[AT].make(
-            frequencies=grid[0],
-            amplitudes=entries,
-            phases=entries,
-        )
+        return Phasor[AT](grid=grid, entries=entries)
 
     def get_interpolated[AT: "Axis"](
         self,
