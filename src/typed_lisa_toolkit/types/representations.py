@@ -484,7 +484,7 @@ def frequency_series[AxisT: "Axis"](
     Note
     ----
     See the :external+l2d-interface:ref:`general description  <shape_convention>`
-    of the shape convention for 'entries'.
+    of the shape convention for `entries`.
     """  # noqa: E501
     _validate_shape(
         entries,
@@ -531,7 +531,7 @@ def time_series[AxisT: "Axis"](
     Note
     ----
     See the :external+l2d-interface:ref:`general description  <shape_convention>`
-    of the shape convention for 'entries'.
+    of the shape convention for `entries`.
     """
     _validate_shape(entries, (entries.shape[0], 1, 1, 1, len(times)))
     try:
@@ -652,7 +652,7 @@ def stft[FreqAxisT: "Axis", TimeAxisT: "Axis"](
     Note
     ----
     See the :external+l2d-interface:ref:`general description  <shape_convention>`
-    of the shape convention for 'entries'.
+    of the shape convention for `entries`.
     """
     if sparse_indices is None:
         _validate_shape(
@@ -728,7 +728,7 @@ def wdm(
     Note
     ----
     See the :external+l2d-interface:ref:`general description  <shape_convention>`
-    of the shape convention for 'entries'.
+    of the shape convention for `entries`.
     """
     if sparse_indices is None:
         _validate_shape(

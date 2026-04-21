@@ -7,7 +7,7 @@ loading data and constructing objects. It also has two submodules:
 
 - :mod:`typed_lisa_toolkit.types` for core typed objects.
 - :mod:`typed_lisa_toolkit.shop` for utility functions acting on those objects
-(conversions, transforms, etc.). Shop for what you need in this module.
+  (conversions, transforms, etc.). Shop for what you need in this module.
 
 This page focuses on the top-level module.
 

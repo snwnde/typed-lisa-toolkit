@@ -296,7 +296,7 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
           - ``entries`` for the entries.
 
         - For :class:`.TimedFSData`, there will be a dataset ``times`` at
-        the root level containing the time grid.
+          the root level containing the time grid.
 
         """
         with h5py.File(str(file_path), "a") as f:
@@ -335,7 +335,7 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
         Warning
         -------
         This method is deprecated and will be removed in 0.8.0;
-        use :func:`~load_data` instead.
+        use :func:`~typed_lisa_toolkit.load_data` instead.
         """
         msg = (
             "The 'load' method is deprecated and will be removed in 0.8.0; "
@@ -379,9 +379,8 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     """Multi-channel time series data container.
 
     .. note::
-        To construct a :class:`.TSData`, use factory
-        functions: :func:`~typed_lisa_toolkit.tsdata`
-        or :func:`~typed_lisa_toolkit.construct_tsdata`.
+        To construct a :class:`.TSData`,
+        use the factory function :func:`~typed_lisa_toolkit.tsdata`.
 
     """
 
@@ -402,7 +401,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         -------
         This method is considered an expert-level API; for most users,
         prefer to construct a :class:`.TSData` with the factory function
-        :func:`~tsdata`.
+        :func:`~typed_lisa_toolkit.tsdata`.
         """
         return cls((times,), entries, channels=channels, name=name)
 
@@ -527,9 +526,8 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     """Multi-channel frequency series data container.
 
     .. note::
-        To construct a :class:`.FSData`, use factory
-        functions: :func:`~typed_lisa_toolkit.fsdata`
-        or :func:`~typed_lisa_toolkit.construct_fsdata`.
+        To construct a :class:`.FSData`, use the factory
+        function :func:`~typed_lisa_toolkit.fsdata`.
 
     """
 
@@ -550,7 +548,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         -------
         This method is considered an expert-level API; for most users,
         prefer to construct a :class:`.FSData` with the factory function
-        :func:`~fsdata`.
+        :func:`~typed_lisa_toolkit.fsdata`.
         """
         return cls((frequencies,), entries, channels=channels, name=name)
 
@@ -625,9 +623,8 @@ class TimedFSData(FSData):
     """Multi-channel frequency series data with time information.
 
     .. note::
-        To construct a :class:`.TimedFSData`, use factory
-        functions: :func:`~typed_lisa_toolkit.timed_fsdata`
-        or :func:`~typed_lisa_toolkit.construct_timed_fsdata`.
+        To construct a :class:`.TimedFSData`, use the factory
+        function :func:`~typed_lisa_toolkit.fsdata`.
     """
 
     @property
@@ -720,9 +717,8 @@ class STFTData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.STFT[GridT]])
     """Multi-channel short-time Fourier transform data container.
 
     .. note::
-        To construct a :class:`.STFTData`, use factory
-        functions: :func:`~typed_lisa_toolkit.stftdata`
-        or :func:`~typed_lisa_toolkit.construct_stftdata`.
+        To construct a :class:`.STFTData`, use the factory
+        function :func:`~typed_lisa_toolkit.stftdata`.
     """
 
     _REP_TYPE: type[reps.STFT[GridT]] = reps.STFT[GridT]
@@ -737,9 +733,8 @@ class WDMData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.WDM[GridT]]):
     """Multi-channel wavelet domain model data container.
 
     .. note::
-        To construct a :class:`.WDMData`, use factory
-        functions: :func:`~typed_lisa_toolkit.wdmdata`
-        or :func:`~typed_lisa_toolkit.construct_wdmdata`.
+        To construct a :class:`.WDMData`, use the factory
+        function :func:`~typed_lisa_toolkit.wdmdata`.
     """
 
     _REP_TYPE: type[reps.WDM[GridT]] = reps.WDM[GridT]

@@ -438,15 +438,21 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
 
     @classmethod
     def from_dict(cls, data_dict: Mapping[str, "AnyReps"], /, **kwargs: Any) -> Self:
-        """Create a new instance from a dictionary of channel names to representations."""  # noqa: E501
+        """Create a new instance from a dictionary of channel names to representations.
+
+        Warning
+        -------
+        This is an expert-level API. Most users should use the top-level factory
+        functions in :mod:`typed_lisa_toolkit`.
+        """
         return cls(_mapping=data_dict, **kwargs)
 
     def set_name(self, name: str | None) -> Self:
         """Set the name of the data container.
 
-        .. note:: The name is only used for labeling the data container in plots.
+        The name is only used for labeling the data container in plots.
 
-        .. note:: This method returns ``self`` to allow for fluent method chaining.
+        .. note:: This method returns `self` to allow for fluent method chaining.
         """
         self.name: str | None = name
         return self
