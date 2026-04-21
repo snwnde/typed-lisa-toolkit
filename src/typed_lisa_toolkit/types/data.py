@@ -632,6 +632,29 @@ class TimedFSData(FSData):
         """Semantic kind of the data."""
         return "timed"
 
+    def create_like(self, entries: Array) -> Self:  # noqa: D102
+        return super().create_like(entries).set_times(self.times)
+
+    def get_subset(  # noqa: D102
+        self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
+    ) -> Self:
+        return super().get_subset(interval=interval, slice=slice).set_times(self.times)
+
+    def get_embedded(  # noqa: D102
+        self,
+        embedding_grid: Grid1D[Axis],
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ) -> Self:
+        return (
+            super()
+            .get_embedded(
+                embedding_grid,
+                known_slices=known_slices,
+            )
+            .set_times(self.times)
+        )
+
     def _additional_save(self, f: h5py.File):
         f.create_dataset("times", data=np.asarray(self.times))
 
@@ -1848,8 +1871,8 @@ def load_sangria(
         if domain == "t":
             tsdata = TSData.from_dict(
                 {
-                    chnname: reps.UniformTimeSeries(
-                        grid=(dataset[domain].squeeze(),),
+                    chnname: reps.time_series(
+                        _enforce_uniform(dataset[domain].squeeze()),
                         entries=dataset[chnname].squeeze()[None, None, None, None, :],
                     )
                     for chnname in channel_names
@@ -1872,7 +1895,7 @@ def load_mojito(processed_data: SignalProcessor):
     _data = cast("dict[str, Array]", processed_data.data)
     _mapping = {
         chnname: reps.time_series(
-            processed_data.t,
+            _enforce_uniform(processed_data.t),
             _data[chnname][None, None, None, None, :],
         )
         for chnname in channel_names

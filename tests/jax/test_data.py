@@ -357,8 +357,6 @@ class TestDataContainersJAX(unittest.TestCase):
             interval=(float(fdata.frequencies.start), float(fdata.frequencies.stop)),
         )
         assert isinstance(sub, TimedFSData)
-        with pytest.raises(AttributeError):
-            _ = sub.times
 
     def test_data_arithmetic_inplace_and_reflected(self):
         case = build_fd_pair(jnp)
