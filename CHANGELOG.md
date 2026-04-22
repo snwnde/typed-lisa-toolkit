@@ -2,6 +2,23 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.2 - 2026-04-22
+#### Bug Fixes
+- phasor amplitudes - (d341853) - Senwen Deng
+- channel map pick - (1d5cd4f) - Senwen Deng
+- load sangria, timed fsdata, phasor - (48e2451) - Senwen Deng
+#### Documentation
+- maintained docs - (c4d419d) - Senwen Deng
+#### Refactoring
+- unified data constructors - (7066fb8) - Senwen Deng
+- unify (WIP) - (cb1b56b) - Senwen Deng
+#### Style
+- more linting - (cb58714) - Senwen Deng
+- lint tests - (7f9326e) - Senwen Deng
+- more linting - (a716fc0) - Senwen Deng
+
+- - -
+
 ## 0.6.1 - 2026-04-16
 #### Features
 - update deps - (bc3a646) - Senwen Deng
