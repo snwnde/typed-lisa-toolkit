@@ -1744,6 +1744,40 @@ class TestPhasor(unittest.TestCase):
         npt.assert_allclose(np.asarray(self.phasor.amplitudes), self.amps)
         npt.assert_allclose(np.asarray(self.phasor.phases), self.phases)
 
+    def test_amplitudes_dtype_is_complex(self):
+        """Test that amplitudes property returns complex dtype, not real."""
+        amplitudes = self.phasor.amplitudes
+        assert np.iscomplexobj(amplitudes), (
+            "Amplitudes should be complex, but got dtype "
+            f"{np.asarray(amplitudes).dtype}"
+        )
+
+    def test_phases_dtype_is_real(self):
+        """Test that phases property returns real dtype."""
+        phases = self.phasor.phases
+        assert not np.iscomplexobj(phases), (
+            f"Phases should be real, but got dtype {np.asarray(phases).dtype}"
+        )
+
+    def test_amplitudes_preserve_imaginary_part(self):
+        """Test that amplitudes with non-zero imaginary parts are preserved."""
+        # Create phasor with complex amplitudes that have non-zero imaginary parts
+        freqs = np.linspace(1e-4, 1e-2, 10)
+        # Create amplitudes as complex numbers with real and imaginary parts
+        amps = (1.0 + 0.5j * np.arange(1, 11)).astype(np.complex128)[
+            None, None, None, None, :
+        ]
+        phases = np.linspace(0, np.pi, 10, dtype=np.float64)[None, None, None, None, :]
+        phasor_obj = phasor(frequencies=freqs, amplitudes=amps, phases=phases)
+
+        returned_amps = np.asarray(phasor_obj.amplitudes)
+        # Verify the imaginary parts are preserved
+        npt.assert_allclose(returned_amps.imag, amps.imag, atol=1e-10)
+        # Verify the real parts are preserved
+        npt.assert_allclose(returned_amps.real, amps.real, atol=1e-10)
+        # Verify full complex values match
+        npt.assert_allclose(returned_amps, amps, atol=1e-10)
+
     def test_frequencies_f_min_f_max(self):
         npt.assert_allclose(np.array(self.phasor.frequencies), self.freqs)
         assert self.phasor.f_min == pytest.approx(self.freqs[0])

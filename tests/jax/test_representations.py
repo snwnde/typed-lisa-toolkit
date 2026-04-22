@@ -1803,6 +1803,49 @@ class TestPhasorJAX(unittest.TestCase):
         npt.assert_allclose(np.asarray(self.phasor.amplitudes), np.asarray(self.amps))
         npt.assert_allclose(np.asarray(self.phasor.phases), np.asarray(self.phases))
 
+    def test_amplitudes_dtype_is_complex(self):
+        """Test that amplitudes property returns complex dtype, not real."""
+        amplitudes = self.phasor.amplitudes
+        amplitudes_array = np.asarray(amplitudes)
+        assert np.iscomplexobj(amplitudes_array), (
+            f"Amplitudes should be complex, but got dtype {amplitudes_array.dtype}"
+        )
+
+    def test_phases_dtype_is_real(self):
+        """Test that phases property returns real dtype."""
+        phases = self.phasor.phases
+        phases_array = np.asarray(phases)
+        assert not np.iscomplexobj(phases_array), (
+            f"Phases should be real, but got dtype {phases_array.dtype}"
+        )
+
+    def test_amplitudes_preserve_imaginary_part(self):
+        """Test that amplitudes with non-zero imaginary parts are preserved."""
+        # Create phasor with complex amplitudes that have non-zero imaginary parts
+        freqs = jnp.linspace(1e-4, 1e-2, 10, dtype=jnp.float64)
+        # Create amplitudes as complex numbers with real and imaginary parts
+        amps_data = (1.0 + 0.5j * jnp.arange(1, 11, dtype=jnp.float64)).astype(
+            jnp.complex128
+        )
+        amps = amps_data[None, None, None, None, :]
+        phases = jnp.linspace(0, jnp.pi, 10, dtype=jnp.float64)[
+            None, None, None, None, :
+        ]
+
+        entries = jnp.zeros((1, 1, 1, 2, 10), dtype=jnp.complex128)
+        entries = entries.at[:, :, :, slice(0, 1), :].set(amps)
+        entries = entries.at[:, :, :, slice(1, 2), :].set(phases)
+        phasor_obj = Phasor(grid=(freqs,), entries=entries)
+
+        returned_amps = np.asarray(phasor_obj.amplitudes)
+        amps_np = np.asarray(amps)
+        # Verify the imaginary parts are preserved
+        npt.assert_allclose(returned_amps.imag, amps_np.imag, atol=1e-10)
+        # Verify the real parts are preserved
+        npt.assert_allclose(returned_amps.real, amps_np.real, atol=1e-10)
+        # Verify full complex values match
+        npt.assert_allclose(returned_amps, amps_np, atol=1e-10)
+
     def test_frequencies_f_min_f_max(self):
         npt.assert_allclose(np.asarray(self.phasor.frequencies), np.asarray(self.freqs))
         assert self.phasor.f_min == pytest.approx(float(self.freqs[0]))
