@@ -1,11 +1,11 @@
 """Mode types."""
 
 import logging
-from typing import NamedTuple, Self, overload
+from typing import NamedTuple, NewType, Self, overload
 
 log = logging.getLogger(__name__)
 
-PosInt = int  # Positive integer
+PosInt = NewType("PosInt", int)  # Positive integer
 
 
 class Harmonic(NamedTuple):
@@ -28,9 +28,9 @@ class Harmonic(NamedTuple):
         return self.m
 
     @classmethod
-    def cast(cls, mode: tuple[PosInt, PosInt]) -> Self:
+    def cast(cls, mode: tuple[int, int]) -> Self:
         """Cast a tuple to :class:`.Harmonic`."""
-        return cls(*mode)
+        return cls(PosInt(mode[0]), PosInt(mode[1]))
 
 
 class QuasiNormalMode(NamedTuple):
@@ -61,23 +61,23 @@ class QuasiNormalMode(NamedTuple):
         return self.n
 
     @classmethod
-    def cast(cls, mode: tuple[PosInt, PosInt, PosInt] | Self) -> Self:
+    def cast(cls, mode: tuple[int, int, int]) -> Self:
         """Cast a tuple to :class:`.QNM`."""
-        return cls(*mode)
+        return cls(PosInt(mode[0]), PosInt(mode[1]), PosInt(mode[2]))
 
 
 QNM = QuasiNormalMode
 
 
 @overload
-def cast_mode(mode: tuple[PosInt, PosInt]) -> Harmonic: ...
+def cast_mode(mode: tuple[int, int]) -> Harmonic: ...
 
 
 @overload
-def cast_mode(mode: tuple[PosInt, PosInt, PosInt]) -> QNM: ...
+def cast_mode(mode: tuple[int, int, int]) -> QNM: ...
 
 
-def cast_mode(mode: tuple[PosInt, ...]):
+def cast_mode(mode: tuple[int, ...]):
     """Cast a tuple of positive integers to :class:`.Harmonic` or :class:`.QNM`."""
     if len(mode) == 2:  # noqa: PLR2004
         return Harmonic.cast(mode)

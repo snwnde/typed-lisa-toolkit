@@ -14,7 +14,7 @@ import logging
 import operator
 from collections.abc import Callable, Iterator, Mapping
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Protocol, Self, cast
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast, overload
 
 import array_api_compat as xpc
 import l2d_interface.validators as l2dv
@@ -25,7 +25,9 @@ from .. import utils
 from . import modes
 from .misc import AnyGrid, Array, Axis, Domain, Linspace
 
-Mode = modes.Harmonic | modes.QNM
+_ModeHM = tuple[int, int]
+_ModeQNM = tuple[int, int, int]
+Mode = _ModeHM | _ModeQNM
 
 
 if TYPE_CHECKING:
@@ -556,12 +558,29 @@ class _HasXPAndDomain(HasXP, HasDomain, Protocol): ...
 
 
 class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayMixin):
-    def __init__(self, mapping: Mapping[ModeT, Any]):
-        self._mapping: Mapping[ModeT, Any] = mapping
+    def __init__(self, mapping: Mapping[ModeT, Any], /, *, cast_mode: bool = False):
+        if cast_mode:
+            self._mapping: Mapping[ModeT, Any] = {
+                self._normalize_mode_key(mode): value for mode, value in mapping.items()
+            }
+        else:
+            self._mapping = mapping
+
+    def _normalize_mode_key(self, mode: ModeT):
+        return modes.cast_mode(mode)
+
+    @overload
+    def __getitem__(self: "ModeMapping[modes.Harmonic, VT]", key: _ModeHM) -> VT: ...
+
+    @overload
+    def __getitem__(self: "ModeMapping[modes.QNM, VT]", key: _ModeQNM) -> VT: ...
+
+    @overload
+    def __getitem__(self, key: ModeT) -> VT: ...
 
     # Implement Mapping protocol
-    def __getitem__(self, key: ModeT) -> VT:
-        """Get a channel by name as a view with preserved channel dimension (size 1)."""
+    def __getitem__(self, key: Any) -> VT:
+        """Get a mode by its mode numbers."""
         return self._mapping[key]
 
     def __iter__(self) -> Iterator[ModeT]:
@@ -576,14 +595,27 @@ class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayM
         items = {key: self[key] for key in self}
         return f"{self.__class__.__name__}({items!r})"
 
-    def pick(self, modes: ModeT | tuple[ModeT, ...]) -> Self:
+    @overload
+    def pick[ST: "ModeMapping[modes.Harmonic, Any]"](
+        self: ST, modes: _ModeHM | tuple[_ModeHM, ...]
+    ) -> ST: ...
+
+    @overload
+    def pick[ST: "ModeMapping[modes.QNM, Any]"](
+        self: ST, modes: _ModeQNM | tuple[_ModeQNM, ...]
+    ) -> ST: ...
+
+    @overload
+    def pick(self, modes: ModeT | tuple[ModeT, ...]) -> Self: ...
+
+    def pick(self, modes: Any):
         """Return a new instance containing only the specified modes."""
         try:
-            return self._pick(modes)  # type: ignore[arg-type]
+            return self._pick(modes)
         except KeyError:
-            return self._pick((modes,))  # type: ignore[arg-type]
+            return self._pick((modes,))
 
-    def _pick(self, modes: tuple[ModeT, ...]) -> Self:
+    def _pick(self, modes: tuple[ModeT, ...]) -> Any:
         new_mapping = {mode: self[mode] for mode in modes}
         return type(self)(new_mapping)
 

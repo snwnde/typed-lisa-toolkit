@@ -5,7 +5,6 @@ import logging
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from . import data as dm
-from . import modes
 from . import noisemodel as nm
 from . import representations as reps
 from . import waveforms as wf
@@ -17,11 +16,11 @@ if TYPE_CHECKING:
 
 
 ChnName = str
-Modes = modes.Harmonic | modes.QNM
+Mode = tuple[int, int] | tuple[int, int, int]
 FDUniformHomogeneous = (
     dm.Data[reps.FrequencySeries[Linspace]]
     | wf.ProjectedWaveform[reps.FrequencySeries[Linspace]]
-    | wf.HomogeneousHarmonicProjectedWaveform[Modes, reps.FrequencySeries[Linspace]]
+    | wf.HomogeneousHarmonicProjectedWaveform[Mode, reps.FrequencySeries[Linspace]]
 )
 
 

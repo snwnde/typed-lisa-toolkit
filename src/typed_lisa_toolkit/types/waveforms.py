@@ -19,7 +19,7 @@ from . import _mixins, modes
 from . import representations as reps
 from .misc import AnyGrid, Array, Axis, Interpolator
 
-Mode = modes.Harmonic | modes.QNM
+Mode = tuple[int, int] | tuple[int, int, int]
 
 if TYPE_CHECKING:
     AnyReps = reps.Representation[AnyGrid]
@@ -170,9 +170,27 @@ class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
         )
 
 
+@overload
+def harmonic_waveform[RepT: "AnyReps"](
+    modes_to_reps: Mapping[tuple[int, int], RepT],
+) -> HarmonicWaveform[modes.Harmonic, RepT]: ...
+
+
+@overload
+def harmonic_waveform[RepT: "AnyReps"](
+    modes_to_reps: Mapping[tuple[int, int, int], RepT],
+) -> HarmonicWaveform[modes.QuasiNormalMode, RepT]: ...
+
+
+@overload
 def harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
     modes_to_reps: Mapping[ModeT, RepT],
-) -> HarmonicWaveform[ModeT, RepT]:
+) -> HarmonicWaveform[ModeT, RepT]: ...
+
+
+def harmonic_waveform[RepT: "AnyReps"](
+    modes_to_reps: Mapping[Any, RepT],
+):
     """Build a :class:`~types.HarmonicWaveform`.
 
     Parameters
@@ -182,12 +200,30 @@ def harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
         to :ref:`representations <representation_types>`.
     """
     _ = _mixins.validate_maps_to_reps(modes_to_reps)
-    return HarmonicWaveform(modes_to_reps)
+    return HarmonicWaveform[Any, RepT](modes_to_reps, cast_mode=True)
 
 
+@overload
+def homogeneous_harmonic_waveform[RepT: "AnyReps"](
+    modes_to_reps: Mapping[tuple[int, int], RepT],
+) -> HomogeneousHarmonicWaveform[modes.Harmonic, RepT]: ...
+
+
+@overload
+def homogeneous_harmonic_waveform[RepT: "AnyReps"](
+    modes_to_reps: Mapping[tuple[int, int, int], RepT],
+) -> HomogeneousHarmonicWaveform[modes.QuasiNormalMode, RepT]: ...
+
+
+@overload
 def homogeneous_harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
     modes_to_reps: Mapping[ModeT, RepT],
-) -> HomogeneousHarmonicWaveform[ModeT, RepT]:
+) -> HomogeneousHarmonicWaveform[ModeT, RepT]: ...
+
+
+def homogeneous_harmonic_waveform[RepT: "AnyReps"](
+    modes_to_reps: Mapping[Any, RepT],
+):
     """Build a :class:`~types.HomogeneousHarmonicWaveform`.
 
     Parameters
@@ -197,7 +233,7 @@ def homogeneous_harmonic_waveform[ModeT: Mode, RepT: "AnyReps"](
         to :ref:`representations <representation_types>`.
     """
     _ = _mixins.validate_maps_to_reps(modes_to_reps)
-    return HomogeneousHarmonicWaveform(modes_to_reps)
+    return HomogeneousHarmonicWaveform[Any, RepT](modes_to_reps, cast_mode=True)
 
 
 def plus_cross_waveform[RepT: "AnyReps"](
@@ -230,9 +266,27 @@ def projected_waveform[RepT: "AnyReps"](
     return ProjectedWaveform[RepT].from_dict(channels_to_reps)
 
 
+@overload
+def harmonic_projected_waveform[RepT: "AnyReps"](
+    modes_to_pws: Mapping[tuple[int, int], ProjectedWaveform[RepT]],
+) -> HarmonicProjectedWaveform[modes.Harmonic, RepT]: ...
+
+
+@overload
+def harmonic_projected_waveform[RepT: "AnyReps"](
+    modes_to_pws: Mapping[tuple[int, int, int], ProjectedWaveform[RepT]],
+) -> HarmonicProjectedWaveform[modes.QuasiNormalMode, RepT]: ...
+
+
+@overload
 def harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
     modes_to_pws: Mapping[ModeT, ProjectedWaveform[RepT]],
-) -> HarmonicProjectedWaveform[ModeT, RepT]:
+) -> HarmonicProjectedWaveform[ModeT, RepT]: ...
+
+
+def harmonic_projected_waveform[RepT: "AnyReps"](
+    modes_to_pws: Mapping[Any, ProjectedWaveform[RepT]],
+):
     """Build a :class:`~types.HarmonicProjectedWaveform`.
 
     Parameters
@@ -242,12 +296,30 @@ def harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
         to :class:`~types.ProjectedWaveform` instances.
     """
     _ = _validate_maps_to_pws(modes_to_pws)
-    return HarmonicProjectedWaveform(modes_to_pws)
+    return HarmonicProjectedWaveform[Any, RepT](modes_to_pws, cast_mode=True)
 
 
+@overload
+def homogeneous_harmonic_projected_waveform[RepT: "AnyReps"](
+    modes_to_pws: Mapping[tuple[int, int], ProjectedWaveform[RepT]],
+) -> HomogeneousHarmonicProjectedWaveform[modes.Harmonic, RepT]: ...
+
+
+@overload
+def homogeneous_harmonic_projected_waveform[RepT: "AnyReps"](
+    modes_to_pws: Mapping[tuple[int, int, int], ProjectedWaveform[RepT]],
+) -> HomogeneousHarmonicProjectedWaveform[modes.QuasiNormalMode, RepT]: ...
+
+
+@overload
 def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
     modes_to_pws: Mapping[ModeT, ProjectedWaveform[RepT]],
-) -> HomogeneousHarmonicProjectedWaveform[ModeT, RepT]:
+) -> HomogeneousHarmonicProjectedWaveform[ModeT, RepT]: ...
+
+
+def homogeneous_harmonic_projected_waveform[RepT: "AnyReps"](
+    modes_to_pws: Mapping[Any, ProjectedWaveform[RepT]],
+):
     """Build a :class:`~types.HomogeneousHarmonicProjectedWaveform`.
 
     Parameters
@@ -257,7 +329,7 @@ def homogeneous_harmonic_projected_waveform[ModeT: Mode, RepT: "AnyReps"](
         to :class:`~types.ProjectedWaveform` instances.
     """
     _ = _validate_maps_to_pws(modes_to_pws)
-    return HomogeneousHarmonicProjectedWaveform(modes_to_pws)
+    return HomogeneousHarmonicProjectedWaveform[Any, RepT](modes_to_pws, cast_mode=True)
 
 
 # Convenience aliases

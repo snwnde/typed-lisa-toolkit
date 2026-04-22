@@ -69,6 +69,10 @@ recorded data.
 Mode Types
 ^^^^^^^^^^
 
+We use tuples of positive integers to represent modes.
+Internally, we use the following named tuples to store
+mode information in a more structured way.
+
 .. currentmodule:: typed_lisa_toolkit.types
 
 .. autosummary::

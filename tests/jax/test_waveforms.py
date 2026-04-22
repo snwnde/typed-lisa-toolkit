@@ -43,6 +43,18 @@ jax.config.update("jax_enable_x64", val=True)
 
 
 class TestHarmonicWaveformJAX(unittest.TestCase):
+    def test_constructor_normalizes_tuple_mode_keys(self):
+        case = build_harmonic_waveform_frequency_series(jnp)
+        wf = harmonic_waveform(
+            {
+                (2, 2): case["wf_22"],
+                (3, 3): case["wf_33"],
+            },
+        )
+
+        assert tuple(wf.keys()) == (modes.Harmonic(2, 2), modes.Harmonic(3, 3))
+        assert wf[(2, 2)] is case["wf_22"]
+
     def test_domain_and_pick(self):
         case = build_harmonic_waveform_frequency_series(jnp)
         wf = case["wf"]
