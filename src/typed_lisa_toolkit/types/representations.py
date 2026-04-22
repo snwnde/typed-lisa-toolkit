@@ -1087,7 +1087,7 @@ class Phasor[AxisT: "Axis"](
     @property
     def amplitudes(self) -> Array:
         """The amplitudes of the phasors."""
-        return self.entries[..., slice(0, 1), :].real
+        return self.entries[..., slice(0, 1), :]
 
     @property
     def frequencies(self) -> Axis | Linspace:
