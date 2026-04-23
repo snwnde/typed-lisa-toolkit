@@ -14,7 +14,7 @@ class Harmonic(NamedTuple):
     l: PosInt  # noqa: E741
     """The degree of the mode."""
 
-    m: PosInt
+    m: int
     """The order of the mode."""
 
     @property
@@ -23,14 +23,14 @@ class Harmonic(NamedTuple):
         return self.l
 
     @property
-    def order(self) -> PosInt:
+    def order(self) -> int:
         """Return the attribute :attr:`m`."""
         return self.m
 
     @classmethod
     def cast(cls, mode: tuple[int, int]) -> Self:
         """Cast a tuple to :class:`.Harmonic`."""
-        return cls(PosInt(mode[0]), PosInt(mode[1]))
+        return cls(PosInt(mode[0]), mode[1])
 
 
 class QuasiNormalMode(NamedTuple):
@@ -39,10 +39,10 @@ class QuasiNormalMode(NamedTuple):
     l: PosInt  # noqa: E741
     """The degree of the mode."""
 
-    m: PosInt
+    m: int
     """The order of the mode."""
 
-    n: PosInt
+    n: int
     """The overtone of the mode."""
 
     @property
@@ -51,19 +51,19 @@ class QuasiNormalMode(NamedTuple):
         return self.l
 
     @property
-    def order(self) -> PosInt:
+    def order(self) -> int:
         """Return the attribute :attr:`m`."""
         return self.m
 
     @property
-    def overtone(self) -> PosInt:
+    def overtone(self) -> int:
         """Return the attribute :attr:`n`."""
         return self.n
 
     @classmethod
     def cast(cls, mode: tuple[int, int, int]) -> Self:
         """Cast a tuple to :class:`.QNM`."""
-        return cls(PosInt(mode[0]), PosInt(mode[1]), PosInt(mode[2]))
+        return cls(PosInt(mode[0]), mode[1], mode[2])
 
 
 QNM = QuasiNormalMode

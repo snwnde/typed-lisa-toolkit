@@ -198,6 +198,28 @@ def harmonic_waveform[RepT: "AnyReps"](
     modes_to_reps :
         A mapping from :ref:`modes <mode_types>`
         to :ref:`representations <representation_types>`.
+
+
+    See Also
+    --------
+    :func:`~typed_lisa_toolkit.hw`
+        A convenience alias.
+
+
+    Example
+    -------
+    .. code-block:: python
+
+        import jax.numpy as jnp
+        import typed_lisa_toolkit as tlt
+
+        ts = tlt.time_series(
+            tlt.linspace(0, 1, 10), jnp.ones((1, 1, 1, 1, 10))
+        )  # UniformTimeSeries
+        hw = tlt.harmonic_waveform(
+            {(2, 2): ts}
+        )  # HarmonicWaveform[Harmonic, UniformTimeSeries]
+
     """
     _ = _mixins.validate_maps_to_reps(modes_to_reps)
     return HarmonicWaveform[Any, RepT](modes_to_reps, cast_mode=True)

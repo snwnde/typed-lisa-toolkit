@@ -475,7 +475,7 @@ def frequency_series[AxisT: "Axis"](
 
     Parameters
     ----------
-    frequencies: AxisT
+    frequencies:
         Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
         :class:`array <typed_lisa_toolkit.types.misc.Array>` of positive frequencies.
     entries: :class:`~typed_lisa_toolkit.types.misc.Array`
@@ -485,6 +485,20 @@ def frequency_series[AxisT: "Axis"](
     ----
     See the :external+l2d-interface:ref:`general description  <shape_convention>`
     of the shape convention for `entries`.
+
+    Example
+    -------
+    .. code-block:: python
+
+        import jax.numpy as jnp
+        import typed_lisa_toolkit as tlt
+
+        fs1 = tlt.frequency_series(
+            tlt.linspace(0, 1, 10), jnp.ones((1, 1, 1, 1, 10))
+        )  # UniformFrequencySeries
+        fs2 = tlt.frequency_series(
+            jnp.array([0, 0.1, 0.3, 0.6, 1]), jnp.ones((1, 1, 1, 1, 5))
+        )  # FrequencySeries[Array]
     """  # noqa: E501
     _validate_shape(
         entries,
@@ -520,7 +534,7 @@ def time_series[AxisT: "Axis"](
 
     Parameters
     ----------
-    times: AxisT
+    times:
         Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
         :class:`array <typed_lisa_toolkit.types.misc.Array>` of time points.
 
@@ -532,6 +546,20 @@ def time_series[AxisT: "Axis"](
     ----
     See the :external+l2d-interface:ref:`general description  <shape_convention>`
     of the shape convention for `entries`.
+
+    Example
+    -------
+    .. code-block:: python
+
+        import jax.numpy as jnp
+        import typed_lisa_toolkit as tlt
+
+        ts1 = tlt.time_series(
+            tlt.linspace(0, 1, 10), jnp.ones((1, 1, 1, 1, 10))
+        )  # UniformTimeSeries
+        ts2 = tlt.time_series(
+            jnp.array([0, 0.1, 0.3, 0.6, 1]), jnp.ones((1, 1, 1, 1, 5))
+        )  # TimeSeries[Array]
     """
     _validate_shape(entries, (entries.shape[0], 1, 1, 1, len(times)))
     try:

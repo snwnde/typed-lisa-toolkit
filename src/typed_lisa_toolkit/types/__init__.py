@@ -63,28 +63,6 @@ recorded data.
     STFTData
     WDMData
 
-
-.. _mode_types:
-
-Mode Types
-^^^^^^^^^^
-
-We use tuples of positive integers to represent modes.
-Internally, we use the following named tuples to store
-mode information in a more structured way.
-
-.. currentmodule:: typed_lisa_toolkit.types
-
-.. autosummary::
-   :toctree: _generated
-   :template: type.rst
-   :nosignatures:
-
-    Harmonic
-    QuasiNormalMode
-    QNM
-
-
 .. _waveform_types:
 
 Waveforms
@@ -114,6 +92,35 @@ and are typically TDI channel signals.
     ProjectedWaveform
     HarmonicProjectedWaveform
     HomogeneousHarmonicProjectedWaveform
+
+
+.. _mode_types:
+
+Modes
+^^^^^
+
+.. currentmodule:: typed_lisa_toolkit.types
+
+We use tuples of integers to label the modes
+of gravitational wave signals. Internally,
+these tuples are casted to :class:`.Harmonic`
+or :class:`.QuasiNormalMode` objects, which
+provide more semantic access to the components.
+
+As the casting is done internally,
+users can just use normal tuples like ``(2, 2)`` to label
+the modes when constructing waveforms, or when
+accessing signal in some modes.
+
+.. autosummary::
+   :toctree: _generated
+   :template: type.rst
+   :nosignatures:
+
+    Harmonic
+    QuasiNormalMode
+    QNM
+
 
 .. _spectral_density_matrices:
 
