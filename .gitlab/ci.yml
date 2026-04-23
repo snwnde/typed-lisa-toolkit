@@ -1,6 +1,19 @@
 stages:
   - test
   - deploy
+
+commitcheck:
+  stage: test
+  image: 
+    name: ghcr.io/cocogitto/cog:latest
+    entrypoint: ["/bin/sh", "-c"]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /Merge branch .+ into .+\n+See merge request/'
+      when: never  # Skip post-merge pipelines
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - cog check
   
 pytest:
   stage: test

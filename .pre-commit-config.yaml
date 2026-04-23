@@ -1,8 +1,4 @@
 repos:
-  - repo: https://github.com/commit-check/commit-check
-    rev: v2.5.0
-    hooks:
-      - id: check-message
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.11.7
     hooks:
