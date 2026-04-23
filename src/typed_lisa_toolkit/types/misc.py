@@ -53,7 +53,8 @@ class Linspace:
     """A lazy representation of a uniformly spaced array.
 
     .. note::
-        To construct a Linspace, use :func:`~typed_lisa_toolkit.linspace`
+        To construct a Linspace, use :func:`~typed_lisa_toolkit.linspace`,
+        :func:`~typed_lisa_toolkit.linspace_from_step`,
         or :func:`~typed_lisa_toolkit.linspace_from_array`.
 
     .. attention::
@@ -160,7 +161,9 @@ class Linspace:
         if isinstance(array, Linspace):
             return array
         if isinstance(array, LinspaceLike):
-            return linspace(start=array.start, step=array.step, num=len(array))
+            return linspace_from_step(
+                start=array.start, step=array.step, num=len(array)
+            )
         return linspace_from_array(array)
 
     @classmethod
@@ -184,9 +187,15 @@ Axis = Array | Linspace
 """An axis of a grid, which can be either an :class:`array <.Array>` or a :class:`Linspace`."""  # noqa: E501
 
 
-def linspace(start: float, step: float, num: int) -> Linspace:
-    """Create a :class:`~types.Linspace` instance."""
+def linspace_from_step(start: float, step: float, num: int) -> Linspace:
+    """Create a :class:`~types.Linspace` instance from a start, step, and num."""
     return Linspace(start=start, step=step, num=num)
+
+
+def linspace(start: float, stop: float, num: int) -> Linspace:
+    """Create a :class:`~types.Linspace` instance."""
+    step = (stop - start) / (num - 1) if num > 1 else 0
+    return linspace_from_step(start=start, step=step, num=num)
 
 
 def linspace_from_array(array: ArrayLike) -> Linspace:
@@ -201,7 +210,7 @@ def linspace_from_array(array: ArrayLike) -> Linspace:
     if not xp.allclose(diff, diff[0], rtol=1e-8, atol=0):
         msg = "Array must have uniform spacing to create Linspace."
         raise ValueError(msg)
-    return linspace(start=float(_array[0]), step=float(diff[0]), num=len(_array))
+    return linspace(start=float(_array[0]), stop=float(_array[-1]), num=len(_array))
 
 
 class Grid2DSparse[Axis0: Axis, Axis1: Axis]:

@@ -40,7 +40,7 @@ Representations are the most fundamental types in TLT, and are components
 of other more involved types.
 
 They house numerical signal arrays, together with time and/or frequency
-grids and other metadata. They not only support basic algebraic operations as
+grids and other metadata. They support not only basic algebraic operations as
 the underlying arrays do, but also some grid-aware operations such as
 semantic subsetting and embedding.
 
@@ -166,6 +166,7 @@ but are useful helpers for constructing the above objects.
    :nosignatures:
 
    linspace
+   linspace_from_step
    linspace_from_array
    build_grid2d
 
@@ -197,6 +198,7 @@ from ._constructors import (
     hw,
     linspace,
     linspace_from_array,
+    linspace_from_step,
     make_sdm,
     noise_model,
     pcw,
@@ -244,6 +246,7 @@ __all__ = [
     "hw",
     "linspace",
     "linspace_from_array",
+    "linspace_from_step",
     "load_data",
     "load_ldc_data",
     "load_mojito",

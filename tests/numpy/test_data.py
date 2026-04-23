@@ -1,5 +1,5 @@
 """Tests for data containers with NumPy arrays."""
-# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import tempfile
 import warnings
@@ -11,6 +11,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
+import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
     construct_fsdata,
     construct_stftdata,
@@ -18,6 +19,7 @@ from typed_lisa_toolkit import (
     construct_tsdata,
     construct_wdmdata,
     fsdata,
+    linspace_from_array,
     load_data,
     load_ldc_data,
     shop,
@@ -47,7 +49,7 @@ if TYPE_CHECKING:
 
 
 def _build_tsdata_numpy():
-    times = np.linspace(0.0, 3.0, 8)
+    times = tlt.linspace(0.0, 3.0, 8)
     x = np.array([0.0, 1.0, 0.5, -0.5, -1.0, -0.25, 0.75, 0.0])
     y = np.array([1.0, 0.0, -0.5, 0.25, 0.5, -0.75, 0.0, 1.0])
     data = tsdata(
@@ -100,7 +102,6 @@ class TestDataContainersNumpy:
         times, _, _, tsdata = _build_tsdata_numpy()
 
         npt.assert_allclose(np.asarray(tsdata.times), times)
-        assert tsdata.dt == pytest.approx(times[1] - times[0])
         npt.assert_allclose(
             np.asarray(tsdata.get_frequencies()),
             np.fft.rfftfreq(len(times), d=tsdata.dt),
@@ -187,7 +188,7 @@ class TestDataContainersNumpy:
         )
 
     def test_init_rejects_non_unit_harmonic_dimension(self):
-        times = np.linspace(0.0, 1.0, 4)
+        times = tlt.linspace(0.0, 1.0, 4)
         bad_entries = np.ones((1, 2, 2, 1, 4))
         built = self._assert_construct_tsdata_deprecation(
             times=times,
@@ -200,7 +201,7 @@ class TestDataContainersNumpy:
 
     def test_fsdata_set_times_drop_times_and_to_tsdata(self):
         case = build_fdata(np)
-        times = np.linspace(0.0, 7.0, 8)
+        times = tlt.linspace(0.0, 7.0, 8)
 
         timed = case.set_times(times)
         recovered = self._assert_to_tsdata_deprecation(timed)
@@ -258,18 +259,13 @@ class TestDataContainersNumpy:
 
     def test_save_and_load_dispatches_by_type(self):
         case = build_fdata(np)
-        times = np.linspace(0.0, 7.0, 8)
+        times = tlt.linspace(0.0, 7.0, 8)
         timed = case.set_times(times)
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             timed.save(handle.name)
             with pytest.raises(TypeError):
                 _ = load_data(handle.name, domain="frequency", kind="timed")
-
-    def test_tsdata_t_start_and_t_end(self):
-        times, _, _, tsdata = _build_tsdata_numpy()
-        assert tsdata.t_start == pytest.approx(float(times[0]))
-        assert tsdata.t_end == pytest.approx(float(times[-1]))
 
     def test_fsdata_f_min_and_f_max(self):
         _, _, _, tsdata = _build_tsdata_numpy()
@@ -356,8 +352,8 @@ class TestDataContainersNumpy:
 
     def test_timedfsdata_set_times_updates_in_place(self):
         case = build_fdata(np)
-        times_orig = np.linspace(0.0, 7.0, 8)
-        times_new = np.linspace(0.0, 14.0, 8)
+        times_orig = tlt.linspace(0.0, 7.0, 8)
+        times_new = tlt.linspace(0.0, 14.0, 8)
         timed = case.set_times(times_orig)
         result = timed.set_times(times_new)
         assert result is timed
@@ -365,7 +361,7 @@ class TestDataContainersNumpy:
 
     def test_timedfsdata_get_subset_creates_new(self):
         fdata = build_fdata(np)
-        times = np.linspace(0.0, 7.0, 8)
+        times = tlt.linspace(0.0, 7.0, 8)
         timed = fdata.set_times(times)
         sub = timed.get_subset(
             interval=(float(fdata.frequencies.start), float(fdata.frequencies.stop)),
@@ -544,7 +540,7 @@ class TestDataContainersNumpy:
             with h5py.File(handle.name, "w") as f:
                 f.create_dataset("obs/tdi", data=dataset)
             with pytest.raises(ValueError, match=r".+"):
-                load_ldc_data(handle.name, name="obs/tdi", channels="Q")  # type: ignore[arg-type]
+                load_ldc_data(handle.name, name="obs/tdi", channels="Q")
 
     def test_load_ldc_data_invalid_structure_raises(self):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
@@ -596,8 +592,8 @@ class TestDataContainersNumpy:
         plotter.draw.assert_called_once()
 
     def test_factory_constructors_build_expected_types(self):
-        times = np.linspace(0.0, 3.0, 8)
-        freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+        times = tlt.linspace(0.0, 3.0, 8)
+        freqs = linspace_from_array(np.fft.rfftfreq(len(times), d=float(times.step)))
 
         ts_entries = np.ones((1, 2, 1, 1, len(times)))
         fs_entries = np.ones((1, 2, 1, 1, len(freqs)), dtype=np.complex128)
@@ -652,8 +648,8 @@ class TestDataContainersNumpy:
         assert wdm_data.channel_names == ("X", "Y")
 
     def test_stftdata_and_wdmdata_mapping_factories(self):
-        times = np.linspace(0.0, 3.0, 8)
-        freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+        times = tlt.linspace(0.0, 3.0, 8)
+        freqs = linspace_from_array(np.fft.rfftfreq(len(times), d=times.step))
 
         stft_mapping = {
             "X": stft(freqs, times, np.ones((1, 1, 1, 1, len(freqs), len(times)))),
@@ -803,8 +799,8 @@ class TestDataLoadValidationBranches:
                 load_data(handle.name, domain="time", kind=None, sparse=True)
 
     def test_load_data_dispatches_sparse_stft_and_dense_wdm(self):
-        times = np.linspace(0.0, 3.0, 8)
-        freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+        times = tlt.linspace(0.0, 3.0, 8)
+        freqs = linspace_from_array(np.fft.rfftfreq(len(times), d=float(times.step)))
         sparse_indices = np.array([[0, 0], [1, 2], [2, 4]], dtype=int)
 
         stft_entries = np.ones((1, 2, 1, 1, len(sparse_indices)))

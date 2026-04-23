@@ -11,7 +11,7 @@ from .types.data import (
     wdmdata,
 )
 from .types.likelihood import whittle
-from .types.misc import build_grid2d, linspace, linspace_from_array
+from .types.misc import build_grid2d, linspace, linspace_from_array, linspace_from_step
 from .types.modes import cast_mode
 from .types.noisemodel import make_sdm, noise_model
 from .types.representations import (
@@ -70,6 +70,7 @@ __all__ = [
     "hw",
     "linspace",
     "linspace_from_array",
+    "linspace_from_step",
     "make_sdm",
     "noise_model",
     "pcw",

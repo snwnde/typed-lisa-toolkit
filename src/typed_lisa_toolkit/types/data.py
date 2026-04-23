@@ -787,6 +787,31 @@ def _validate_rep_shape(mapping: Mapping[Any, AnyReps], /):
             raise ValueError(_msg)
 
 
+def _enforce_uniform_mapping[RepT: AnyReps](
+    mapping: Mapping[str, RepT], /
+) -> Mapping[str, RepT]:
+
+    def axis_gen(grid: AnyGrid):
+        for axis in grid:
+            if isinstance(axis, Linspace):
+                yield axis
+            else:
+                msg = (
+                    f"Linspace axes expected; found array axis {axis}"
+                    "Convert the axes to Linspace with `tlt.linsapce_from_array`"
+                    "before constructing the data object."
+                )
+                warnings.warn(msg, UserWarning, stacklevel=3)
+                yield _enforce_uniform(axis)
+
+    def new_grid(grid: AnyGrid) -> AnyGrid:
+        return tuple(axis_gen(grid))  # pyright: ignore[reportReturnType]
+
+    return {
+        ch: type(rep)(new_grid(rep.grid), rep.entries) for ch, rep in mapping.items()
+    }
+
+
 _func_deprecation_msg = (
     "The factory function `{deprecated_func_name}` is deprecated "
     "and will be removed in 0.8.0;"
@@ -867,7 +892,8 @@ def tsdata(
             raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
-        return TSData.from_dict(mapping, name=name)
+        _mapping = _enforce_uniform_mapping(mapping)
+        return TSData.from_dict(_mapping, name=name)
     _msg = (
         "Must specify `times`, `entries`, and `channels`"
         "when not using `mapping` to construct TSData."
@@ -996,7 +1022,8 @@ def fsdata(
             raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
-        _fsdata = FSData.from_dict(mapping, name=name)
+        _mapping = _enforce_uniform_mapping(mapping)
+        _fsdata = FSData.from_dict(_mapping, name=name)
     else:
         _msg = (
             "Must specify `frequencies`, `entries`, and `channels` when "
@@ -1146,7 +1173,8 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
             raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
-        return STFTData[GridT].from_dict(mapping, name=name)
+        _mapping = _enforce_uniform_mapping(mapping)
+        return STFTData[GridT].from_dict(_mapping, name=name)
     _msg = (
         "Must specify `frequencies`, `times`, `entries`, and `channels` "
         "when not using `mapping` to construct STFTData."
@@ -1282,7 +1310,8 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
             raise ValueError(_msg_from_mapping)
         _ = _mixins.validate_maps_to_reps(mapping)
         _ = _validate_rep_shape(mapping)
-        return WDMData[GridT].from_dict(mapping, name=name)
+        _mapping = _enforce_uniform_mapping(mapping)
+        return WDMData[GridT].from_dict(_mapping, name=name)
     _msg = (
         "Must specify `frequencies`, `times`, `entries`, and `channels` "
         "when not using `mapping` to construct WDMData."

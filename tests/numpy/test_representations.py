@@ -1,5 +1,5 @@
 """Tests for canonical shape functionality in representations."""
-# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import contextlib
 
@@ -10,6 +10,7 @@ from l2d_interface.validators import (
     validate_representation,
 )
 
+import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
     build_grid2d,
     frequency_series,
@@ -96,7 +97,7 @@ class TestL2DContractNumpy(TestCanonicalShape):
         assert fs.kind is None
 
     def test_data_contract(self):
-        times = np.linspace(0.0, 1.0, 16)
+        times = tlt.linspace(0.0, 1.0, 16)
         x = time_series(times, entries=rng.standard_normal((1, 1, 1, 1, len(times))))
         y = time_series(times, entries=rng.standard_normal((1, 1, 1, 1, len(times))))
 
@@ -308,8 +309,8 @@ class TestSubsetOperations:
         )
         self.fs_large = frequency_series(self.freqs_large, entries=entries_fs_large)
 
-        # Time series fixture with Linspace
-        self.times_ls = Linspace(0.0, 0.01, self.len_grid_large)
+        # Time series fixture
+        self.times_ls = tlt.linspace_from_step(0.0, 0.01, self.len_grid_large)
         entries_ts_ls = rng.standard_normal(
             (
                 self.n_batches,
@@ -1352,32 +1353,6 @@ class TestGridTupleHandling:
             self.n_features,
         )
 
-    def test_grid_conversion_linspace(self):
-        """Test that arrays are converted to Linspace when uniform."""
-        freqs = np.linspace(0, 1, self.len_grid_large)
-        entries = rng.standard_normal(
-            (
-                self.n_batches,
-                self.n_channels,
-                self.n_harmonics,
-                self.n_features,
-                self.len_grid_large,
-            )
-        )
-        fs = frequency_series(freqs, entries=entries)
-
-        # Should be converted to Linspace
-        assert isinstance(fs.grid[0], Linspace)
-        assert fs.grid[0].start == pytest.approx(0.0)
-        assert fs.grid[0].step == pytest.approx(1.0 / (self.len_grid_large - 1))
-        assert fs.grid[0].num == self.len_grid_large
-        assert fs.entries.shape[0:4] == (
-            self.n_batches,
-            self.n_channels,
-            self.n_harmonics,
-            self.n_features,
-        )
-
     def test_grid_not_converted_non_uniform(self):
         """Test that non-uniform arrays are not converted to Linspace."""
         freqs = np.array([0.1, 0.2, 0.5, 1.0, 2.0])  # Non-uniform
@@ -1838,7 +1813,7 @@ class TestPhasor:
         npt.assert_allclose(np.abs(np.asarray(fs.entries) - expected), 0, atol=1e-10)
 
     def test_get_interpolated(self):
-        from scipy.interpolate import interp1d  # type: ignore[import]
+        from scipy.interpolate import interp1d
 
         new_freqs = np.linspace(self.freqs[2], self.freqs[-3], 8)
         interpolated = self.phasor.get_interpolated(new_freqs, interp1d)

@@ -296,9 +296,9 @@ class TestFDNoiseModelJAX:
         npt.assert_allclose(overlap.squeeze(), 1.0)
 
     def test_cross_correlation_currently_raises_for_linspace_grid(self):
-        times = np.linspace(0.0, 7.0, 8)
+        times = linspace_from_array(np.linspace(0.0, 7.0, 8))
         frequencies = linspace_from_array(
-            np.fft.rfftfreq(len(times), d=times[1] - times[0]),
+            np.fft.rfftfreq(len(times), d=times.step),
         )
         x = np.array([1.0 + 0.0j, 0.5 + 0.25j, -0.25 + 0.5j, 0.1 - 0.2j, 0.05 + 0.0j])
         y = np.array([0.5 + 0.0j, -0.2 + 0.1j, 0.3 - 0.4j, -0.1 + 0.2j, 0.01 + 0.0j])

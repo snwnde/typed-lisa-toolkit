@@ -17,6 +17,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
+import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
     build_grid2d,
     frequency_series,
@@ -1188,7 +1189,7 @@ class TestGridTupleHandlingJAX:
 
     def test_grid_conversion_linspace(self):
         """Test that uniform JAX arrays are converted to Linspace."""
-        freqs = jnp.linspace(0, 1, self.len_grid_large)
+        freqs = tlt.linspace(0, 1, self.len_grid_large)
         entries = jnp.array(
             rng.standard_normal(
                 (

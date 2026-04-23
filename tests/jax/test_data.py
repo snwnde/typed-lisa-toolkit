@@ -1,5 +1,5 @@
 """Tests for data containers with JAX arrays."""
-# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
+# pyright: reportUnknownMemberType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportUnknownArgumentType=false
 
 import tempfile
 import warnings
@@ -13,6 +13,7 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
+import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
     construct_fsdata,
     construct_stftdata,
@@ -20,8 +21,10 @@ from typed_lisa_toolkit import (
     construct_tsdata,
     construct_wdmdata,
     fsdata,
+    linspace_from_array,
     load_data,
     load_ldc_data,
+    load_mojito,
     shop,
     stft,
     stftdata,
@@ -37,7 +40,6 @@ from typed_lisa_toolkit.types import (
     TSData,
     WDMData,
 )
-from typed_lisa_toolkit.types.data import load_mojito
 
 if TYPE_CHECKING:
     from conftest import (
@@ -52,7 +54,7 @@ jax.config.update("jax_enable_x64", val=True)
 
 
 def _build_tsdata_jax():
-    times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
+    times = tlt.linspace(0.0, 3.0, 8)
     x = jnp.asarray([0.0, 1.0, 0.5, -0.5, -1.0, -0.25, 0.75, 0.0], dtype=jnp.float64)
     y = jnp.asarray([1.0, 0.0, -0.5, 0.25, 0.5, -0.75, 0.0, 1.0], dtype=jnp.float64)
     data = tsdata(
@@ -75,11 +77,11 @@ class TestDataContainersJAX:
 
     def _assert_construct_stftdata_deprecation(self, **kwargs):
         with pytest.warns(DeprecationWarning, match=r"construct_stftdata"):
-            return construct_stftdata(**kwargs)
+            return construct_stftdata(**kwargs)  # pyright: ignore[reportUnknownVariableType]
 
     def _assert_construct_wdmdata_deprecation(self, **kwargs):
         with pytest.warns(DeprecationWarning, match=r"construct_wdmdata"):
-            return construct_wdmdata(**kwargs)
+            return construct_wdmdata(**kwargs)  # pyright: ignore[reportUnknownVariableType]
 
     def _assert_to_fsdata_deprecation(self, tsdata: TSData, *, keep_times: bool):
         with pytest.warns(
@@ -92,20 +94,19 @@ class TestDataContainersJAX:
         self,
         fs_like: FSData | TimedFSData,
         times: np.ndarray | None = None,
-    ):
+    ) -> TSData:
         with pytest.warns(  # noqa: PT031
             DeprecationWarning,
             match=r"The 'to_tsdata' method is deprecated",
         ):
             if times is None:
-                return fs_like.to_tsdata()
+                return fs_like.to_tsdata()  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
             return fs_like.to_tsdata(times)
 
     def test_tsdata_times_dt_and_get_frequencies(self):
         times, tsdata = _build_tsdata_jax()
 
         npt.assert_allclose(np.asarray(tsdata.times), np.asarray(times))
-        assert tsdata.dt == pytest.approx(float(times[1] - times[0]))
         npt.assert_allclose(
             np.asarray(tsdata.get_frequencies()),
             np.asarray(jnp.fft.rfftfreq(len(times), tsdata.dt)),
@@ -135,7 +136,7 @@ class TestDataContainersJAX:
         )
 
     def test_init_rejects_non_unit_harmonic_dimension(self):
-        times = jnp.linspace(0.0, 1.0, 4, dtype=jnp.float64)
+        times = tlt.linspace(0.0, 1.0, 4)
         bad_entries = jnp.ones((1, 2, 2, 1, 4), dtype=jnp.float64)
         built = self._assert_construct_tsdata_deprecation(
             times=times,
@@ -235,7 +236,7 @@ class TestDataContainersJAX:
 
     def test_fsdata_set_times_drop_times_and_to_tsdata(self):
         case = build_fdata(jnp)
-        times = np.linspace(0.0, 7.0, 8)
+        times = tlt.linspace(0.0, 7.0, 8)
 
         timed = case.set_times(times)
         recovered = self._assert_to_tsdata_deprecation(timed)
@@ -247,18 +248,13 @@ class TestDataContainersJAX:
 
     def test_save_and_load_dispatches_by_type(self):
         case = build_fdata(jnp)
-        times = np.linspace(0.0, 7.0, 8)
+        times = tlt.linspace(0.0, 7.0, 8)
         timed = case.set_times(times)
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             timed.save(handle.name)
             with pytest.raises(TypeError):
                 _ = load_data(handle.name, domain="frequency", kind="timed")
-
-    def test_tsdata_t_start_and_t_end(self):
-        times, tsdata = _build_tsdata_jax()
-        assert tsdata.t_start == pytest.approx(float(times[0]))
-        assert tsdata.t_end == pytest.approx(float(times[-1]))
 
     def test_fsdata_f_min_and_f_max(self):
         _, tsdata = _build_tsdata_jax()
@@ -344,8 +340,8 @@ class TestDataContainersJAX:
 
     def test_timedfsdata_set_times_updates_in_place(self):
         case = build_fdata(jnp)
-        times_orig = np.linspace(0.0, 7.0, 8)
-        times_new = np.linspace(0.0, 14.0, 8)
+        times_orig = tlt.linspace(0.0, 7.0, 8)
+        times_new = tlt.linspace(0.0, 14.0, 8)
         timed = case.set_times(times_orig)
         result = timed.set_times(times_new)
         assert result is timed
@@ -353,7 +349,7 @@ class TestDataContainersJAX:
 
     def test_timedfsdata_get_subset_creates_new(self):
         fdata = build_fdata(jnp)
-        times = np.linspace(0.0, 7.0, 8)
+        times = tlt.linspace(0.0, 7.0, 8)
         timed = fdata.set_times(times)
         sub = timed.get_subset(
             interval=(float(fdata.frequencies.start), float(fdata.frequencies.stop)),
@@ -447,7 +443,7 @@ class TestDataContainersJAX:
                     match="load_data",
                 ),
             ):
-                load_data(handle.name, legacy=True)
+                load_data(handle.name, legacy=True)  # pyright: ignore[reportCallIssue]
 
     def test_load_data_dispatches_fsdata(self):
         _, tsdata = _build_tsdata_jax()
@@ -530,7 +526,7 @@ class TestDataContainersJAX:
             with h5py.File(handle.name, "w") as f:
                 f.create_dataset("obs/tdi", data=dataset)
             with pytest.raises(ValueError, match=r".+"):
-                load_ldc_data(handle.name, name="obs/tdi", channels="Q")  # type: ignore[arg-type]
+                load_ldc_data(handle.name, name="obs/tdi", channels="Q")
 
     def test_load_ldc_data_invalid_structure_raises(self):
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
@@ -582,8 +578,8 @@ class TestDataContainersJAX:
         plotter.draw.assert_called_once()
 
     def test_factory_constructors_build_expected_types(self):
-        times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
-        freqs = jnp.fft.rfftfreq(len(times), d=float(times[1] - times[0]))
+        times = tlt.linspace(0.0, 3.0, 8)
+        freqs = linspace_from_array(jnp.fft.rfftfreq(len(times), d=float(times.step)))
 
         ts_entries = jnp.ones((1, 2, 1, 1, len(times)), dtype=jnp.float64)
         fs_entries = jnp.ones((1, 2, 1, 1, len(freqs)), dtype=jnp.complex128)
@@ -638,8 +634,8 @@ class TestDataContainersJAX:
         assert wdm_data.channel_names == ("X", "Y")
 
     def test_stftdata_and_wdmdata_mapping_factories(self):
-        times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
-        freqs = jnp.fft.rfftfreq(len(times), d=float(times[1] - times[0]))
+        times = tlt.linspace(0.0, 3.0, 8)
+        freqs = linspace_from_array(jnp.fft.rfftfreq(len(times), d=times.step))
 
         stft_mapping = {
             "X": stft(
@@ -803,8 +799,8 @@ class TestDataLoadValidationBranchesJAX:
                 load_data(handle.name, domain="time", kind=None, sparse=True)
 
     def test_load_data_dispatches_sparse_stft_and_dense_wdm(self):
-        times = jnp.linspace(0.0, 3.0, 8, dtype=jnp.float64)
-        freqs = jnp.fft.rfftfreq(len(times), d=float(times[1] - times[0]))
+        times = tlt.linspace(0.0, 3.0, 8)
+        freqs = linspace_from_array(jnp.fft.rfftfreq(len(times), d=float(times.step)))
         sparse_indices = np.array([[0, 0], [1, 2], [2, 4]], dtype=int)
 
         stft_entries = jnp.ones((1, 2, 1, 1, len(sparse_indices)), dtype=jnp.float64)

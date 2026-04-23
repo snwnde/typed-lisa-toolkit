@@ -504,12 +504,9 @@ def frequency_series[AxisT: "Axis"](
         entries,
         (entries.shape[0], 1, 1, 1, len(frequencies)),
     )
-    try:
-        _frequencies = Linspace.make(frequencies)
-    except ValueError:
-        return FrequencySeries[AxisT]((frequencies,), entries)
-    else:
-        return UniformFrequencySeries((_frequencies,), entries)
+    if isinstance(frequencies, Linspace):
+        return UniformFrequencySeries((frequencies,), entries)
+    return FrequencySeries[AxisT]((frequencies,), entries)
 
 
 @overload
@@ -562,12 +559,9 @@ def time_series[AxisT: "Axis"](
         )  # TimeSeries[Array]
     """
     _validate_shape(entries, (entries.shape[0], 1, 1, 1, len(times)))
-    try:
-        _times = Linspace.make(times)
-    except ValueError:
-        return TimeSeries[AxisT]((times,), entries)
-    else:
-        return UniformTimeSeries((_times,), entries)
+    if isinstance(times, Linspace):
+        return UniformTimeSeries((times,), entries)
+    return TimeSeries[AxisT]((times,), entries)
 
 
 def phasor[AxisT: "Axis"](

@@ -83,7 +83,7 @@ def time2freq(
         )
         raise NotImplementedError(msg) from e
     _freqs = fft.rfftfreq(len(td.times), d=td.times.step)
-    freqs = _constructors.linspace(_freqs[0], _freqs[1] - _freqs[0], len(_freqs))
+    freqs = _constructors.linspace(_freqs[0], _freqs[-1], len(_freqs))
     signal = fft.rfft(td.get_kernel() * td.times.step, axis=-1)
     if isinstance(td, reps.TimeSeries):
         return _constructors.frequency_series(
@@ -414,6 +414,6 @@ def wdm2freq(
     wtfs = _frequency_wdm(_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
     # wtfs is on a grid from fftfreq but we want rfftfreq
     _num = wtfs.n // 2 + 1 if wtfs.n % 2 == 0 else (wtfs.n + 1) // 2
-    freqs = _constructors.linspace(start=0.0, step=wdm.df, num=_num)
+    freqs = _constructors.linspace_from_step(start=0.0, step=wdm.df, num=_num)
     _entries = _conventionaize(wtfs.data[:_num])
     return _constructors.frequency_series(freqs, entries=_entries)

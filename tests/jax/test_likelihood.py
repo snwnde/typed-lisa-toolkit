@@ -1,6 +1,8 @@
 """Tests for likelihood computations with JAX arrays."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
+from typing import TYPE_CHECKING
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -18,6 +20,13 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import (
     FDWhittleLikelihood,
 )
+
+if TYPE_CHECKING:
+    from conftest import (
+        build_fd_pair,
+        build_harmonic_projected_frequency_waveform,
+        dense_kernel_2ch,
+    )
 
 jax.config.update("jax_enable_x64", val=True)
 
@@ -38,13 +47,11 @@ class TestFDWhittleLikelihoodJAX:
 
     def test_cross_product_and_template_square_match_noise_model(
         self,
-        build_fd_pair,
-        dense_kernel_2ch,
     ):
         case = build_fd_pair(jnp)
         sdm = make_sdm(
             dense_kernel_2ch(jnp),
-            frequencies=case["frequencies"],
+            frequencies=case["frequencies"].asarray(jnp),
             channel_names=("X", "Y"),
         )
         model = noise_model(sdm)
@@ -62,11 +69,11 @@ class TestFDWhittleLikelihoodJAX:
             np.asarray(model.reset().get_scalar_product(case["right"], case["right"])),
         )
 
-    def test_log_likelihood_matches_closed_form(self, build_fd_pair, dense_kernel_2ch):
+    def test_log_likelihood_matches_closed_form(self):
         case = build_fd_pair(jnp)
         sdm = make_sdm(
             dense_kernel_2ch(jnp),
-            frequencies=case["frequencies"],
+            frequencies=case["frequencies"].asarray(jnp),
             channel_names=("X", "Y"),
         )
         model = noise_model(sdm)
@@ -85,8 +92,6 @@ class TestFDWhittleLikelihoodJAX:
 
     def test_harmonic_projected_template_is_summed_before_evaluation(
         self,
-        build_harmonic_projected_frequency_waveform,
-        dense_kernel_2ch,
     ):
         case = build_harmonic_projected_frequency_waveform(jnp)
         data = fsdata(sum_harmonics(case["wf"]))
@@ -143,8 +148,6 @@ class TestFDWhittleLikelihoodJAX:
 
     def test_whittle_factory_returns_fd_whittle_likelihood(
         self,
-        build_fd_pair,
-        dense_kernel_2ch,
     ):
         case = build_fd_pair(jnp)
         model = noise_model(

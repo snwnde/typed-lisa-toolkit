@@ -20,7 +20,7 @@ Representations are the most fundamental types in TLT, and are components
 of other more involved types.
 
 They house numerical signal arrays, together with time and/or frequency
-grids and other metadata. They not only support basic algebraic operations as
+grids and other metadata. They support not only basic algebraic operations as
 the underlying arrays do, but also some grid-aware operations such as
 semantic subsetting and embedding.
 

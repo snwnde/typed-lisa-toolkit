@@ -56,25 +56,25 @@ type MockPhasorTriple = tuple[MagicMock, MagicMock, MagicMock]
 type HarmonicPhasorHandles = dict[Harmonic, dict[str, MockPhasorTriple]]
 
 
-class CanonicalRepresentationsResult(TypedDict):
-    freqs: Array
-    times: Array
+class CanonicalRepresentationsResult[AT: Axis](TypedDict):
+    freqs: AT
+    times: AT
     entries_fs: Array
     entries_ts: Array
     entries_tf: Array
-    fs: reps.FrequencySeries[Axis] | UniformFrequencySeries
-    ts: TimeSeries[Axis] | UniformTimeSeries
-    tf: STFT[Grid2DCartesian[Axis, Axis]]
+    fs: reps.FrequencySeries[AT] | UniformFrequencySeries
+    ts: TimeSeries[AT] | UniformTimeSeries
+    tf: STFT[Grid2DCartesian[AT, AT]]
 
 
-class FrequencySeriesBuildResult(TypedDict):
-    fs: reps.FrequencySeries[Axis] | UniformFrequencySeries
-    frequencies: Array
+class FrequencySeriesBuildResult[AT: Axis](TypedDict):
+    fs: reps.FrequencySeries[AT] | UniformFrequencySeries
+    frequencies: AT
     entries: Array
 
 
-class FdPairResult(TypedDict):
-    frequencies: Array
+class FdPairResult[AT: Axis](TypedDict):
+    frequencies: AT
     left: FSData
     right: FSData
     left_x: Array
@@ -83,9 +83,9 @@ class FdPairResult(TypedDict):
     right_y: Array
 
 
-class WdmPairResult(TypedDict):
-    times: Array
-    frequencies: Array
+class WdmPairResult[AT: Axis](TypedDict):
+    times: AT
+    frequencies: AT
     left: WDMData[Grid2DCartesian[Linspace, Linspace]]
     right: WDMData[Grid2DCartesian[Linspace, Linspace]]
     left_x: Array
@@ -104,15 +104,15 @@ class HarmonicWaveformFrequencySeriesResult(TypedDict):
     wf_33: reps.FrequencySeries[Axis]
 
 
-class HarmonicProjectedFrequencyWaveformResult(TypedDict):
+class HarmonicProjectedFrequencyWaveformResult[AT: Axis](TypedDict):
     frequencies: Array
     mode_22: Harmonic
     mode_33: Harmonic
-    wf: HomogeneousHarmonicProjectedWaveform[Harmonic, reps.FrequencySeries[Axis]]
-    resp_22: ProjectedWaveform[reps.FrequencySeries[Axis]]
-    resp_33: ProjectedWaveform[reps.FrequencySeries[Axis]]
-    resp_22_map: dict[str, reps.FrequencySeries[Axis]]
-    resp_33_map: dict[str, reps.FrequencySeries[Axis]]
+    wf: HomogeneousHarmonicProjectedWaveform[Harmonic, reps.FrequencySeries[AT]]
+    resp_22: ProjectedWaveform[reps.FrequencySeries[AT]]
+    resp_33: ProjectedWaveform[reps.FrequencySeries[AT]]
+    resp_22_map: dict[str, reps.FrequencySeries[AT]]
+    resp_33_map: dict[str, reps.FrequencySeries[AT]]
 
 
 def _randn_array(xp: ModuleType, shape: tuple[int, ...]) -> Array:
@@ -129,20 +129,20 @@ def _canonicalize_2d_entries(values: Array) -> Array:
     return values[None, None, None, None, :, :]
 
 
-def _build_uniform_frequencies(xp: ModuleType) -> Array:
-    return xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64)
+def _build_uniform_frequencies(xp: ModuleType):
+    return linspace_from_array(xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64))
 
 
 def _build_frequencies(xp: ModuleType) -> Array:
     return xp.asarray([1.0, 2.0, 4.0], dtype=xp.float64)
 
 
-def _build_wdm_axes(xp: ModuleType) -> tuple[Array, Array]:
+def _build_wdm_axes(xp: ModuleType):
     nt, nf = 20, 16
     dt = 0.12891289
     df = 1.0 / (2.0 * dt)
-    times = xp.asarray(dt * np.arange(nt), dtype=xp.float64)
-    frequencies = xp.asarray(df * np.arange(nf), dtype=xp.float64)
+    times = linspace_from_array(xp.asarray(dt * np.arange(nt), dtype=xp.float64))
+    frequencies = linspace_from_array(xp.asarray(df * np.arange(nf), dtype=xp.float64))
     return times, frequencies
 
 
@@ -218,9 +218,9 @@ def build_canonical_representations(
     n_features: int,
     len_time: int,
     len_freq: int,
-) -> CanonicalRepresentationsResult:
-    freqs = xp.linspace(0, 1, len_freq)
-    times = xp.linspace(0, 10, len_time)
+) -> CanonicalRepresentationsResult[Linspace]:
+    freqs = linspace_from_array(xp.linspace(0, 1, len_freq))
+    times = linspace_from_array(xp.linspace(0, 10, len_time))
 
     entries_fs = _randn_array(
         xp,
@@ -255,7 +255,7 @@ def build_freq_series(
     xp: ModuleType,
     *,
     uniform: bool = True,
-) -> FrequencySeriesBuildResult:
+) -> FrequencySeriesBuildResult[Axis]:
     frequencies = _build_uniform_frequencies(xp) if uniform else _build_frequencies(xp)
     _entries = _build_complex_entries(
         xp,
@@ -283,7 +283,7 @@ def build_wdm(xp: ModuleType) -> WDM[Grid2DCartesian[Linspace, Linspace]]:
     return WDM.make(times=times, frequencies=frequencies, entries=entries)
 
 
-def build_fd_pair(xp: ModuleType) -> FdPairResult:
+def build_fd_pair(xp: ModuleType) -> FdPairResult[Linspace]:
     frequencies = _build_uniform_frequencies(xp)
     left_x = _build_complex_entries(xp, [1.0 + 1.0j, 2.0 - 1.0j, -1.0 + 0.5j])
     left_y = _build_complex_entries(xp, [0.5 - 0.25j, -1.0j, 2.0 + 0.0j])
@@ -304,11 +304,13 @@ def build_fd_pair(xp: ModuleType) -> FdPairResult:
     }
 
 
-def build_wdm_pair(xp: ModuleType) -> WdmPairResult:
+def build_wdm_pair(xp: ModuleType) -> WdmPairResult[Linspace]:
     times, frequencies = _build_wdm_axes(xp)
     nt, nf = len(times), len(frequencies)
 
-    left_x = _canonicalize_2d_entries(xp.outer(xp.cos(frequencies), xp.sin(times)))
+    left_x = _canonicalize_2d_entries(
+        xp.outer(xp.cos(frequencies.asarray(xp)), xp.sin(times.asarray(xp)))
+    )
     left_y = _canonicalize_2d_entries(xp.ones((nf, nt), dtype=xp.float64))
     right_x = left_x
     right_y = left_y
@@ -328,7 +330,7 @@ def build_wdm_pair(xp: ModuleType) -> WdmPairResult:
     }
 
 
-def build_fd_pair_batched_2x2(xp: ModuleType) -> FdPairResult:
+def build_fd_pair_batched_2x2(xp: ModuleType) -> FdPairResult[Linspace]:
     base = build_fd_pair(xp)
     frequencies = base["frequencies"]
 
@@ -379,7 +381,7 @@ def build_fd_pair_batched_2x2(xp: ModuleType) -> FdPairResult:
     }
 
 
-def build_wdm_pair_batched_2x2(xp: ModuleType) -> WdmPairResult:
+def build_wdm_pair_batched_2x2(xp: ModuleType) -> WdmPairResult[Linspace]:
     base = build_wdm_pair(xp)
     times = base["times"]
     frequencies = base["frequencies"]
@@ -956,11 +958,11 @@ def build_fake_harmonic_projected_waveform() -> tuple[
     return build_harmonic_projected_phasor_waveform()
 
 
-def _make_fs(
+def _make_fs[AT: Axis](
     xp: ModuleType,
-    frequencies: Axis,
+    frequencies: AT,
     values: Sequence[float | complex],
-) -> reps.FrequencySeries[Axis]:
+) -> reps.FrequencySeries[AT]:
     entries = xp.asarray(values, dtype=xp.complex128)[None, None, None, None, :]
     return reps.FrequencySeries((frequencies,), entries)
 
@@ -991,7 +993,7 @@ def build_harmonic_waveform_frequency_series(
 
 def build_harmonic_projected_frequency_waveform(
     xp: ModuleType,
-) -> HarmonicProjectedFrequencyWaveformResult:
+) -> HarmonicProjectedFrequencyWaveformResult[Linspace]:
     frequencies = xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64)
     _freqs = linspace_from_array(frequencies)
 
