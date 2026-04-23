@@ -1,22 +1,12 @@
 """Tests for noise models with NumPy arrays."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.testing as npt
 import pytest
 
-from tests._helpers import (
-    build_fd_pair,
-    build_fd_pair_batched_2x2,
-    build_fdata,
-    build_wdm_pair,
-    build_wdm_pair_batched_2x2,
-    dense_esdm_2ch,
-    dense_kernel_2ch,
-    diagonal_kernel_2ch,
-)
 from typed_lisa_toolkit import (
     frequency_series,
     fsdata,
@@ -33,6 +23,18 @@ from typed_lisa_toolkit.types import (
 )
 from typed_lisa_toolkit.types.noisemodel import _make_integration_policy
 
+if TYPE_CHECKING:
+    from conftest import (
+        build_fd_pair,
+        build_fd_pair_batched_2x2,
+        build_fdata,
+        build_wdm_pair,
+        build_wdm_pair_batched_2x2,
+        dense_esdm_2ch,
+        dense_kernel_2ch,
+        diagonal_kernel_2ch,
+    )
+
 
 class _FlatFDNoise:
     def psd(self, frequencies, option):
@@ -40,7 +42,7 @@ class _FlatFDNoise:
         return np.ones_like(frequencies)
 
 
-class TestSpectralDensity(unittest.TestCase):
+class TestSpectralDensity:
     def test_to_subband_slices_frequency_axis(self):
         case = build_fdata(np)
         sdm = SpectralDensity(
@@ -103,7 +105,7 @@ class TestSpectralDensity(unittest.TestCase):
         npt.assert_allclose(kernel[:, 1, 1], np.ones(3))
 
 
-class TestFDNoiseModel(unittest.TestCase):
+class TestFDNoiseModel:
     def test_make_integration_policy_numpy(self):
         ip = _make_integration_policy(np)
         y = np.array([0.0, 1.0, 2.0])
@@ -281,7 +283,7 @@ class TestFDNoiseModel(unittest.TestCase):
             model.get_cross_correlation(fs, fs)
 
 
-class TestEvolutionarySpectralDensity(unittest.TestCase):
+class TestEvolutionarySpectralDensity:
     def test_is_valid_sdm_returns_false_without_raising(self):
         assert not EvolutionarySpectralDensity.is_valid_sdm(
             np.eye(2), channel_order=["X", "Y"]
@@ -357,7 +359,7 @@ class TestEvolutionarySpectralDensity(unittest.TestCase):
             esd.get_whitening_matrix(kind="qr")
 
 
-class TestTFNoiseModel(unittest.TestCase):
+class TestTFNoiseModel:
     def test_scalar_product_with_identity_esdm(self):
         case = build_wdm_pair(np)
         invevsdm = np.broadcast_to(
@@ -454,7 +456,7 @@ class TestTFNoiseModel(unittest.TestCase):
         npt.assert_allclose(got, expected, rtol=1e-12, atol=1e-12)
 
 
-class TestNoiseModelFactoriesNumpy(unittest.TestCase):
+class TestNoiseModelFactoriesNumpy:
     def test_make_sdm_builds_dense_diagonal_and_evolutionary_variants(self):
         frequencies = np.array([0.5, 1.0, 1.5], dtype=float)
         times = np.array([0.0, 1.0], dtype=float)

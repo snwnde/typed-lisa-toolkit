@@ -1,18 +1,11 @@
 """Tests for likelihood computations with JAX arrays."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
-
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
 
-from tests._helpers import (
-    build_fd_pair,
-    build_harmonic_projected_frequency_waveform,
-    dense_kernel_2ch,
-)
 from typed_lisa_toolkit import (
     frequency_series,
     fsdata,
@@ -38,12 +31,16 @@ def _build_fsdata(freqs, x_values, y_values):
     )
 
 
-class TestFDWhittleLikelihoodJAX(unittest.TestCase):
+class TestFDWhittleLikelihoodJAX:
     def test_classmethod_formulas(self):
         assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0
         assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0
 
-    def test_cross_product_and_template_square_match_noise_model(self):
+    def test_cross_product_and_template_square_match_noise_model(
+        self,
+        build_fd_pair,
+        dense_kernel_2ch,
+    ):
         case = build_fd_pair(jnp)
         sdm = make_sdm(
             dense_kernel_2ch(jnp),
@@ -65,7 +62,7 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
             np.asarray(model.reset().get_scalar_product(case["right"], case["right"])),
         )
 
-    def test_log_likelihood_matches_closed_form(self):
+    def test_log_likelihood_matches_closed_form(self, build_fd_pair, dense_kernel_2ch):
         case = build_fd_pair(jnp)
         sdm = make_sdm(
             dense_kernel_2ch(jnp),
@@ -86,7 +83,11 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
 
         npt.assert_allclose(got, expected)
 
-    def test_harmonic_projected_template_is_summed_before_evaluation(self):
+    def test_harmonic_projected_template_is_summed_before_evaluation(
+        self,
+        build_harmonic_projected_frequency_waveform,
+        dense_kernel_2ch,
+    ):
         case = build_harmonic_projected_frequency_waveform(jnp)
         data = fsdata(sum_harmonics(case["wf"]))
         sdm = make_sdm(
@@ -140,7 +141,11 @@ class TestFDWhittleLikelihoodJAX(unittest.TestCase):
 
         npt.assert_allclose(got, expected)
 
-    def test_whittle_factory_returns_fd_whittle_likelihood(self):
+    def test_whittle_factory_returns_fd_whittle_likelihood(
+        self,
+        build_fd_pair,
+        dense_kernel_2ch,
+    ):
         case = build_fd_pair(jnp)
         model = noise_model(
             make_sdm(

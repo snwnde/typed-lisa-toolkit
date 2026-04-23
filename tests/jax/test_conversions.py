@@ -1,7 +1,5 @@
 """Unit tests for shop/conversions.py (JAX backend)."""
 
-import unittest
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -61,7 +59,7 @@ def _build_xyz_evolutionary_spectral_density_jax() -> EvolutionarySpectralDensit
     )
 
 
-class TestConversionsJax(unittest.TestCase):
+class TestConversionsJax:
     def test_xyz_aet_roundtrip_tsdata(self):
         xyz = _build_xyz_tsdata_jax()
 
@@ -108,7 +106,7 @@ class TestConversionsJax(unittest.TestCase):
     def test_xyz2aet_with_xyz_and_xyz_components_raises(self):
         xyz = _build_xyz_tsdata_jax()
         with pytest.raises(ValueError, match="Cannot specify both xyz and X, Y, Z"):
-            shop.xyz2aet(
+            shop.xyz2aet(  # pyright: ignore[reportCallIssue]
                 xyz,
                 X=jnp.array([1.0], dtype=jnp.float64),
                 Y=jnp.array([2.0], dtype=jnp.float64),
@@ -118,7 +116,7 @@ class TestConversionsJax(unittest.TestCase):
     def test_aet2xyz_with_aet_and_aet_components_raises(self):
         aet = shop.xyz2aet(_build_xyz_tsdata_jax())
         with pytest.raises(ValueError, match="Cannot specify both aet and A, E, T"):
-            shop.aet2xyz(
+            shop.aet2xyz(  # pyright: ignore[reportCallIssue]
                 aet,
                 A=jnp.array([1.0], dtype=jnp.float64),
                 E=jnp.array([2.0], dtype=jnp.float64),
@@ -129,13 +127,13 @@ class TestConversionsJax(unittest.TestCase):
         with pytest.raises(
             ValueError, match="Must specify either xyz or all of X, Y, Z"
         ):
-            shop.xyz2aet()
+            shop.xyz2aet()  # pyright: ignore[reportCallIssue]
 
     def test_aet2xyz_without_inputs_raises(self):
         with pytest.raises(
             ValueError, match="Must specify either aet or all of A, E, T"
         ):
-            shop.aet2xyz()
+            shop.aet2xyz()  # pyright: ignore[reportCallIssue]
 
     def test_xyz2aet_keyword_components_path(self):
         x = jnp.array([0.0, 1.0, 2.0], dtype=jnp.float64)
@@ -156,7 +154,7 @@ class TestConversionsJax(unittest.TestCase):
             "Z": jnp.array([-1.0, 4.0], dtype=jnp.float64),
         }
         with pytest.raises(TypeError, match="got dict"):
-            shop.xyz2aet(bad_mapping)
+            shop.xyz2aet(bad_mapping)  # pyright: ignore[reportCallIssue, reportArgumentType]
 
     def test_spectral_density_channel_order_assertions(self):
         freqs = jnp.array([0.25, 0.5], dtype=jnp.float64)
@@ -182,7 +180,3 @@ class TestConversionsJax(unittest.TestCase):
             ValueError, match="Expected last dimension of input array to be"
         ):
             shop.aet2xyz(wrong_shape)
-
-
-if __name__ == "__main__":
-    unittest.main()

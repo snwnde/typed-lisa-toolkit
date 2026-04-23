@@ -9,7 +9,7 @@ All tests should pass with JAX arrays.
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import contextlib
-import unittest
+from typing import TYPE_CHECKING
 
 import jax
 import jax.numpy as jnp
@@ -17,13 +17,6 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from tests._helpers import (
-    AdvancedRepresentationMethodsMixin,
-    HelperFunctionsMixin,
-    LinspaceExtraPropertiesMixin,
-    WDMPropertiesAndMethodsMixin,
-    build_canonical_representations,
-)
 from typed_lisa_toolkit import (
     build_grid2d,
     frequency_series,
@@ -46,16 +39,21 @@ from typed_lisa_toolkit.types.representations import (
     _take_subset,
 )
 
+if TYPE_CHECKING:
+    from conftest import (
+        build_canonical_representations,
+    )
+
 jax.config.update("jax_enable_x64", val=True)
 
 SEED = 11324214
 rng = np.random.default_rng(SEED)
 
 
-class TestCanonicalShapeJAX(unittest.TestCase):
+class TestCanonicalShapeJAX:
     """Test semantic benefits of canonical shape with JAX: (n_batches, n_channels, n_harmonics, n_features, *grid_dims)."""  # noqa: E501
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures with JAX arrays."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -262,10 +260,10 @@ class TestCanonicalShapeJAX(unittest.TestCase):
         assert semantic_slice_fs.shape[1] == 1  # single channel
 
 
-class TestSubsetOperationsJAX(unittest.TestCase):
+class TestSubsetOperationsJAX:
     """Test subset operations with canonical shapes using JAX."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for subset operation tests with JAX arrays."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -534,7 +532,7 @@ class TestSubsetOperationsJAX(unittest.TestCase):
         assert tf_sub.entries.shape[5] == 100  # time dimension preserved
 
 
-class TestEmbedOperationsJAX(unittest.TestCase):
+class TestEmbedOperationsJAX:
     """Test embedding operations with canonical shapes using JAX."""
 
     def test_extend_to_canonical_shape(self):
@@ -627,10 +625,10 @@ class TestEmbedOperationsJAX(unittest.TestCase):
         assert ts_large.entries.shape == (2, 1, 1, 1, 100)
 
 
-class TestArithmeticOperationsJAX(unittest.TestCase):
+class TestArithmeticOperationsJAX:
     """Test arithmetic operations with canonical shapes using JAX."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for arithmetic operation tests with JAX arrays."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1030,10 +1028,10 @@ class TestArithmeticOperationsJAX(unittest.TestCase):
         assert tf_scaled.entries.shape[4:] == (100, 50)
 
 
-class TestPropertiesAndAliasesJAX(unittest.TestCase):
+class TestPropertiesAndAliasesJAX:
     """Test property access like df, dt, resolution with JAX arrays."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for property access tests with JAX."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1152,10 +1150,10 @@ class TestPropertiesAndAliasesJAX(unittest.TestCase):
         )
 
 
-class TestGridTupleHandlingJAX(unittest.TestCase):
+class TestGridTupleHandlingJAX:
     """Test that grids are always tuples with JAX arrays."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for grid tuple handling tests with JAX."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1242,10 +1240,10 @@ class TestGridTupleHandlingJAX(unittest.TestCase):
         )
 
 
-class TestEdgeCasesJAX(unittest.TestCase):
+class TestEdgeCasesJAX:
     """Test edge cases with JAX arrays."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for edge case tests with JAX."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1358,7 +1356,7 @@ class TestEdgeCasesJAX(unittest.TestCase):
         )
 
 
-class TestLinspaceJAX(unittest.TestCase):
+class TestLinspaceJAX:
     """Test Linspace utility class with JAX compatibility."""
 
     def make_array(self, start, step, num):
@@ -1425,10 +1423,10 @@ class TestLinspaceJAX(unittest.TestCase):
             assert Linspace.get_step(ar) == step
 
 
-class TestComplexPropertiesJAX(unittest.TestCase):
+class TestComplexPropertiesJAX:
     """Test complex number handling with JAX arrays."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for complex property tests with JAX."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1554,10 +1552,10 @@ class TestComplexPropertiesJAX(unittest.TestCase):
 # It's a design choice to not validate shape on construction,
 # so some tests are commented out.
 # If strict validation is added, they should be re-enabled.
-class TestErrorHandlingJAX(unittest.TestCase):
+class TestErrorHandlingJAX:
     """Test error handling and validation for invalid operations with JAX."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for error handling tests."""
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.freqs_short = jnp.linspace(0, 1, 50)
@@ -1675,26 +1673,63 @@ class TestErrorHandlingJAX(unittest.TestCase):
             pass
 
 
-class TestLinspaceExtraPropertiesJAX(LinspaceExtraPropertiesMixin, unittest.TestCase):
-    """Linspace edge-case tests (shared via mixin)."""
+class TestLinspaceExtraPropertiesJAX:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_shape_property",
+            "test_stop_property",
+            "test_eq_raises_for_non_linspacelike",
+            "test_eq_returns_false_for_step_mismatch",
+            "test_array_with_copy_false",
+            "test_getitem_invalid_type_raises",
+            "test_make_from_linspace_like",
+        ],
+    )
+    def test_linspace_helpers(self, linspace_helpers, method_name):
+        getattr(linspace_helpers, method_name)()
 
 
-class TestHelperFunctionsJAX(HelperFunctionsMixin, unittest.TestCase):
-    """Module-level helper function tests (shared via mixin)."""
+class TestHelperFunctionsJAX:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_check_entry_grid_compatibility_raises_on_mismatch",
+            "test_take_subset_slice_dimension_mismatch_raises",
+            "test_take_subset_with_array_grid",
+            "test_non_uniform_grid_stays_array",
+            "test_axis_onset_and_end_from_plain_arrays",
+        ],
+    )
+    def test_helper_functions(self, representation_helpers, method_name):
+        getattr(representation_helpers, method_name)(jnp)
 
-    xp = jnp
+
+class TestAdvancedRepresentationMethodsJAX:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_frequency_series_get_time_shifted",
+            "test_frequency_series_angle",
+            "test_stft_make_classmethod",
+            "test_stft_times_and_frequencies_properties",
+            "test_series_repr_and_grid_shape",
+        ],
+    )
+    def test_advanced_representation_methods(
+        self, advanced_representation_helpers, method_name
+    ):
+        method = getattr(advanced_representation_helpers, method_name)
+        if method_name in {
+            "test_stft_make_classmethod",
+            "test_stft_times_and_frequencies_properties",
+        }:
+            method()
+            return
+        method(jnp)
 
 
-class TestAdvancedRepresentationMethodsJAX(
-    AdvancedRepresentationMethodsMixin,
-    unittest.TestCase,
-):
-    """FrequencySeries/TimeSeries/STFT method tests (shared via mixin)."""
-
-    xp = jnp
-
-
-class TestArithmeticAddMethodsJAX(unittest.TestCase):
+class TestArithmeticAddMethodsJAX:
     def test_iadd_method(self):
         large_freqs = Linspace(0.0, 0.01, 100)
         small_freqs = Linspace(0.30, 0.01, 30)
@@ -1779,8 +1814,8 @@ class TestArithmeticAddMethodsJAX(unittest.TestCase):
         npt.assert_allclose(np.asarray(fs.entries), before)
 
 
-class TestPhasorJAX(unittest.TestCase):
-    def setUp(self):
+class TestPhasorJAX:
+    def setup_method(self):
         self.freqs = jnp.linspace(1e-4, 1e-2, 20, dtype=jnp.float64)
         self.amps = jnp.ones(20, dtype=jnp.complex128)[None, None, None, None, :]
         self.phases = jnp.linspace(0, jnp.pi, 20, dtype=jnp.float64)[
@@ -1889,20 +1924,23 @@ class TestPhasorJAX(unittest.TestCase):
         assert len(np.asarray(interpolated.frequencies)) == 8
 
 
-class TestWDMPropertiesAndMethodsJAX(WDMPropertiesAndMethodsMixin, unittest.TestCase):
-    """WDM property/method tests (shared via mixin)."""
+class TestWDMPropertiesAndMethodsJAX:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_nd_duration_sample_interval",
+            "test_df_shape_sample_rate_nyquist",
+            "test_is_critically_sampled",
+            "test_get_subset_time",
+            "test_get_subset_freq",
+        ],
+    )
+    def test_wdm_helpers(self, wdm_helpers, build_wdm_pair, method_name):
+        wdm = build_wdm_pair(jnp)["left"]["X"]
+        getattr(wdm_helpers, method_name)(wdm)
 
-    def setUp(self):
-        self.wdm = build_canonical_wdm_jax()
 
-
-def build_canonical_wdm_jax():
-    from tests._helpers import build_wdm_pair
-
-    return build_wdm_pair(jnp)["left"]["X"]
-
-
-class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
+class TestSparse2DGridRepresentationsJAX:
     """Coverage tests for sparse-grid code paths in representations with JAX arrays."""
 
     def test_embed_entries_to_grid_2d_sparse_with_known_slices(self):
@@ -2007,7 +2045,7 @@ class TestSparse2DGridRepresentationsJAX(unittest.TestCase):
         npt.assert_array_equal(np.asarray(new_entries), np.asarray(source_entries))
 
 
-class TestRepresentationErrorBranchesJAX(unittest.TestCase):
+class TestRepresentationErrorBranchesJAX:
     def test_get_subset_slice_rejects_interval_and_slice_together(self):
         grid = jnp.linspace(0.0, 1.0, 11, dtype=jnp.float64)
         with pytest.raises(ValueError, match=r".+"):

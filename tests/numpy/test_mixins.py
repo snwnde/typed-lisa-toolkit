@@ -1,7 +1,6 @@
 # pyright: reportPrivateUsage=false
 
 import operator
-import unittest
 
 import numpy as np
 
@@ -38,7 +37,7 @@ class _Probe(NDArrayMixin):
         return _Probe()
 
 
-class TestNDArrayMixinDelegates(unittest.TestCase):
+class TestNDArrayMixinDelegates:
     def test_xp_property(self):
         probe = _Probe()
         assert probe.xp is np

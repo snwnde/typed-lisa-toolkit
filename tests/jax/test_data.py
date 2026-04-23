@@ -2,8 +2,8 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import tempfile
-import unittest
 import warnings
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import h5py
@@ -13,13 +13,6 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from tests._helpers import (
-    DataAbstractBranchesMixin,
-    build_fd_pair,
-    build_fdata,
-    build_harmonic_projected_frequency_waveform,
-    build_wdm_pair,
-)
 from typed_lisa_toolkit import (
     construct_fsdata,
     construct_stftdata,
@@ -46,6 +39,15 @@ from typed_lisa_toolkit.types import (
 )
 from typed_lisa_toolkit.types.data import load_mojito
 
+if TYPE_CHECKING:
+    from conftest import (
+        build_fd_pair,
+        build_fdata,
+        build_harmonic_projected_frequency_waveform,
+        build_wdm_pair,
+    )
+
+
 jax.config.update("jax_enable_x64", val=True)
 
 
@@ -62,27 +64,27 @@ def _build_tsdata_jax():
     return times, data
 
 
-class TestDataContainersJAX(unittest.TestCase):
+class TestDataContainersJAX:
     def _assert_construct_tsdata_deprecation(self, **kwargs):
-        with self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"):
+        with pytest.warns(DeprecationWarning, match=r"construct_tsdata"):
             return construct_tsdata(**kwargs)
 
     def _assert_construct_fsdata_deprecation(self, **kwargs):
-        with self.assertWarnsRegex(DeprecationWarning, r"construct_fsdata"):
+        with pytest.warns(DeprecationWarning, match=r"construct_fsdata"):
             return construct_fsdata(**kwargs)
 
     def _assert_construct_stftdata_deprecation(self, **kwargs):
-        with self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"):
+        with pytest.warns(DeprecationWarning, match=r"construct_stftdata"):
             return construct_stftdata(**kwargs)
 
     def _assert_construct_wdmdata_deprecation(self, **kwargs):
-        with self.assertWarnsRegex(DeprecationWarning, r"construct_wdmdata"):
+        with pytest.warns(DeprecationWarning, match=r"construct_wdmdata"):
             return construct_wdmdata(**kwargs)
 
     def _assert_to_fsdata_deprecation(self, tsdata: TSData, *, keep_times: bool):
-        with self.assertWarnsRegex(
+        with pytest.warns(
             DeprecationWarning,
-            r"The 'to_fsdata' method is deprecated",
+            match=r"The 'to_fsdata' method is deprecated",
         ):
             return tsdata.to_fsdata(keep_times=keep_times)
 
@@ -91,9 +93,9 @@ class TestDataContainersJAX(unittest.TestCase):
         fs_like: FSData | TimedFSData,
         times: np.ndarray | None = None,
     ):
-        with self.assertWarnsRegex(
+        with pytest.warns(  # noqa: PT031
             DeprecationWarning,
-            r"The 'to_tsdata' method is deprecated",
+            match=r"The 'to_tsdata' method is deprecated",
         ):
             if times is None:
                 return fs_like.to_tsdata()
@@ -440,9 +442,9 @@ class TestDataContainersJAX(unittest.TestCase):
                 f.attrs["type"] = "UnknownData"
             with (
                 pytest.raises(ValueError, match=r".+"),
-                self.assertWarnsRegex(
+                pytest.warns(
                     DeprecationWarning,
-                    "load_data",
+                    match="load_data",
                 ),
             ):
                 load_data(handle.name, legacy=True)
@@ -687,7 +689,7 @@ class TestDataContainersJAX(unittest.TestCase):
 
         with (
             pytest.raises(ValueError, match="grid axes must be uniform"),
-            self.assertWarnsRegex(DeprecationWarning, r"construct_tsdata"),
+            pytest.warns(DeprecationWarning, match=r"construct_tsdata"),
         ):
             _ = construct_tsdata(
                 times=times,
@@ -697,7 +699,7 @@ class TestDataContainersJAX(unittest.TestCase):
 
         with (
             pytest.raises(ValueError, match="grid axes must be uniform"),
-            self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"),
+            pytest.warns(DeprecationWarning, match=r"construct_stftdata"),
         ):
             _ = construct_stftdata(
                 frequencies=freqs,
@@ -718,9 +720,9 @@ class TestDataContainersJAX(unittest.TestCase):
                     grp.create_dataset("grid", data=freqs)
                     grp.create_dataset("entries", data=values)
 
-            with self.assertWarnsRegex(
+            with pytest.warns(
                 DeprecationWarning,
-                r"The 'load' method is deprecated",
+                match=r"The 'load' method is deprecated",
             ):
                 loaded = FSData.load(handle.name, legacy=True)
 
@@ -755,17 +757,18 @@ class TestDataContainersJAX(unittest.TestCase):
         assert np.asarray(loaded.get_kernel()).shape[-1] == len(t)
 
 
-class TestDataInternalAbstractBranchesJAX(DataAbstractBranchesMixin, unittest.TestCase):
-    """Abstract/NotImplementedError branch tests (shared via mixin)."""
+class TestDataInternalAbstractBranchesJAX:
+    def test_data_base_get_plotter_notimplemented(self, data_abstract_branch_helpers):
+        data_abstract_branch_helpers.test_data_base_get_plotter_notimplemented()
 
 
-class TestDataLoadValidationBranchesJAX(unittest.TestCase):
+class TestDataLoadValidationBranchesJAX:
     def test_load_data_warns_when_domain_not_provided(self):
         _, tsdata = _build_tsdata_jax()
 
         with tempfile.NamedTemporaryFile(suffix=".h5") as handle:
             tsdata.save(handle.name)
-            with self.assertWarns(FutureWarning):
+            with pytest.warns(FutureWarning):
                 loaded = load_data(handle.name, kind=None)
 
         assert isinstance(loaded, TSData)
@@ -780,9 +783,9 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
 
     def test_load_data_kind_mismatch_raises(self):
         _, tsdata = _build_tsdata_jax()
-        with self.assertWarnsRegex(
+        with pytest.warns(
             DeprecationWarning,
-            r"The 'to_fsdata' method is deprecated",
+            match=r"The 'to_fsdata' method is deprecated",
         ):
             fsd = tsdata.to_fsdata(keep_times=False)
 
@@ -805,7 +808,7 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
         sparse_indices = np.array([[0, 0], [1, 2], [2, 4]], dtype=int)
 
         stft_entries = jnp.ones((1, 2, 1, 1, len(sparse_indices)), dtype=jnp.float64)
-        with self.assertWarnsRegex(DeprecationWarning, r"construct_stftdata"):
+        with pytest.warns(DeprecationWarning, match=r"construct_stftdata"):
             stft_data = construct_stftdata(
                 frequencies=freqs,
                 times=times,
@@ -830,7 +833,7 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
         )
 
         wdm_entries = jnp.ones((1, 2, 1, 1, len(freqs), len(times)), dtype=jnp.float64)
-        with self.assertWarnsRegex(DeprecationWarning, r"construct_wdmdata"):
+        with pytest.warns(DeprecationWarning, match=r"construct_wdmdata"):
             wdm_data = construct_wdmdata(
                 frequencies=freqs,
                 times=times,
@@ -855,16 +858,16 @@ class TestDataLoadValidationBranchesJAX(unittest.TestCase):
 
     def test_timedfsdata_to_tsdata_ignores_explicit_times_argument(self):
         times, tsdata = _build_tsdata_jax()
-        with self.assertWarnsRegex(
+        with pytest.warns(
             DeprecationWarning,
-            r"The 'to_fsdata' method is deprecated",
+            match=r"The 'to_fsdata' method is deprecated",
         ):
             timed = tsdata.to_fsdata(keep_times=True)
         alt_times = np.linspace(100.0, 103.5, len(times))
 
-        with self.assertWarnsRegex(
+        with pytest.warns(
             DeprecationWarning,
-            r"The 'to_tsdata' method is deprecated",
+            match=r"The 'to_tsdata' method is deprecated",
         ):
             recovered = timed.to_tsdata(alt_times)
 

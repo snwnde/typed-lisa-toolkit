@@ -1,14 +1,12 @@
 """Unit tests for utils.py (NumPy backend)."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
-
 import numpy as np
 
 from typed_lisa_toolkit import utils
 
 
-class TestUtilsNumpy(unittest.TestCase):
+class TestUtilsNumpy:
     def test_get_subset_slice_basic(self):
         arr = np.arange(10)
         # Should select indices 2 through 6 (inclusive of 2, exclusive of 7)

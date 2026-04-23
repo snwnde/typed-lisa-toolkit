@@ -1,7 +1,5 @@
 """Tests for top-level public API re-exports."""
 
-import unittest
-
 import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
     cast_mode,
@@ -46,7 +44,7 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import FrequencySeries, TSData
 
 
-class TestPublicApi(unittest.TestCase):
+class TestPublicApi:
     def test_module_reexports_are_available(self):
         assert tlt.types is not None
         assert tlt.shop is not None
@@ -150,7 +148,3 @@ class TestPublicApi(unittest.TestCase):
             "whittle",
         ):
             assert name in tlt.__all__
-
-
-if __name__ == "__main__":
-    unittest.main()

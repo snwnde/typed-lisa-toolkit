@@ -1,21 +1,13 @@
 """Tests for waveform containers with NumPy arrays."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import numpy.testing as npt
 import pytest
 
-from tests._helpers import (
-    build_harmonic_projected_frequency_waveform,
-    build_harmonic_projected_phasor_waveform,
-    build_harmonic_waveform_frequency_series,
-    make_mock_phasor,
-    make_valid_mock_representation,
-)
 from typed_lisa_toolkit import (
     densify_phasor,
     densify_phasor_hpw,
@@ -37,8 +29,17 @@ from typed_lisa_toolkit import (
 )
 from typed_lisa_toolkit.types import modes
 
+if TYPE_CHECKING:
+    from conftest import (
+        build_harmonic_projected_frequency_waveform,
+        build_harmonic_projected_phasor_waveform,
+        build_harmonic_waveform_frequency_series,
+        make_mock_phasor,
+        make_valid_mock_representation,
+    )
 
-class TestHarmonicWaveformNumpy(unittest.TestCase):
+
+class TestHarmonicWaveformNumpy:
     def test_constructor_normalizes_tuple_mode_keys(self):
         case = build_harmonic_waveform_frequency_series(np)
         wf = harmonic_waveform(
@@ -90,7 +91,7 @@ class TestHarmonicWaveformNumpy(unittest.TestCase):
         assert xp.__name__ == "array_api_compat.numpy"
 
 
-class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
+class TestHarmonicProjectedWaveformNumpy:
     def test_homogeneous_properties_and_kernel_shape(self):
         case = build_harmonic_projected_frequency_waveform(np)
         wf = case["wf"]
@@ -175,7 +176,7 @@ class TestHarmonicProjectedWaveformNumpy(unittest.TestCase):
             _ = left + mismatched
 
 
-class TestDenseMakerNumpy(unittest.TestCase):
+class TestDenseMakerNumpy:
     @staticmethod
     def _identity_mapping(d: dict[str, Any]) -> dict[str, Any]:
         # Replaces ProjectedWaveform.from_dict so the test never touches the real
@@ -283,7 +284,7 @@ class TestDenseMakerNumpy(unittest.TestCase):
                 assert out[harmonic][channel] is embedded
 
 
-class TestDensifyHelpersNumpy(unittest.TestCase):
+class TestDensifyHelpersNumpy:
     def test_densify_phasor_embed_false(self):
         frequencies = np.array([0.5, 1.0, 2.0, 3.0, 4.0])
         interpolator = MagicMock(name="interpolator")
@@ -377,7 +378,7 @@ class TestDensifyHelpersNumpy(unittest.TestCase):
                 assert out[mode][channel] is interpolated
 
 
-class TestCombineHelpersNumpy(unittest.TestCase):
+class TestCombineHelpersNumpy:
     def test_phasor_to_fs_hw_converts_each_mode(self):
         mode_22 = modes.Harmonic(2, 2)
         mode_33 = modes.Harmonic(3, 3)
@@ -441,7 +442,7 @@ class TestCombineHelpersNumpy(unittest.TestCase):
                 assert out[mode][channel] is expected[mode][channel]
 
 
-class TestWaveformConstructorsNumpy(unittest.TestCase):
+class TestWaveformConstructorsNumpy:
     def test_constructor_aliases(self):
         assert hw is harmonic_waveform
         assert pw is projected_waveform

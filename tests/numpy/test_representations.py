@@ -2,22 +2,14 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 import contextlib
-import unittest
 
 import numpy as np
 import numpy.testing as npt
 import pytest
 from l2d_interface.validators import (
-    validate_representation,  # type: ignore[import-untyped]
+    validate_representation,
 )
 
-from tests._helpers import (
-    AdvancedRepresentationMethodsMixin,
-    HelperFunctionsMixin,
-    LinspaceExtraPropertiesMixin,
-    WDMPropertiesAndMethodsMixin,
-    build_canonical_representations,
-)
 from typed_lisa_toolkit import (
     build_grid2d,
     frequency_series,
@@ -46,10 +38,10 @@ SEED = 11324214
 rng = np.random.default_rng(SEED)
 
 
-class TestCanonicalShape(unittest.TestCase):
+class TestCanonicalShape:
     """Test semantic benefits of canonical shape: (n_batches, n_channels, n_harmonics, n_features, *grid_dims)."""  # noqa: E501
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for canonical shape tests."""
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
         self.len_time, self.len_freq = 100, 50
@@ -294,10 +286,10 @@ class TestL2DContractNumpy(TestCanonicalShape):
         assert semantic_slice_fs.shape[1] == 1  # single channel
 
 
-class TestSubsetOperations(unittest.TestCase):
+class TestSubsetOperations:
     """Test subset operations with canonical shapes."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for subset operation tests."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -537,7 +529,7 @@ class TestSubsetOperations(unittest.TestCase):
         )
 
 
-class TestEmbedOperations(unittest.TestCase):
+class TestEmbedOperations:
     """Test embedding operations with canonical shapes."""
 
     def test_extend_to_canonical_shape(self):
@@ -634,10 +626,10 @@ class TestEmbedOperations(unittest.TestCase):
         assert ts_large.entries.shape == (2, 1, 1, 1, 100)
 
 
-class TestArithmeticOperations(unittest.TestCase):
+class TestArithmeticOperations:
     """Test arithmetic operations with canonical shapes."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for arithmetic operation tests."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1012,7 +1004,7 @@ class TestArithmeticOperations(unittest.TestCase):
         assert tf_scaled.entries.shape[4:] == (50, 100)
 
 
-class TestLinspace(unittest.TestCase):
+class TestLinspace:
     """Test Linspace utility class."""
 
     def make_array(self, start, step, num):
@@ -1095,10 +1087,10 @@ class TestLinspace(unittest.TestCase):
             assert Linspace.get_step(ar) == step
 
 
-class TestComplexProperties(unittest.TestCase):
+class TestComplexProperties:
     """Test complex number handling and properties."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for complex property tests."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1212,10 +1204,10 @@ class TestComplexProperties(unittest.TestCase):
         )
 
 
-class TestPropertiesAndAliases(unittest.TestCase):
+class TestPropertiesAndAliases:
     """Test property access like df, dt, resolution."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for property access tests."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1326,10 +1318,10 @@ class TestPropertiesAndAliases(unittest.TestCase):
         )
 
 
-class TestGridTupleHandling(unittest.TestCase):
+class TestGridTupleHandling:
     """Test that grids are always tuples, even for 1D."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for grid tuple handling tests."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1411,10 +1403,10 @@ class TestGridTupleHandling(unittest.TestCase):
         )
 
 
-class TestEdgeCases(unittest.TestCase):
+class TestEdgeCases:
     """Test edge cases and error handling."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for edge case tests."""
         # Canonical shape dimensions
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = 2, 1, 1, 1
@@ -1516,10 +1508,10 @@ class TestEdgeCases(unittest.TestCase):
 # It's a design choice to not validate shape on construction,
 # so some tests are commented out.
 # If strict validation is added, they should be re-enabled.
-class TestErrorHandling(unittest.TestCase):
+class TestErrorHandling:
     """Test error handling and validation for invalid operations."""
 
-    def setUp(self):
+    def setup_method(self):
         """Create test fixtures for error handling tests."""
         self.n_batches, self.n_channels, self.n_harmonics, self.n_features = (
             2,
@@ -1598,29 +1590,66 @@ class TestErrorHandling(unittest.TestCase):
             pass
 
 
-class TestLinspaceExtraProperties(LinspaceExtraPropertiesMixin, unittest.TestCase):
-    """Linspace edge-case tests (shared via mixin)."""
+class TestLinspaceExtraProperties:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_shape_property",
+            "test_stop_property",
+            "test_eq_raises_for_non_linspacelike",
+            "test_eq_returns_false_for_step_mismatch",
+            "test_array_with_copy_false",
+            "test_getitem_invalid_type_raises",
+            "test_make_from_linspace_like",
+        ],
+    )
+    def test_linspace_helpers(self, linspace_helpers, method_name):
+        getattr(linspace_helpers, method_name)()
 
 
-class TestHelperFunctions(HelperFunctionsMixin, unittest.TestCase):
-    """Module-level helper function tests (shared via mixin)."""
+class TestHelperFunctions:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_check_entry_grid_compatibility_raises_on_mismatch",
+            "test_take_subset_slice_dimension_mismatch_raises",
+            "test_take_subset_with_array_grid",
+            "test_non_uniform_grid_stays_array",
+            "test_axis_onset_and_end_from_plain_arrays",
+        ],
+    )
+    def test_helper_functions(self, representation_helpers, method_name):
+        getattr(representation_helpers, method_name)(np)
 
-    xp = np
+
+class TestAdvancedRepresentationMethods:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_frequency_series_get_time_shifted",
+            "test_frequency_series_angle",
+            "test_stft_make_classmethod",
+            "test_stft_times_and_frequencies_properties",
+            "test_series_repr_and_grid_shape",
+        ],
+    )
+    def test_advanced_representation_methods(
+        self, advanced_representation_helpers, method_name
+    ):
+        method = getattr(advanced_representation_helpers, method_name)
+        if method_name in {
+            "test_stft_make_classmethod",
+            "test_stft_times_and_frequencies_properties",
+        }:
+            method()
+            return
+        method(np)
 
 
-class TestAdvancedRepresentationMethods(
-    AdvancedRepresentationMethodsMixin,
-    unittest.TestCase,
-):
-    """FrequencySeries/TimeSeries/STFT method tests (shared via mixin)."""
-
-    xp = np
-
-
-class TestArithmeticAddMethods(unittest.TestCase):
+class TestArithmeticAddMethods:
     """Test add/iadd/iadd-operator methods on representations."""
 
-    def setUp(self):
+    def setup_method(self):
         self.large_freqs = Linspace(0.0, 0.01, 100)
         self.small_freqs = Linspace(0.30, 0.01, 30)
         self.entries_large = np.ones((1, 1, 1, 1, 100))
@@ -1717,10 +1746,10 @@ class TestArithmeticAddMethods(unittest.TestCase):
             fs[10:20] = np.zeros((1, 1, 1, 1, 10))
 
 
-class TestPhasor(unittest.TestCase):
+class TestPhasor:
     """Test Phasor representation class."""
 
-    def setUp(self):
+    def setup_method(self):
         self.freqs = np.linspace(1e-4, 1e-2, 20)
         self.amps = np.ones(20, dtype=np.complex128)[None, None, None, None, :]
         self.phases = np.linspace(0, np.pi, 20, dtype=np.float64)[
@@ -1817,16 +1846,23 @@ class TestPhasor(unittest.TestCase):
         assert len(np.array(interpolated.frequencies)) == 8
 
 
-class TestWDMPropertiesAndMethods(WDMPropertiesAndMethodsMixin, unittest.TestCase):
-    """WDM property/method tests (shared via mixin)."""
+class TestWDMPropertiesAndMethods:
+    @pytest.mark.parametrize(
+        "method_name",
+        [
+            "test_nd_duration_sample_interval",
+            "test_df_shape_sample_rate_nyquist",
+            "test_is_critically_sampled",
+            "test_get_subset_time",
+            "test_get_subset_freq",
+        ],
+    )
+    def test_wdm_helpers(self, wdm_helpers, build_wdm_pair, method_name):
+        wdm = build_wdm_pair(np)["left"]["X"]
+        getattr(wdm_helpers, method_name)(wdm)
 
-    def setUp(self):
-        from tests._helpers import build_wdm_pair
 
-        self.wdm = build_wdm_pair(np)["left"]["X"]
-
-
-class TestSparse2DGridRepresentations(unittest.TestCase):
+class TestSparse2DGridRepresentations:
     """Coverage tests for sparse-grid code paths in representations."""
 
     def test_embed_entries_to_grid_2d_sparse_with_known_slices(self):
@@ -1932,7 +1968,7 @@ class TestSparse2DGridRepresentations(unittest.TestCase):
         npt.assert_array_equal(np.asarray(new_entries), source_entries)
 
 
-class TestRepresentationErrorBranches(unittest.TestCase):
+class TestRepresentationErrorBranches:
     def test_get_subset_slice_rejects_interval_and_slice_together(self):
         grid = np.linspace(0.0, 1.0, 11)
         with pytest.raises(ValueError, match=r".+"):

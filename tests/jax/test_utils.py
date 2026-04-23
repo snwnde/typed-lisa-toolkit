@@ -1,8 +1,6 @@
 """Unit tests for utils.py (JAX backend)."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -12,7 +10,7 @@ from typed_lisa_toolkit import utils
 jax.config.update("jax_enable_x64", val=True)
 
 
-class TestUtilsJax(unittest.TestCase):
+class TestUtilsJax:
     def test_get_subset_slice_basic(self):
         arr = jnp.arange(10)
         s = utils.get_subset_slice(arr, 2, 6)

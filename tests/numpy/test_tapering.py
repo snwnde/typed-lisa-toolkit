@@ -1,15 +1,13 @@
 """Unit tests for tapering.py (NumPy backend)."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
-
 import numpy as np
 import pytest
 
 from typed_lisa_toolkit.types import tapering
 
 
-class TestTaperingNumpy(unittest.TestCase):
+class TestTaperingNumpy:
     def test_ldc_window_basic(self):
         # kap=1.0 ensures tanh drives ends to ~0 and middle to ~1
         grid = np.linspace(0, 100, 100)

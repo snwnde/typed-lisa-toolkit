@@ -1,8 +1,7 @@
 """Tests for waveform containers with JAX arrays."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import jax
@@ -11,13 +10,6 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from tests._helpers import (
-    build_harmonic_projected_frequency_waveform,
-    build_harmonic_projected_phasor_waveform,
-    build_harmonic_waveform_frequency_series,
-    make_mock_phasor,
-    make_valid_mock_representation,
-)
 from typed_lisa_toolkit import (
     densify_phasor,
     densify_phasor_hpw,
@@ -39,10 +31,19 @@ from typed_lisa_toolkit import (
 )
 from typed_lisa_toolkit.types import modes
 
+if TYPE_CHECKING:
+    from conftest import (
+        build_harmonic_projected_frequency_waveform,
+        build_harmonic_projected_phasor_waveform,
+        build_harmonic_waveform_frequency_series,
+        make_mock_phasor,
+        make_valid_mock_representation,
+    )
+
 jax.config.update("jax_enable_x64", val=True)
 
 
-class TestHarmonicWaveformJAX(unittest.TestCase):
+class TestHarmonicWaveformJAX:
     def test_constructor_normalizes_tuple_mode_keys(self):
         case = build_harmonic_waveform_frequency_series(jnp)
         wf = harmonic_waveform(
@@ -93,7 +94,7 @@ class TestHarmonicWaveformJAX(unittest.TestCase):
         assert xp.__name__ == "jax.numpy"
 
 
-class TestHarmonicProjectedWaveformJAX(unittest.TestCase):
+class TestHarmonicProjectedWaveformJAX:
     def test_homogeneous_properties_and_kernel_shape(self):
         case = build_harmonic_projected_frequency_waveform(jnp)
         wf = case["wf"]
@@ -177,7 +178,7 @@ class TestHarmonicProjectedWaveformJAX(unittest.TestCase):
             _ = left + mismatched
 
 
-class TestDenseMakerJAX(unittest.TestCase):
+class TestDenseMakerJAX:
     @staticmethod
     def _identity_mapping(d: dict[str, Any]) -> dict[str, Any]:
         # Replaces ProjectedWaveform.from_dict so the test never touches the real
@@ -288,7 +289,7 @@ class TestDenseMakerJAX(unittest.TestCase):
                 assert out[harmonic][channel] is embedded
 
 
-class TestDensifyHelpersJAX(unittest.TestCase):
+class TestDensifyHelpersJAX:
     def test_densify_phasor_embed_false(self):
         frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
@@ -382,7 +383,7 @@ class TestDensifyHelpersJAX(unittest.TestCase):
                 assert out[mode][channel] is interpolated
 
 
-class TestCombineHelpersJAX(unittest.TestCase):
+class TestCombineHelpersJAX:
     def test_phasor_to_fs_hw_converts_each_mode(self):
         mode_22 = modes.Harmonic(2, 2)
         mode_33 = modes.Harmonic(3, 3)
@@ -446,7 +447,7 @@ class TestCombineHelpersJAX(unittest.TestCase):
                 assert out[mode][channel] is expected[mode][channel]
 
 
-class TestWaveformConstructorsJAX(unittest.TestCase):
+class TestWaveformConstructorsJAX:
     def test_constructor_aliases(self):
         assert hw is harmonic_waveform
         assert pw is projected_waveform

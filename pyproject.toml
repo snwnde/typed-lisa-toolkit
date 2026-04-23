@@ -147,7 +147,7 @@ ignore = [
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "PL", "DOC", "INP", "S101", "N802"]
+"tests/**" = ["D", "PL", "DOC", "INP", "S101", "N802", "F821"]
 "docs/**" = ["D", "PL", "DOC", "INP", "RET504", "C901", "N806", "PERF", "E402"]
 
 [tool.coverage.report]
@@ -165,7 +165,7 @@ addopts = "--import-mode=importlib"
 [tool.basedpyright]
 include = ["src"]
 exclude = ["**/__pycache__"]
-ignore = ["tests", "docs"]
+ignore = ["docs"]
 defineConstant = { DEBUG = true }
 enableTypeIgnoreComments = true
 reportIgnoreCommentWithoutRule = "none"

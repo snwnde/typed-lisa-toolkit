@@ -1,12 +1,10 @@
 """Unit tests for shop/conversions.py (NumPy backend)."""
 
-import unittest
-
 import numpy as np
 import numpy.testing as npt
 import pytest
 
-from typed_lisa_toolkit import shop, time_series, tsdata
+from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import (
     EvolutionarySpectralDensity,
     SpectralDensity,
@@ -15,7 +13,7 @@ from typed_lisa_toolkit.types import (
 
 
 def _build_xyz_tsdata_numpy(n: int = 8) -> TSData:
-    times = np.linspace(0.0, 3.5, n)
+    times = linspace(0.0, 3.5, n)
     x = np.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=np.float64)
     y = np.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=np.float64)
     z = np.asarray([-0.2, 0.3, -0.1, 0.5, -0.7, 0.9, -0.4, 0.2], dtype=np.float64)
@@ -59,7 +57,7 @@ def _build_xyz_evolutionary_spectral_density_numpy() -> EvolutionarySpectralDens
     )
 
 
-class TestConversionsNumpy(unittest.TestCase):
+class TestConversionsNumpy:
     def test_xyz_aet_roundtrip_tsdata(self):
         xyz = _build_xyz_tsdata_numpy()
 
@@ -106,24 +104,24 @@ class TestConversionsNumpy(unittest.TestCase):
     def test_xyz2aet_with_xyz_and_xyz_components_raises(self):
         xyz = _build_xyz_tsdata_numpy()
         with pytest.raises(ValueError, match="Cannot specify both xyz and X, Y, Z"):
-            shop.xyz2aet(xyz, X=np.array([1.0]), Y=np.array([2.0]), Z=np.array([3.0]))
+            shop.xyz2aet(xyz, X=np.array([1.0]), Y=np.array([2.0]), Z=np.array([3.0]))  # pyright: ignore[reportCallIssue]
 
     def test_aet2xyz_with_aet_and_aet_components_raises(self):
         aet = shop.xyz2aet(_build_xyz_tsdata_numpy())
         with pytest.raises(ValueError, match="Cannot specify both aet and A, E, T"):
-            shop.aet2xyz(aet, A=np.array([1.0]), E=np.array([2.0]), T=np.array([3.0]))
+            shop.aet2xyz(aet, A=np.array([1.0]), E=np.array([2.0]), T=np.array([3.0]))  # pyright: ignore[reportCallIssue]
 
     def test_xyz2aet_without_inputs_raises(self):
         with pytest.raises(
             ValueError, match="Must specify either xyz or all of X, Y, Z"
         ):
-            shop.xyz2aet()
+            shop.xyz2aet()  # pyright: ignore[reportCallIssue]
 
     def test_aet2xyz_without_inputs_raises(self):
         with pytest.raises(
             ValueError, match="Must specify either aet or all of A, E, T"
         ):
-            shop.aet2xyz()
+            shop.aet2xyz()  # pyright: ignore[reportCallIssue]
 
     def test_xyz2aet_keyword_components_path(self):
         x = np.array([0.0, 1.0, 2.0], dtype=np.float64)
@@ -144,7 +142,7 @@ class TestConversionsNumpy(unittest.TestCase):
             "Z": np.array([-1.0, 4.0], dtype=np.float64),
         }
         with pytest.raises(TypeError, match="got dict"):
-            shop.xyz2aet(bad_mapping)
+            shop.xyz2aet(bad_mapping)  # pyright: ignore[reportCallIssue, reportArgumentType]
 
     def test_spectral_density_channel_order_assertions(self):
         freqs = np.array([0.25, 0.5], dtype=np.float64)
@@ -170,7 +168,3 @@ class TestConversionsNumpy(unittest.TestCase):
             ValueError, match="Expected last dimension of input array to be 3"
         ):
             shop.aet2xyz(wrong_shape)
-
-
-if __name__ == "__main__":
-    unittest.main()

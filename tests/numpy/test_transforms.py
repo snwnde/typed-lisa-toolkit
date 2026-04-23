@@ -1,12 +1,10 @@
 """Unit tests for shop/transforms.py (NumPy backend)."""
 
-import unittest
 import warnings
 
 import numpy as np
 import numpy.testing as npt
-from numpy import float64
-from numpy._typing._array_like import NDArray
+import pytest
 
 from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import FSData, WDMData
@@ -17,12 +15,12 @@ from typed_lisa_toolkit.types.data import TSData
 def _require_wdm_transform():
     try:
         import wdm_transform  # noqa: F401
-    except ImportError as exc:
+    except ImportError:
         msg = (
             "The wdm_transform package is required for WDM conversion tests. "
             "Please install it with `pip install wdm_transform`."
         )
-        raise unittest.SkipTest(msg) from exc
+        pytest.skip(msg)
 
 
 def _build_timeseries_numpy(n: int = 8):
@@ -35,8 +33,8 @@ def _build_timeseries_numpy(n: int = 8):
     return times, entries, ts
 
 
-def _build_tsdata_numpy(n: int = 8) -> tuple[NDArray[float64], TSData]:
-    times = np.linspace(0.0, 3.5, n)
+def _build_tsdata_numpy(n: int = 8):
+    times = linspace(0.0, 3.5, n)
     x = np.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=np.float64)
     y = np.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=np.float64)
     tsd = tsdata(
@@ -48,7 +46,7 @@ def _build_tsdata_numpy(n: int = 8) -> tuple[NDArray[float64], TSData]:
     return times, tsd
 
 
-class TestTransformsNumpy(unittest.TestCase):
+class TestTransformsNumpy:
     def test_time2freq_timeseries_returns_representation(self):
         _, entries, ts = _build_timeseries_numpy()
 
@@ -190,7 +188,3 @@ class TestTransformsNumpy(unittest.TestCase):
             np.asarray(fsd.frequencies),
             err_msg="Frequencies do not match after round-trip conversion.",
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -1,6 +1,8 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from types import ModuleType
+from typing import Any, TypedDict
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -19,7 +21,11 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import (
     STFT,
     WDM,
+    Array,
     Axis,
+    FSData,
+    Grid2DCartesian,
+    Harmonic,
     HarmonicProjectedWaveform,
     HarmonicWaveform,
     HomogeneousHarmonicProjectedWaveform,
@@ -28,6 +34,7 @@ from typed_lisa_toolkit.types import (
     TimeSeries,
     UniformFrequencySeries,
     UniformTimeSeries,
+    WDMData,
     data,
     modes,
 )
@@ -43,29 +50,94 @@ SEED = 11324214
 rng = np.random.default_rng(SEED)
 
 
-def _randn_array(xp, shape):
+type EntryTransform = Callable[[Array], Array]
+type ChannelSpec = tuple[Array, EntryTransform]
+type MockPhasorTriple = tuple[MagicMock, MagicMock, MagicMock]
+type HarmonicPhasorHandles = dict[Harmonic, dict[str, MockPhasorTriple]]
+
+
+class CanonicalRepresentationsResult(TypedDict):
+    freqs: Array
+    times: Array
+    entries_fs: Array
+    entries_ts: Array
+    entries_tf: Array
+    fs: reps.FrequencySeries[Axis] | UniformFrequencySeries
+    ts: TimeSeries[Axis] | UniformTimeSeries
+    tf: STFT[Grid2DCartesian[Axis, Axis]]
+
+
+class FrequencySeriesBuildResult(TypedDict):
+    fs: reps.FrequencySeries[Axis] | UniformFrequencySeries
+    frequencies: Array
+    entries: Array
+
+
+class FdPairResult(TypedDict):
+    frequencies: Array
+    left: FSData
+    right: FSData
+    left_x: Array
+    left_y: Array
+    right_x: Array
+    right_y: Array
+
+
+class WdmPairResult(TypedDict):
+    times: Array
+    frequencies: Array
+    left: WDMData[Grid2DCartesian[Linspace, Linspace]]
+    right: WDMData[Grid2DCartesian[Linspace, Linspace]]
+    left_x: Array
+    left_y: Array
+    right_x: Array
+    right_y: Array
+
+
+class HarmonicWaveformFrequencySeriesResult(TypedDict):
+    frequencies: Array
+    modes: tuple[Harmonic, Harmonic]
+    mode_22: Harmonic
+    mode_33: Harmonic
+    wf: HarmonicWaveform[Harmonic, reps.FrequencySeries[Axis]]
+    wf_22: reps.FrequencySeries[Axis]
+    wf_33: reps.FrequencySeries[Axis]
+
+
+class HarmonicProjectedFrequencyWaveformResult(TypedDict):
+    frequencies: Array
+    mode_22: Harmonic
+    mode_33: Harmonic
+    wf: HomogeneousHarmonicProjectedWaveform[Harmonic, reps.FrequencySeries[Axis]]
+    resp_22: ProjectedWaveform[reps.FrequencySeries[Axis]]
+    resp_33: ProjectedWaveform[reps.FrequencySeries[Axis]]
+    resp_22_map: dict[str, reps.FrequencySeries[Axis]]
+    resp_33_map: dict[str, reps.FrequencySeries[Axis]]
+
+
+def _randn_array(xp: ModuleType, shape: tuple[int, ...]) -> Array:
     return xp.asarray(rng.standard_normal(shape))
 
 
-def _canonicalize_1d_entries(values):
+def _canonicalize_1d_entries(values: Array) -> Array:
     """Convert 1D values to canonical entries shape: (B, C, H, F, N)."""
     return values[None, None, None, None, :]
 
 
-def _canonicalize_2d_entries(values):
+def _canonicalize_2d_entries(values: Array) -> Array:
     """Convert 2D values to canonical entries shape: (B, C, H, F, Nf, Nt)."""
     return values[None, None, None, None, :, :]
 
 
-def _build_uniform_frequencies(xp):
+def _build_uniform_frequencies(xp: ModuleType) -> Array:
     return xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64)
 
 
-def _build_frequencies(xp):
+def _build_frequencies(xp: ModuleType) -> Array:
     return xp.asarray([1.0, 2.0, 4.0], dtype=xp.float64)
 
 
-def _build_wdm_axes(xp):
+def _build_wdm_axes(xp: ModuleType) -> tuple[Array, Array]:
     nt, nf = 20, 16
     dt = 0.12891289
     df = 1.0 / (2.0 * dt)
@@ -74,14 +146,19 @@ def _build_wdm_axes(xp):
     return times, frequencies
 
 
-def _build_complex_entries(xp, values, *, random_scale=False):
+def _build_complex_entries(
+    xp: ModuleType,
+    values: Sequence[float | complex],
+    *,
+    random_scale: bool = False,
+) -> Array:
     entries = _canonicalize_1d_entries(xp.asarray(values, dtype=xp.complex128))
     if random_scale:
         entries = entries * rng.standard_normal(entries.shape)
     return entries
 
 
-def _build_fsdata(frequencies, channel_entries):
+def _build_fsdata(frequencies: Axis, channel_entries: Mapping[str, Array]) -> FSData:
     return fsdata(
         {
             name: frequency_series(frequencies, entries)
@@ -90,7 +167,11 @@ def _build_fsdata(frequencies, channel_entries):
     )
 
 
-def _build_wdmdata(times, frequencies, channel_entries):
+def _build_wdmdata(
+    times: Axis,
+    frequencies: Axis,
+    channel_entries: Mapping[str, Array],
+) -> WDMData[Grid2DCartesian[Linspace, Linspace]]:
     return wdmdata(
         {
             name: wdm(frequencies=frequencies, times=times, entries=entries)
@@ -99,17 +180,29 @@ def _build_wdmdata(times, frequencies, channel_entries):
     )
 
 
-def _stack_batched_entries(xp, base_entries, variant_entries):
+def _stack_batched_entries(
+    xp: ModuleType,
+    base_entries: Array,
+    variant_entries: Array,
+) -> Array:
     return xp.concatenate([base_entries, variant_entries], axis=0)
 
 
-def _build_2ch_kernel(xp, values_x, values_y, offdiag):
+def _build_2ch_kernel(
+    xp: ModuleType,
+    values_x: Array,
+    values_y: Array,
+    offdiag: Array,
+) -> Array:
     row0 = xp.stack([values_x, offdiag], axis=-1)
     row1 = xp.stack([offdiag, values_y], axis=-1)
     return xp.stack([row0, row1], axis=-2)
 
 
-def _build_batched_channel_entries(xp, channel_specs):
+def _build_batched_channel_entries(
+    xp: ModuleType,
+    channel_specs: Mapping[str, ChannelSpec],
+) -> dict[str, Array]:
     return {
         name: _stack_batched_entries(xp, entries, transform(entries))
         for name, (entries, transform) in channel_specs.items()
@@ -117,15 +210,15 @@ def _build_batched_channel_entries(xp, channel_specs):
 
 
 def build_canonical_representations(
-    xp,
+    xp: ModuleType,
     *,
-    n_batches,
-    n_channels,
-    n_harmonics,
-    n_features,
-    len_time,
-    len_freq,
-):
+    n_batches: int,
+    n_channels: int,
+    n_harmonics: int,
+    n_features: int,
+    len_time: int,
+    len_freq: int,
+) -> CanonicalRepresentationsResult:
     freqs = xp.linspace(0, 1, len_freq)
     times = xp.linspace(0, 10, len_time)
 
@@ -158,7 +251,11 @@ def build_canonical_representations(
     }
 
 
-def build_freq_series(xp, *, uniform=True):
+def build_freq_series(
+    xp: ModuleType,
+    *,
+    uniform: bool = True,
+) -> FrequencySeriesBuildResult:
     frequencies = _build_uniform_frequencies(xp) if uniform else _build_frequencies(xp)
     _entries = _build_complex_entries(
         xp,
@@ -172,21 +269,21 @@ def build_freq_series(xp, *, uniform=True):
     }
 
 
-def build_fdata(xp):
+def build_fdata(xp: ModuleType) -> FSData:
     frequencies = _build_uniform_frequencies(xp)
     x_entries = _build_complex_entries(xp, [1.0 + 0.5j, -1.0j, 2.0 + 0.0j])
     y_entries = _build_complex_entries(xp, [0.5 - 0.25j, -1.0 + 0.25j, 2.0 + 0.5j])
     return _build_fsdata(frequencies, {"X": x_entries, "Y": y_entries})
 
 
-def build_wdm(xp):
+def build_wdm(xp: ModuleType) -> WDM[Grid2DCartesian[Linspace, Linspace]]:
     times, frequencies = _build_wdm_axes(xp)
     nt, nf = len(times), len(frequencies)
     entries = _randn_array(xp, (1, 1, 1, 1, nf, nt))
     return WDM.make(times=times, frequencies=frequencies, entries=entries)
 
 
-def build_fd_pair(xp):
+def build_fd_pair(xp: ModuleType) -> FdPairResult:
     frequencies = _build_uniform_frequencies(xp)
     left_x = _build_complex_entries(xp, [1.0 + 1.0j, 2.0 - 1.0j, -1.0 + 0.5j])
     left_y = _build_complex_entries(xp, [0.5 - 0.25j, -1.0j, 2.0 + 0.0j])
@@ -207,7 +304,7 @@ def build_fd_pair(xp):
     }
 
 
-def build_wdm_pair(xp):
+def build_wdm_pair(xp: ModuleType) -> WdmPairResult:
     times, frequencies = _build_wdm_axes(xp)
     nt, nf = len(times), len(frequencies)
 
@@ -231,7 +328,7 @@ def build_wdm_pair(xp):
     }
 
 
-def build_fd_pair_batched_2x2(xp):
+def build_fd_pair_batched_2x2(xp: ModuleType) -> FdPairResult:
     base = build_fd_pair(xp)
     frequencies = base["frequencies"]
 
@@ -282,7 +379,7 @@ def build_fd_pair_batched_2x2(xp):
     }
 
 
-def build_wdm_pair_batched_2x2(xp):
+def build_wdm_pair_batched_2x2(xp: ModuleType) -> WdmPairResult:
     base = build_wdm_pair(xp)
     times = base["times"]
     frequencies = base["frequencies"]
@@ -325,21 +422,21 @@ def build_wdm_pair_batched_2x2(xp):
     }
 
 
-def diagonal_kernel_2ch(xp):
+def diagonal_kernel_2ch(xp: ModuleType) -> Array:
     values_x = xp.asarray([2.0, 4.0, 8.0], dtype=xp.float64)
     values_y = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64)
     offdiag = xp.zeros_like(values_x)
     return _build_2ch_kernel(xp, values_x, values_y, offdiag)
 
 
-def dense_kernel_2ch(xp):
+def dense_kernel_2ch(xp: ModuleType) -> Array:
     values_x = xp.asarray([2.0, 4.0, 8.0], dtype=xp.float64)
     values_y = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64)
     offdiag = xp.asarray([0.1, 0.2, -0.3], dtype=xp.float64)
     return _build_2ch_kernel(xp, values_x, values_y, offdiag)
 
 
-def dense_esdm_2ch(xp):
+def dense_esdm_2ch(xp: ModuleType) -> Array:
     times, frequencies = _build_wdm_axes(xp)
     n_freq = len(frequencies)
     n_time = len(times)
@@ -384,12 +481,12 @@ class LinspaceExtraPropertiesMixin:
     def test_getitem_invalid_type_raises(self):
         ls = Linspace(0.0, 1.0, 10)
         with pytest.raises(TypeError):
-            ls["bad"]  # type: ignore[index]
+            ls["bad"]
 
     def test_make_from_linspace_like(self):
         class _MockLinspaceLike:
             def __init__(self, start, step, num):
-                self._start, self._step, self._num = start, step, num
+                self._start, self._step, self._num = start, step, num  # pyright: ignore[reportUnannotatedClassAttribute]
 
             @property
             def start(self):
@@ -403,7 +500,7 @@ class LinspaceExtraPropertiesMixin:
                 return self._num
 
         mock = _MockLinspaceLike(2.0, 0.5, 8)
-        ls = Linspace.make(mock)  # type: ignore[arg-type]
+        ls = Linspace.make(mock)
         assert isinstance(ls, Linspace)
         assert ls.start == pytest.approx(2.0)
         assert ls.step == pytest.approx(0.5)
@@ -416,7 +513,8 @@ class HelperFunctionsMixin:
     Subclass must provide a class-level ``xp`` attribute (numpy or jax.numpy).
     """
 
-    xp = None  # subclasses set: np or jnp
+    xp = None  # pyright: ignore[reportUnannotatedClassAttribute]
+    # subclasses set: np or jnp
 
     def test_check_entry_grid_compatibility_raises_on_mismatch(self):
         xp = self.xp
@@ -470,7 +568,8 @@ class AdvancedRepresentationMethodsMixin:
     Tests that use only plain numpy arrays need no ``xp``.
     """
 
-    xp = None  # subclasses set: np or jnp
+    xp = None  # pyright: ignore[reportUnannotatedClassAttribute]
+    # subclasses set: np or jnp
 
     def test_frequency_series_get_time_shifted(self):
         xp = self.xp
@@ -581,7 +680,7 @@ class DataAbstractBranchesMixin:
 
     def test_data_base_get_plotter_notimplemented(self):
         class Dummy(data.Data[TimeSeries[Axis]]):
-            _REP_TYPE = TimeSeries[Axis]
+            _REP_TYPE = TimeSeries[Axis]  # pyright: ignore[reportUnannotatedClassAttribute]
 
             @property
             def kind(self):
@@ -591,8 +690,148 @@ class DataAbstractBranchesMixin:
         representation = TimeSeries[Axis]((times,), np.ones((1, 1, 1, 1, 4)))
         dummy = Dummy.from_dict({"X": representation})
 
-        with pytest.raises(AttributeError):  # type: ignore[attr-defined]
+        with pytest.raises(AttributeError):
             dummy._get_plotter()
+
+
+@pytest.fixture
+def data_abstract_branch_helpers():
+    class _Helpers:
+        @staticmethod
+        def test_data_base_get_plotter_notimplemented():
+            DataAbstractBranchesMixin().test_data_base_get_plotter_notimplemented()
+
+    return _Helpers
+
+
+@pytest.fixture
+def linspace_helpers():
+    class _Helpers:
+        @staticmethod
+        def test_shape_property():
+            LinspaceExtraPropertiesMixin().test_shape_property()
+
+        @staticmethod
+        def test_stop_property():
+            LinspaceExtraPropertiesMixin().test_stop_property()
+
+        @staticmethod
+        def test_eq_raises_for_non_linspacelike():
+            LinspaceExtraPropertiesMixin().test_eq_raises_for_non_linspacelike()
+
+        @staticmethod
+        def test_eq_returns_false_for_step_mismatch():
+            LinspaceExtraPropertiesMixin().test_eq_returns_false_for_step_mismatch()
+
+        @staticmethod
+        def test_array_with_copy_false():
+            LinspaceExtraPropertiesMixin().test_array_with_copy_false()
+
+        @staticmethod
+        def test_getitem_invalid_type_raises():
+            LinspaceExtraPropertiesMixin().test_getitem_invalid_type_raises()
+
+        @staticmethod
+        def test_make_from_linspace_like():
+            LinspaceExtraPropertiesMixin().test_make_from_linspace_like()
+
+    return _Helpers
+
+
+@pytest.fixture
+def representation_helpers():
+    class _Helpers:
+        @staticmethod
+        def _run(method_name, xp):
+            helper = HelperFunctionsMixin()
+            helper.xp = xp
+            getattr(helper, method_name)()
+
+        @staticmethod
+        def test_check_entry_grid_compatibility_raises_on_mismatch(xp):
+            _Helpers._run("test_check_entry_grid_compatibility_raises_on_mismatch", xp)
+
+        @staticmethod
+        def test_take_subset_slice_dimension_mismatch_raises(xp):
+            _Helpers._run("test_take_subset_slice_dimension_mismatch_raises", xp)
+
+        @staticmethod
+        def test_take_subset_with_array_grid(xp):
+            _Helpers._run("test_take_subset_with_array_grid", xp)
+
+        @staticmethod
+        def test_non_uniform_grid_stays_array(xp):
+            _Helpers._run("test_non_uniform_grid_stays_array", xp)
+
+        @staticmethod
+        def test_axis_onset_and_end_from_plain_arrays(xp):
+            _Helpers._run("test_axis_onset_and_end_from_plain_arrays", xp)
+
+    return _Helpers
+
+
+@pytest.fixture
+def advanced_representation_helpers():
+    class _Helpers:
+        @staticmethod
+        def _run(method_name, xp):
+            helper = AdvancedRepresentationMethodsMixin()
+            helper.xp = xp
+            getattr(helper, method_name)()
+
+        @staticmethod
+        def test_frequency_series_get_time_shifted(xp):
+            _Helpers._run("test_frequency_series_get_time_shifted", xp)
+
+        @staticmethod
+        def test_frequency_series_angle(xp):
+            _Helpers._run("test_frequency_series_angle", xp)
+
+        @staticmethod
+        def test_stft_make_classmethod():
+            AdvancedRepresentationMethodsMixin().test_stft_make_classmethod()
+
+        @staticmethod
+        def test_stft_times_and_frequencies_properties():
+            AdvancedRepresentationMethodsMixin().test_stft_times_and_frequencies_properties()
+
+        @staticmethod
+        def test_series_repr_and_grid_shape(xp):
+            _Helpers._run("test_series_repr_and_grid_shape", xp)
+
+    return _Helpers
+
+
+@pytest.fixture
+def wdm_helpers():
+    class _Helpers:
+        @staticmethod
+        def _run(method_name, wdm):
+            helper = WDMPropertiesAndMethodsMixin()
+            helper.wdm = wdm
+            getattr(helper, method_name)()
+
+        @staticmethod
+        def test_nd_duration_sample_interval(wdm):
+            _Helpers._run("test_nd_duration_sample_interval", wdm)
+
+        @staticmethod
+        def test_df_shape_sample_rate_nyquist(wdm):
+            _Helpers._run("test_df_shape_sample_rate_nyquist", wdm)
+
+        @staticmethod
+        def test_is_critically_sampled(wdm):
+            _Helpers._run("test_is_critically_sampled", wdm)
+
+        @staticmethod
+        def test_get_subset_time(wdm):
+            _Helpers._run("test_get_subset_time", wdm)
+
+        @staticmethod
+        def test_get_subset_freq(wdm):
+            _Helpers._run("test_get_subset_freq", wdm)
+
+    return _Helpers
 
 
 # ============================================================================
@@ -612,7 +851,11 @@ class FakeHarmonicWaveform(dict[modes.Harmonic, FakeResponse]):
         return tuple(self.keys())
 
 
-def make_valid_mock_representation(*, name: str | None = None, frequencies: Any = None):
+def make_valid_mock_representation(
+    *,
+    name: str | None = None,
+    frequencies: Any = None,
+) -> MagicMock:
     """Return a MagicMock that satisfies representation runtime validators."""
     rep = MagicMock(name=name)
     if frequencies is None:
@@ -644,7 +887,7 @@ def make_valid_mock_representation(*, name: str | None = None, frequencies: Any 
     return rep
 
 
-def set_mock_frequency_entries(rep: Any, frequencies: Any):
+def set_mock_frequency_entries(rep: Any, frequencies: Any) -> None:
     """Assign canonical frequency-domain entries/grid to a representation mock."""
     grid = np.asarray(frequencies, dtype=np.float64)
     rep.domain = "frequency"
@@ -652,7 +895,12 @@ def set_mock_frequency_entries(rep: Any, frequencies: Any):
     rep.entries = np.zeros((1, 1, 1, 1, len(grid)), dtype=np.complex128)
 
 
-def make_mock_phasor(*, f_min: float, f_max: float, frequencies: Any = None):
+def make_mock_phasor(
+    *,
+    f_min: float,
+    f_max: float,
+    frequencies: Any = None,
+) -> MockPhasorTriple:
     """Return (phasor, interpolated, embedded) mock triple with a preset frequency range."""  # noqa: E501
     phasor = make_valid_mock_representation(name="phasor", frequencies=frequencies)
     phasor.f_min = f_min
@@ -669,7 +917,10 @@ def make_mock_phasor(*, f_min: float, f_max: float, frequencies: Any = None):
     return phasor, interpolated, embedded
 
 
-def build_harmonic_projected_phasor_waveform(*, frequencies: Any = None):
+def build_harmonic_projected_phasor_waveform(
+    *,
+    frequencies: Any = None,
+) -> tuple[HarmonicProjectedWaveform[Harmonic, Any], HarmonicPhasorHandles]:
     """Build a two-mode HarmonicProjectedWaveform-like object with phasor leaves.
 
     The outer container is a real HarmonicProjectedWaveform instance while each
@@ -698,17 +949,25 @@ def build_harmonic_projected_phasor_waveform(*, frequencies: Any = None):
     return wf, handles
 
 
-def build_fake_harmonic_projected_waveform():
+def build_fake_harmonic_projected_waveform() -> tuple[
+    HarmonicProjectedWaveform[Harmonic, Any], HarmonicPhasorHandles
+]:
     """Backward-compatible alias for tests still using the old helper name."""
     return build_harmonic_projected_phasor_waveform()
 
 
-def _make_fs(xp, frequencies, values):
+def _make_fs(
+    xp: ModuleType,
+    frequencies: Axis,
+    values: Sequence[float | complex],
+) -> reps.FrequencySeries[Axis]:
     entries = xp.asarray(values, dtype=xp.complex128)[None, None, None, None, :]
     return reps.FrequencySeries((frequencies,), entries)
 
 
-def build_harmonic_waveform_frequency_series(xp):
+def build_harmonic_waveform_frequency_series(
+    xp: ModuleType,
+) -> HarmonicWaveformFrequencySeriesResult:
     frequencies = xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64)
 
     mode_22 = modes.Harmonic(2, 2)
@@ -730,7 +989,9 @@ def build_harmonic_waveform_frequency_series(xp):
     }
 
 
-def build_harmonic_projected_frequency_waveform(xp):
+def build_harmonic_projected_frequency_waveform(
+    xp: ModuleType,
+) -> HarmonicProjectedFrequencyWaveformResult:
     frequencies = xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64)
     _freqs = linspace_from_array(frequencies)
 
@@ -761,3 +1022,87 @@ def build_harmonic_projected_frequency_waveform(xp):
         "resp_22_map": resp_22_map,
         "resp_33_map": resp_33_map,
     }
+
+
+def _builder_fixture(builder: Callable[..., Any]) -> Any:
+    @pytest.fixture(name=builder.__name__)
+    def _fixture():
+        return builder
+
+    return _fixture
+
+
+build_canonical_representations_fixture = _builder_fixture(
+    build_canonical_representations
+)
+build_fdata_fixture = _builder_fixture(build_fdata)
+build_wdm_fixture = _builder_fixture(build_wdm)
+build_fd_pair_fixture = _builder_fixture(build_fd_pair)
+build_wdm_pair_fixture = _builder_fixture(build_wdm_pair)
+build_fd_pair_batched_2x2_fixture = _builder_fixture(build_fd_pair_batched_2x2)
+build_wdm_pair_batched_2x2_fixture = _builder_fixture(build_wdm_pair_batched_2x2)
+diagonal_kernel_2ch_fixture = _builder_fixture(diagonal_kernel_2ch)
+dense_kernel_2ch_fixture = _builder_fixture(dense_kernel_2ch)
+dense_esdm_2ch_fixture = _builder_fixture(dense_esdm_2ch)
+build_harmonic_waveform_frequency_series_fixture = _builder_fixture(
+    build_harmonic_waveform_frequency_series,
+)
+build_harmonic_projected_phasor_waveform_fixture = _builder_fixture(
+    build_harmonic_projected_phasor_waveform,
+)
+build_fake_harmonic_projected_waveform_fixture = _builder_fixture(
+    build_fake_harmonic_projected_waveform,
+)
+make_mock_phasor_fixture = _builder_fixture(make_mock_phasor)
+make_valid_mock_representation_fixture = _builder_fixture(
+    make_valid_mock_representation,
+)
+build_harmonic_projected_frequency_waveform_fixture = _builder_fixture(
+    build_harmonic_projected_frequency_waveform,
+)
+
+
+@pytest.fixture(autouse=True)
+def _inject_builder_globals(
+    request,
+    build_canonical_representations,
+    build_fdata,
+    build_wdm,
+    build_fd_pair,
+    build_wdm_pair,
+    build_fd_pair_batched_2x2,
+    build_wdm_pair_batched_2x2,
+    diagonal_kernel_2ch,
+    dense_kernel_2ch,
+    dense_esdm_2ch,
+    build_harmonic_waveform_frequency_series,
+    build_harmonic_projected_phasor_waveform,
+    build_fake_harmonic_projected_waveform,
+    make_mock_phasor,
+    make_valid_mock_representation,
+    build_harmonic_projected_frequency_waveform,
+):
+    request.module.build_canonical_representations = build_canonical_representations
+    request.module.build_fdata = build_fdata
+    request.module.build_wdm = build_wdm
+    request.module.build_fd_pair = build_fd_pair
+    request.module.build_wdm_pair = build_wdm_pair
+    request.module.build_fd_pair_batched_2x2 = build_fd_pair_batched_2x2
+    request.module.build_wdm_pair_batched_2x2 = build_wdm_pair_batched_2x2
+    request.module.diagonal_kernel_2ch = diagonal_kernel_2ch
+    request.module.dense_kernel_2ch = dense_kernel_2ch
+    request.module.dense_esdm_2ch = dense_esdm_2ch
+    request.module.build_harmonic_waveform_frequency_series = (
+        build_harmonic_waveform_frequency_series
+    )
+    request.module.build_harmonic_projected_phasor_waveform = (
+        build_harmonic_projected_phasor_waveform
+    )
+    request.module.build_fake_harmonic_projected_waveform = (
+        build_fake_harmonic_projected_waveform
+    )
+    request.module.make_mock_phasor = make_mock_phasor
+    request.module.make_valid_mock_representation = make_valid_mock_representation
+    request.module.build_harmonic_projected_frequency_waveform = (
+        build_harmonic_projected_frequency_waveform
+    )

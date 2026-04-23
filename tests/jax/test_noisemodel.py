@@ -1,7 +1,7 @@
 """Tests for noise models with JAX arrays."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
+from typing import TYPE_CHECKING
 
 import jax
 import jax.numpy as jnp
@@ -9,16 +9,6 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from tests._helpers import (
-    build_fd_pair,
-    build_fd_pair_batched_2x2,
-    build_fdata,
-    build_wdm_pair,
-    build_wdm_pair_batched_2x2,
-    dense_esdm_2ch,
-    dense_kernel_2ch,
-    diagonal_kernel_2ch,
-)
 from typed_lisa_toolkit import (
     frequency_series,
     fsdata,
@@ -34,6 +24,18 @@ from typed_lisa_toolkit.types import (
     TFNoiseModel,
 )
 
+if TYPE_CHECKING:
+    from conftest import (
+        build_fd_pair,
+        build_fd_pair_batched_2x2,
+        build_fdata,
+        build_wdm_pair,
+        build_wdm_pair_batched_2x2,
+        dense_esdm_2ch,
+        dense_kernel_2ch,
+        diagonal_kernel_2ch,
+    )
+
 jax.config.update("jax_enable_x64", val=True)
 
 
@@ -43,7 +45,7 @@ class _FlatFDNoiseJAX:
         return jnp.ones_like(jnp.asarray(frequencies))
 
 
-class TestSpectralDensityJAX(unittest.TestCase):
+class TestSpectralDensityJAX:
     def test_to_subband_slices_frequency_axis(self):
         case = build_fdata(jnp)
         sdm = SpectralDensity(
@@ -134,7 +136,7 @@ class TestSpectralDensityJAX(unittest.TestCase):
         npt.assert_allclose(kernel[:, 1, 1], np.ones(3))
 
 
-class TestFDNoiseModelJAX(unittest.TestCase):
+class TestFDNoiseModelJAX:
     def test_fd_model_init_supports_jax_namespace(self):
         case = build_fd_pair(jnp)
         kernel = diagonal_kernel_2ch(jnp)
@@ -324,7 +326,7 @@ class TestFDNoiseModelJAX(unittest.TestCase):
             model.get_cross_correlation(fs, fs)
 
 
-class TestEvolutionarySpectralDensityJAX(unittest.TestCase):
+class TestEvolutionarySpectralDensityJAX:
     def test_invalid_shape_returns_false_without_raising(self):
         assert not EvolutionarySpectralDensity.is_valid_sdm(
             jnp.eye(2), channel_order=["X", "Y"]
@@ -390,7 +392,7 @@ class TestEvolutionarySpectralDensityJAX(unittest.TestCase):
             esd.get_whitening_matrix(kind="qr")
 
 
-class TestTFNoiseModelJAX(unittest.TestCase):
+class TestTFNoiseModelJAX:
     def test_scalar_product_with_identity_esdm(self):
         case = build_wdm_pair(jnp)
         invevsdm = jnp.broadcast_to(
@@ -491,7 +493,7 @@ class TestTFNoiseModelJAX(unittest.TestCase):
         )
 
 
-class TestNoiseModelFactoriesJAX(unittest.TestCase):
+class TestNoiseModelFactoriesJAX:
     def test_make_sdm_builds_dense_diagonal_and_evolutionary_variants(self):
         frequencies = jnp.array([0.5, 1.0, 1.5], dtype=jnp.float64)
         times = jnp.array([0.0, 1.0], dtype=jnp.float64)

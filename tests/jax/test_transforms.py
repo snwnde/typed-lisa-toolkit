@@ -1,12 +1,12 @@
 """Unit tests for shop/transforms.py (JAX backend)."""
 
-import unittest
 import warnings
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 from typed_lisa_toolkit import linspace, shop, time_series, tsdata
 from typed_lisa_toolkit.types import FSData, TSData, WDMData
@@ -18,12 +18,12 @@ jax.config.update("jax_enable_x64", val=True)
 def _require_wdm_transform():
     try:
         import wdm_transform  # noqa: F401
-    except ImportError as exc:
+    except ImportError:
         msg = (
             "The wdm_transform package is required for WDM conversion tests. "
             "Please install it with `pip install wdm_transform`."
         )
-        raise unittest.SkipTest(msg) from exc
+        pytest.skip(msg)
 
 
 def _build_timeseries_jax(n: int = 8):
@@ -49,7 +49,7 @@ def _build_tsdata_jax(n: int = 8):
     return times, tsd
 
 
-class TestTransformsJax(unittest.TestCase):
+class TestTransformsJax:
     def test_time2freq_timeseries_returns_representation(self):
         _, entries, ts = _build_timeseries_jax()
 
@@ -184,7 +184,3 @@ class TestTransformsJax(unittest.TestCase):
             np.asarray(recovered.frequencies),
             np.asarray(fsd.frequencies),
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

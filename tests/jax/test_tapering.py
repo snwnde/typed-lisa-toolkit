@@ -1,8 +1,6 @@
 """Unit tests for tapering.py (JAX backend)."""
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
-import unittest
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -13,7 +11,7 @@ from typed_lisa_toolkit.types import tapering
 jax.config.update("jax_enable_x64", val=True)
 
 
-class TestTaperingJax(unittest.TestCase):
+class TestTaperingJax:
     def test_ldc_window_basic(self):
         # kap=1.0 ensures tanh drives ends to ~0 and middle to ~1
         grid = jnp.linspace(0, 100, 100)
