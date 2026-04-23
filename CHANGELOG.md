@@ -2,6 +2,22 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.3 - 2026-04-23
+#### Bug Fixes
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>linspace - (b8410a6) - Senwen Deng
+#### Documentation
+- added some examples - (ed7567a) - Senwen Deng
+#### Tests
+- migrated to pytest - (8c744cb) - Senwen Deng
+- phasor properties - (2ffef13) - Senwen Deng
+#### Continuous Integration
+- cog check - (64a973a) - Senwen Deng
+#### Refactoring
+- better deprecation - (c2657a5) - Senwen Deng
+- improved modes - (887de00) - Senwen Deng
+
+- - -
+
 ## 0.6.2 - 2026-04-22
 #### Bug Fixes
 - phasor amplitudes - (d341853) - Senwen Deng
