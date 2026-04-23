@@ -81,7 +81,7 @@ class TestDataContainersNumpy:
     def _assert_to_fsdata_deprecation(self, tsdata: TSData, *, keep_times: bool):
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_fsdata' method is deprecated",
+            match=r"deprecated",
         ):
             return tsdata.to_fsdata(keep_times=keep_times)
 
@@ -92,7 +92,7 @@ class TestDataContainersNumpy:
     ):
         with pytest.warns(  # noqa: PT031
             DeprecationWarning,
-            match=r"The 'to_tsdata' method is deprecated",
+            match=r"deprecated",
         ):
             if times is None:
                 return fs_like.to_tsdata()
@@ -141,8 +141,7 @@ class TestDataContainersNumpy:
             for item in caught
         )
         assert any(
-            "The method `UniformTimeSeries.rfft` is deprecated" in str(item.message)
-            for item in caught
+            "The method 'rfft' is deprecated" in str(item.message) for item in caught
         )
         npt.assert_allclose(
             np.asarray(fs_from_ts_pos.entries),
@@ -158,9 +157,7 @@ class TestDataContainersNumpy:
             for item in caught
         )
         assert any(
-            "The method `UniformFrequencySeries.irfft` is deprecated"
-            in str(item.message)
-            for item in caught
+            "The method 'irfft' is deprecated" in str(item.message) for item in caught
         )
         npt.assert_allclose(
             np.asarray(ts_from_fs_pos.entries),
@@ -282,6 +279,36 @@ class TestDataContainersNumpy:
         assert isinstance(recovered, TSData)
         assert recovered.channel_names == fsdata.channel_names
         assert np.asarray(recovered.times).shape[0] == len(times_grid)
+
+    def test_deprecation_warning_points_to_user_callsite_for_conversions(self):
+        _, _, _, ts = _build_tsdata_numpy()
+
+        with warnings.catch_warnings(record=True) as caught_fs:
+            warnings.simplefilter("always")
+            fs = ts.to_fsdata(keep_times=False)
+        fs_warns = [w for w in caught_fs if isinstance(w.message, DeprecationWarning)]
+        assert fs_warns
+        assert fs_warns[0].filename == __file__
+
+        with warnings.catch_warnings(record=True) as caught_ts:
+            warnings.simplefilter("always")
+            _ = fs.to_tsdata(np.asarray(ts.times))
+        ts_warns = [w for w in caught_ts if isinstance(w.message, DeprecationWarning)]
+        assert ts_warns
+        assert ts_warns[0].filename == __file__
+
+    def test_delegated_to_tsdata_warning_points_to_user_callsite(self):
+        _, _, _, ts = _build_tsdata_numpy()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            timed_fs = ts.to_fsdata(keep_times=True)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            _ = timed_fs.to_tsdata()
+        dep_warns = [w for w in caught if isinstance(w.message, DeprecationWarning)]
+        assert dep_warns
+        assert dep_warns[0].filename == __file__
 
     # def test_tsdata_to_stftdata(self):
     #     _, _, _, tsdata = _build_tsdata_numpy()
@@ -718,7 +745,7 @@ class TestDataContainersNumpy:
 
             with pytest.warns(
                 DeprecationWarning,
-                match=r"The 'load' method is deprecated",
+                match=r"The method 'load' is deprecated",
             ):
                 loaded = FSData.load(handle.name, legacy=True)
 
@@ -781,7 +808,7 @@ class TestDataLoadValidationBranches:
         _, _, _, tsdata = _build_tsdata_numpy()
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_fsdata' method is deprecated",
+            match=r"The method 'to_fsdata' is deprecated",
         ):
             fsd = tsdata.to_fsdata(keep_times=False)
 
@@ -856,14 +883,14 @@ class TestDataLoadValidationBranches:
         times, _, _, tsdata = _build_tsdata_numpy()
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_fsdata' method is deprecated",
+            match=r"deprecated",
         ):
             timed = tsdata.to_fsdata(keep_times=True)
         alt_times = np.linspace(100.0, 103.5, len(times))
 
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_tsdata' method is deprecated",
+            match=r"deprecated",
         ):
             recovered = timed.to_tsdata(alt_times)
 

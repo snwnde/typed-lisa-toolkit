@@ -86,7 +86,7 @@ class TestDataContainersJAX:
     def _assert_to_fsdata_deprecation(self, tsdata: TSData, *, keep_times: bool):
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_fsdata' method is deprecated",
+            match=r"deprecated",
         ):
             return tsdata.to_fsdata(keep_times=keep_times)
 
@@ -97,10 +97,10 @@ class TestDataContainersJAX:
     ) -> TSData:
         with pytest.warns(  # noqa: PT031
             DeprecationWarning,
-            match=r"The 'to_tsdata' method is deprecated",
+            match=r"deprecated",
         ):
             if times is None:
-                return fs_like.to_tsdata()  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+                return fs_like.to_tsdata()
             return fs_like.to_tsdata(times)
 
     def test_tsdata_times_dt_and_get_frequencies(self):
@@ -174,8 +174,7 @@ class TestDataContainersJAX:
             for item in caught
         )
         assert any(
-            "The method `UniformTimeSeries.rfft` is deprecated" in str(item.message)
-            for item in caught
+            "The method 'rfft' is deprecated" in str(item.message) for item in caught
         )
         npt.assert_allclose(
             np.asarray(fs_from_ts_pos.entries),
@@ -191,9 +190,7 @@ class TestDataContainersJAX:
             for item in caught
         )
         assert any(
-            "The method `UniformFrequencySeries.irfft` is deprecated"
-            in str(item.message)
-            for item in caught
+            "The method 'irfft' is deprecated" in str(item.message) for item in caught
         )
         npt.assert_allclose(
             np.asarray(ts_from_fs_pos.entries),
@@ -718,7 +715,7 @@ class TestDataContainersJAX:
 
             with pytest.warns(
                 DeprecationWarning,
-                match=r"The 'load' method is deprecated",
+                match=r"deprecated",
             ):
                 loaded = FSData.load(handle.name, legacy=True)
 
@@ -781,7 +778,7 @@ class TestDataLoadValidationBranchesJAX:
         _, tsdata = _build_tsdata_jax()
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_fsdata' method is deprecated",
+            match=r"deprecated",
         ):
             fsd = tsdata.to_fsdata(keep_times=False)
 
@@ -856,14 +853,14 @@ class TestDataLoadValidationBranchesJAX:
         times, tsdata = _build_tsdata_jax()
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_fsdata' method is deprecated",
+            match=r"deprecated",
         ):
             timed = tsdata.to_fsdata(keep_times=True)
         alt_times = np.linspace(100.0, 103.5, len(times))
 
         with pytest.warns(
             DeprecationWarning,
-            match=r"The 'to_tsdata' method is deprecated",
+            match=r"deprecated",
         ):
             recovered = timed.to_tsdata(alt_times)
 

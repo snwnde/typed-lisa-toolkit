@@ -19,13 +19,80 @@ Decorators
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
+import warnings
+from collections.abc import Callable
+from typing import Any
 
 import array_api_compat as xpc
 
 from .types.misc import Array, ArrayFunc, Interpolator
 
 log = logging.getLogger(__name__)
+
+
+def warn_external(
+    message: str,
+    category: type[Warning],
+    *,
+    package_prefix: str = "typed_lisa_toolkit",
+) -> None:
+    """Emit a warning pointing to the first caller outside this package."""
+    frame = inspect.currentframe()
+    if frame is None:
+        warnings.warn(message, category, stacklevel=2)
+        return
+
+    internal_depth = 0
+    frame = frame.f_back
+    while frame is not None:
+        module_name = str(frame.f_globals.get("__name__", ""))
+        if not module_name.startswith(package_prefix):
+            break
+        internal_depth += 1
+        frame = frame.f_back
+
+    warnings.warn(message, category, stacklevel=internal_depth + 2)
+
+
+def _deprecated(
+    message: str,
+    category: type[Warning] = DeprecationWarning,
+    *,
+    package_prefix: str = "typed_lisa_toolkit",
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Return a decorator that emits a caller-facing deprecation warning."""
+
+    def _decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(func)
+        def _wrapped(*args: Any, **kwargs: Any):
+            warn_external(
+                message,
+                category=category,
+                package_prefix=package_prefix,
+            )
+            return func(*args, **kwargs)
+
+        return _wrapped
+
+    return _decorator
+
+
+def deprecated(
+    name: str,
+    role: str,
+    eol: str,
+    alternative: str | None = None,
+    *,
+    package_prefix: str = "typed_lisa_toolkit",
+):
+    """Return a decorator that emits a caller-facing deprecation warning with a standard message format."""  # noqa: E501
+    alt_msg = f" Use '{package_prefix}.{alternative}' instead." if alternative else ""
+    message = (
+        f"The {role} '{name}' is deprecated and will be removed in {eol}. {alt_msg}"
+    )
+    return _deprecated(message, package_prefix=package_prefix)
 
 
 def get_subset_slice(increasing_array: Array, min: float, max: float):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import abc
 import logging
-import warnings
 from types import ModuleType
 from typing import (
     TYPE_CHECKING,
@@ -21,6 +20,7 @@ import numpy as np
 from l2d_interface import contract
 from l2d_interface.contract import LinspaceLike
 
+from ..utils import deprecated, warn_external
 from ._mixins import to_array
 from .misc import (
     AnyGrid,
@@ -882,6 +882,7 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
         """The frequency spacing. Alias for :attr:`.resolution`."""
         return self.resolution
 
+    @deprecated("irfft", "method", "0.8.0", alternative="shop.freq2time")
     def irfft(
         self,
         time_grid: Array,
@@ -914,22 +915,8 @@ class UniformFrequencySeries(FrequencySeries[Linspace], _Uniform1DMixin):
                 "and will be removed "
                 "in 0.7.0; pass it as a keyword argument instead."
             )
-            warnings.warn(
-                _msg1,
-                DeprecationWarning,
-                stacklevel=2,
-            )
+            warn_external(_msg1, DeprecationWarning)
             tapering = args[0]
-        _msg2 = (
-            "The method `UniformFrequencySeries.irfft` is deprecated "
-            "and will be removed in 0.8.0; "
-            "use `shop.freq2time` instead."
-        )
-        warnings.warn(
-            _msg2,
-            DeprecationWarning,
-            stacklevel=2,
-        )
         self_frequencies = to_array(self.frequencies)
         tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
         _times = Linspace.make(time_grid)
@@ -1004,6 +991,7 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
         """The time step. Alias for :attr:`.resolution`."""
         return self.resolution
 
+    @deprecated("rfft", "method", "0.8.0", alternative="shop.time2freq")
     def rfft(
         self,
         *args: tapering.Tapering | None,
@@ -1043,23 +1031,8 @@ class UniformTimeSeries(TimeSeries[Linspace], _Uniform1DMixin):
                 "and will be removed "
                 "in 0.7.0; pass it as a keyword argument instead."
             )
-            warnings.warn(
-                _msg1,
-                DeprecationWarning,
-                stacklevel=2,
-            )
+            warn_external(_msg1, DeprecationWarning)
             tapering = args[0]
-        _msg2 = (
-            "The method `UniformTimeSeries.rfft` is deprecated "
-            "and will be removed in 0.8.0; "
-            "use `shop.time2freq` instead."
-        )
-        warnings.warn(
-            _msg2,
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
         self_times = self.xp.array(self.times)
         tapering_window = (
             tapering(self_times)

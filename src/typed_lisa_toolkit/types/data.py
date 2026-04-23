@@ -5,7 +5,6 @@ from __future__ import annotations
 import abc
 import logging
 import pathlib
-import warnings
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, cast, overload
 
@@ -14,6 +13,7 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
+from ..utils import deprecated, warn_external
 from . import _mixins, tapering
 from . import representations as reps
 from .misc import (
@@ -329,6 +329,7 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
         return cls.from_dict(dict_, **additions)
 
     @classmethod
+    @deprecated("load", "method", "0.8.0", alternative="load_data")
     def load(cls, file_path: str | pathlib.Path, *, legacy: bool = False):
         """Load the data from an HDF5 file (*Deprecated*).
 
@@ -337,15 +338,6 @@ class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
         This method is deprecated and will be removed in 0.8.0;
         use :func:`~typed_lisa_toolkit.load_data` instead.
         """
-        msg = (
-            "The 'load' method is deprecated and will be removed in 0.8.0; "
-            "use the function `load_data` instead."
-        )
-        warnings.warn(
-            msg,
-            DeprecationWarning,
-            stacklevel=2,
-        )
         return _load_data(cls, file_path, legacy=legacy)
 
 
@@ -450,6 +442,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         tapering: tapering.Tapering | None = None,
     ) -> TimedFSData: ...
 
+    @deprecated("to_fsdata", "method", "0.8.0", alternative="shop.time2freq")
     def to_fsdata(
         self,
         *,
@@ -470,15 +463,6 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         """
         from ..shop import time2freq
 
-        msg = (
-            "The 'to_fsdata' method is deprecated and will be removed in 0.8.0; "
-            "use the function `shop.time2freq` instead."
-        )
-        warnings.warn(
-            msg,
-            DeprecationWarning,
-            stacklevel=2,
-        )
         _window = tapering(self.xp.asarray(self.times)) if tapering is not None else 1
         return time2freq(self * _window, keep_time=keep_times)
 
@@ -586,6 +570,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
             name=self.name,
         ).set_times(times)
 
+    @deprecated("to_tsdata", "method", "0.8.0", alternative="shop.freq2time")
     def to_tsdata(
         self,
         times: npt.NDArray[np.floating[Any]] | Linspace,
@@ -600,16 +585,6 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         """
         from ..shop import freq2time
 
-        msg = (
-            "The 'to_tsdata' method is deprecated and will be removed in 0.8.0; "
-            "use the function `shop.freq2time` instead."
-        )
-
-        warnings.warn(
-            msg,
-            DeprecationWarning,
-            stacklevel=2,
-        )
         _window = tapering(self.xp.asarray(times)) if tapering is not None else 1
         return freq2time(self * _window, times=times)
 
@@ -801,7 +776,7 @@ def _enforce_uniform_mapping[RepT: AnyReps](
                     "Convert the axes to Linspace with `tlt.linsapce_from_array`"
                     "before constructing the data object."
                 )
-                warnings.warn(msg, UserWarning, stacklevel=3)
+                warn_external(msg, category=UserWarning)
                 yield _enforce_uniform(axis)
 
     def new_grid(grid: AnyGrid) -> AnyGrid:
@@ -1046,6 +1021,7 @@ def fsdata(
     return _fsdata
 
 
+@deprecated("timed_fsdata", "function", "0.8.0", alternative="fsdata")
 def timed_fsdata(
     mapping: Mapping[str, reps.FrequencySeries[Linspace]],
     times: Linspace | npt.NDArray[np.floating[Any]],
@@ -1058,15 +1034,6 @@ def timed_fsdata(
     This function is deprecated and will be removed in 0.8.0;
     use the :func:`.fsdata` function with the `times` argument instead.
     """
-    _warn_msg = _func_deprecation_msg.format(
-        deprecated_func_name="timed_fsdata",
-        func_name="`fsdata` with `times` argument",
-    )
-    warnings.warn(
-        _warn_msg,
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return fsdata(mapping, times=times, name=name)
 
 
@@ -1344,6 +1311,7 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
     )
 
 
+@deprecated("construct_tsdata", "function", "0.8.0", alternative="tsdata")
 def construct_tsdata(
     *,
     times: Axis,
@@ -1377,15 +1345,6 @@ def construct_tsdata(
     This function is deprecated and will be removed in 0.8.0; use the :func:`.tsdata`
     function with the keyword arguments instead.
     """  # noqa: E501
-    _msg = _func_deprecation_msg.format(
-        deprecated_func_name="construct_tsdata",
-        func_name="`tsdata` with keyword arguments",
-    )
-    warnings.warn(
-        _msg,
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return tsdata(times=times, entries=entries, channels=channels, name=name)
 
 
@@ -1410,6 +1369,7 @@ def construct_fsdata(
 ) -> FSData: ...
 
 
+@deprecated("construct_fsdata", "function", "0.8.0", alternative="fsdata")
 def construct_fsdata(
     *,
     frequencies: Axis,
@@ -1443,15 +1403,6 @@ def construct_fsdata(
     This function is deprecated and will be removed in 0.8.0; use the
     :func:`.fsdata` function with the keyword arguments instead.
     """  # noqa: E501
-    _msg = _func_deprecation_msg.format(
-        deprecated_func_name="construct_fsdata",
-        func_name="`fsdata` with keyword arguments",
-    )
-    warnings.warn(
-        _msg,
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return fsdata(
         frequencies=frequencies,
         entries=entries,
@@ -1461,6 +1412,7 @@ def construct_fsdata(
     )
 
 
+@deprecated("construct_timed_fsdata", "function", "0.8.0", alternative="fsdata")
 def construct_timed_fsdata(
     *,
     frequencies: Axis,
@@ -1504,15 +1456,6 @@ def construct_timed_fsdata(
     :func:`.fsdata` function with the `times` argument instead.
 
     """  # noqa: E501
-    _msg = _func_deprecation_msg.format(
-        deprecated_func_name="construct_timed_fsdata",
-        func_name="`fsdata` with `times` argument",
-    )
-    warnings.warn(
-        _msg,
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return fsdata(
         frequencies=frequencies,
         entries=entries,
@@ -1546,6 +1489,7 @@ def construct_stftdata(
 ) -> STFTData[Grid2DSparse[Linspace, Linspace]]: ...
 
 
+@deprecated("construct_stftdata", "function", "0.8.0", alternative="stftdata")
 def construct_stftdata(
     *,
     frequencies: Axis,
@@ -1590,15 +1534,6 @@ def construct_stftdata(
     This function is deprecated and will be removed in 0.8.0; use the
     :func:`.stftdata` function with the keyword arguments instead.
     """  # noqa: E501
-    _msg = _func_deprecation_msg.format(
-        deprecated_func_name="construct_stftdata",
-        func_name="`stftdata` with keyword arguments",
-    )
-    warnings.warn(
-        _msg,
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return stftdata(
         frequencies=frequencies,
         times=times,
@@ -1633,6 +1568,7 @@ def construct_wdmdata(
 ) -> WDMData[Grid2DSparse[Linspace, Linspace]]: ...
 
 
+@deprecated("construct_wdmdata", "function", "0.8.0", alternative="wdmdata")
 def construct_wdmdata(
     *,
     frequencies: Axis,
@@ -1677,15 +1613,6 @@ def construct_wdmdata(
     This function is deprecated and will be removed in 0.8.0; use the
     :func:`.wdmdata` function with the keyword arguments instead.
     """  # noqa: E501
-    _msg = _func_deprecation_msg.format(
-        deprecated_func_name="construct_wdmdata",
-        func_name="`wdmdata` with keyword arguments",
-    )
-    warnings.warn(
-        _msg,
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return wdmdata(
         frequencies=frequencies,
         times=times,
@@ -1787,10 +1714,9 @@ def load_data(
             "The `legacy` mode of `load_data` is deprecated "
             "and will be removed in 0.9.0;"
         )
-        warnings.warn(
+        warn_external(
             msg,
             DeprecationWarning,
-            stacklevel=2,
         )
         with h5py.File(str(file_path), "r") as f:
             data_type = str(f.attrs["type"])
@@ -1816,10 +1742,9 @@ def load_data(
                 "Currently, it is inferred from the data, "
                 "but this behavior is deprecated."
             )
-            warnings.warn(
+            warn_external(
                 _msg,
                 FutureWarning,
-                stacklevel=2,
             )
         elif domain_attr != domain:
             _msg = (
