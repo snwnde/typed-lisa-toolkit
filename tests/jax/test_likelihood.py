@@ -9,9 +9,7 @@ import numpy as np
 import numpy.testing as npt
 
 from typed_lisa_toolkit import (
-    frequency_series,
     fsdata,
-    linspace_from_array,
     make_sdm,
     noise_model,
     sum_harmonics,
@@ -24,20 +22,12 @@ from typed_lisa_toolkit.types import (
 if TYPE_CHECKING:
     from conftest import (
         build_fd_pair,
+        build_fd_template_band_case,
         build_harmonic_projected_frequency_waveform,
-        dense_kernel_2ch,
+        dense_kernel_3ch,
     )
 
 jax.config.update("jax_enable_x64", val=True)
-
-
-def _build_fsdata(freqs, x_values, y_values):
-    return fsdata(
-        {
-            "X": frequency_series(freqs, x_values[None, None, None, None, :]),
-            "Y": frequency_series(freqs, y_values[None, None, None, None, :]),
-        },
-    )
 
 
 class TestFDWhittleLikelihoodJAX:
@@ -49,43 +39,47 @@ class TestFDWhittleLikelihoodJAX:
         self,
     ):
         case = build_fd_pair(jnp)
+        left = case["actual"]["left"]
+        right = case["actual"]["right"]
+        frequencies = case["expected"]["frequencies"]
         sdm = make_sdm(
-            dense_kernel_2ch(jnp),
-            frequencies=case["frequencies"].asarray(jnp),
-            channel_names=("X", "Y"),
+            dense_kernel_3ch(jnp),
+            frequencies=frequencies.asarray(jnp),
+            channel_names=("X", "Y", "Z"),
         )
         model = noise_model(sdm)
-        likelihood = whittle(case["left"], model)
+        likelihood = whittle(left, model)
 
-        cross = np.asarray(likelihood.get_cross_product(case["right"]))
-        template_square = np.asarray(likelihood.get_template_square(case["right"]))
+        cross = np.asarray(likelihood.get_cross_product(right))
+        template_square = np.asarray(likelihood.get_template_square(right))
 
         npt.assert_allclose(
             cross,
-            np.asarray(model.reset().get_scalar_product(case["left"], case["right"])),
+            np.asarray(model.reset().get_scalar_product(left, right)),
         )
         npt.assert_allclose(
             template_square,
-            np.asarray(model.reset().get_scalar_product(case["right"], case["right"])),
+            np.asarray(model.reset().get_scalar_product(right, right)),
         )
 
     def test_log_likelihood_matches_closed_form(self):
         case = build_fd_pair(jnp)
+        left = case["actual"]["left"]
+        right = case["actual"]["right"]
+        frequencies = case["expected"]["frequencies"]
         sdm = make_sdm(
-            dense_kernel_2ch(jnp),
-            frequencies=case["frequencies"].asarray(jnp),
-            channel_names=("X", "Y"),
+            dense_kernel_3ch(jnp),
+            frequencies=frequencies.asarray(jnp),
+            channel_names=("X", "Y", "Z"),
         )
         model = noise_model(sdm)
-        likelihood = whittle(case["left"], model)
+        likelihood = whittle(left, model)
 
-        got = np.asarray(likelihood.get_log_likelihood(case["right"]))
+        got = np.asarray(likelihood.get_log_likelihood(right))
         expected = (
-            np.asarray(model.reset().get_scalar_product(case["left"], case["right"]))
-            - 0.5
-            * np.asarray(model.reset().get_scalar_product(case["right"], case["right"]))
-            - 0.5
-            * np.asarray(model.reset().get_scalar_product(case["left"], case["left"]))
+            np.asarray(model.reset().get_scalar_product(left, right))
+            - 0.5 * np.asarray(model.reset().get_scalar_product(right, right))
+            - 0.5 * np.asarray(model.reset().get_scalar_product(left, left))
         )
 
         npt.assert_allclose(got, expected)
@@ -94,42 +88,33 @@ class TestFDWhittleLikelihoodJAX:
         self,
     ):
         case = build_harmonic_projected_frequency_waveform(jnp)
-        data = fsdata(sum_harmonics(case["wf"]))
+        data = fsdata(sum_harmonics(case["actual"]["wf"]))
         sdm = make_sdm(
-            dense_kernel_2ch(jnp),
-            frequencies=case["frequencies"].ax,
-            channel_names=("X", "Y"),
+            dense_kernel_3ch(jnp),
+            frequencies=case["expected"]["frequencies"].ax,
+            channel_names=("X", "Y", "Z"),
         )
         model = noise_model(sdm)
         likelihood = whittle(data, model)
 
-        got = np.asarray(likelihood.get_cross_product(case["wf"]))
+        got = np.asarray(likelihood.get_cross_product(case["actual"]["wf"]))
         expected = np.asarray(
             model.reset().get_scalar_product(
                 data,
-                fsdata(sum_harmonics(case["wf"])),
+                fsdata(sum_harmonics(case["actual"]["wf"])),
             ),
         )
 
         npt.assert_allclose(got, expected)
 
     def test_template_is_restricted_to_its_frequency_band(self):
-        freqs = jnp.array([0.0, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
-        left = _build_fsdata(
-            linspace_from_array(freqs),
-            jnp.array(
-                [1.0 + 0.0j, 0.5 + 0.1j, 2.0 - 0.2j, 1.0 + 0.5j, 0.1 + 0.0j],
-                dtype=jnp.complex128,
-            ),
-            jnp.array(
-                [0.25 + 0.0j, -0.5 + 0.25j, 1.0 + 0.0j, 0.5 - 0.25j, -0.1 + 0.0j],
-                dtype=jnp.complex128,
-            ),
-        )
+        case = build_fd_template_band_case(jnp)
+        left = case["actual"]["data"]
+        freqs = case["expected"]["frequencies"].asarray(jnp)
         template = left.get_subset(interval=(1.0, 3.0))
-        kernel = jnp.broadcast_to(jnp.eye(2, dtype=jnp.float64), (len(freqs), 2, 2))
+        kernel = jnp.broadcast_to(jnp.eye(3, dtype=jnp.float64), (len(freqs), 3, 3))
         model = noise_model(
-            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y")),
+            make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y", "Z")),
         )
         likelihood = whittle(left, model)
 
@@ -139,7 +124,7 @@ class TestFDWhittleLikelihoodJAX:
                 make_sdm(
                     kernel[1:4],
                     frequencies=template.frequencies.asarray(jnp),
-                    channel_names=("X", "Y"),
+                    channel_names=("X", "Y", "Z"),
                 ),
             ).get_scalar_product(left.get_subset(interval=(1.0, 3.0)), template),
         )
@@ -150,14 +135,16 @@ class TestFDWhittleLikelihoodJAX:
         self,
     ):
         case = build_fd_pair(jnp)
+        left = case["actual"]["left"]
+        frequencies = case["expected"]["frequencies"]
         model = noise_model(
             make_sdm(
-                dense_kernel_2ch(jnp),
-                frequencies=case["frequencies"].asarray(jnp),
-                channel_names=("X", "Y"),
+                dense_kernel_3ch(jnp),
+                frequencies=frequencies.asarray(jnp),
+                channel_names=("X", "Y", "Z"),
             ),
         )
 
-        likelihood = whittle(case["left"], model)
+        likelihood = whittle(left, model)
 
         assert isinstance(likelihood, FDWhittleLikelihood)

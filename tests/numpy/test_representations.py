@@ -2,7 +2,7 @@
 # pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false, reportUninitializedInstanceVariable=false
 
 import contextlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, final
 
 import numpy as np
 import numpy.testing as npt
@@ -23,7 +23,6 @@ from typed_lisa_toolkit import (
     utils,
 )
 from typed_lisa_toolkit.types import (
-    STFT,
     FrequencySeries,
     Grid2DSparse,
     Linspace,
@@ -38,14 +37,30 @@ from typed_lisa_toolkit.types.representations import (
 )
 
 if TYPE_CHECKING:
-    from conftest import build_canonical_representations
+    from conftest import (
+        build_canonical_representations,
+        build_stft_make_classmethod_case,
+        build_stft_times_and_frequencies_case,
+        build_wdm_pair,
+    )
 
 SEED = 11324214
 rng = np.random.default_rng(SEED)
 
 
-class TestCanonicalShape:
-    """Test semantic benefits of canonical shape: (n_batches, n_channels, n_harmonics, n_features, *grid_dims)."""  # noqa: E501
+@pytest.fixture
+def stft_make_classmethod_case():
+    return build_stft_make_classmethod_case(np)
+
+
+@pytest.fixture
+def stft_times_and_frequencies_case():
+    return build_stft_times_and_frequencies_case(np)
+
+
+@final
+class TestL2DContractNumpy:
+    """Test l2d-interface runtime contract compliance with NumPy backend."""
 
     def setup_method(self):
         """Create test fixtures for canonical shape tests."""
@@ -69,10 +84,6 @@ class TestCanonicalShape:
         self.fs = case["fs"]
         self.ts = case["ts"]
         self.stft = case["tf"]
-
-
-class TestL2DContractNumpy(TestCanonicalShape):
-    """Test l2d-interface runtime contract compliance with NumPy backend."""
 
     def test_representation_contract(self):
         times = axis(np.linspace(0.0, 1.0, 16))
@@ -106,12 +117,13 @@ class TestL2DContractNumpy(TestCanonicalShape):
         times = tlt.linspace(0.0, 1.0, 16)
         x = time_series(times, entries=rng.standard_normal((1, 1, 1, 1, len(times))))
         y = time_series(times, entries=rng.standard_normal((1, 1, 1, 1, len(times))))
+        z = time_series(times, entries=rng.standard_normal((1, 1, 1, 1, len(times))))
 
-        data = tsdata({"X": x, "Y": y})
+        data = tsdata({"X": x, "Y": y, "Z": z})
         kernel = np.asarray(data.get_kernel())
         assert data.domain == "time"
-        assert data.channel_names == ("X", "Y")
-        assert kernel.shape == (1, 2, 1, 1, len(times))
+        assert data.channel_names == ("X", "Y", "Z")
+        assert kernel.shape == (1, 3, 1, 1, len(times))
 
         x_view = data["X"]
         x_entries = np.asarray(x_view.entries)
@@ -293,6 +305,7 @@ class TestL2DContractNumpy(TestCanonicalShape):
         assert semantic_slice_fs.shape[1] == 1  # single channel
 
 
+@final
 class TestSubsetOperations:
     """Test subset operations with canonical shapes."""
 
@@ -391,7 +404,7 @@ class TestSubsetOperations:
     def test_take_subset_1d(self):
         """Test _take_subset with 1D grid and canonical shape."""
         # Create grid and canonical entries with parameterized shape
-        grid = (np.linspace(0, 10, self.len_grid_small),)
+        grid = (axis(np.linspace(0, 10, self.len_grid_small)),)
         entries = rng.standard_normal(
             (
                 self.n_batches,
@@ -635,6 +648,7 @@ class TestEmbedOperations:
         assert ts_large.entries.shape == (2, 1, 1, 1, 100)
 
 
+@final
 class TestArithmeticOperations:
     """Test arithmetic operations with canonical shapes."""
 
@@ -1102,6 +1116,7 @@ class TestLinspace:
             assert Linspace.get_step(ar) == step
 
 
+@final
 class TestComplexProperties:
     """Test complex number handling and properties."""
 
@@ -1219,6 +1234,7 @@ class TestComplexProperties:
         )
 
 
+@final
 class TestPropertiesAndAliases:
     """Test property access like df, dt, resolution."""
 
@@ -1333,6 +1349,7 @@ class TestPropertiesAndAliases:
         )
 
 
+@final
 class TestGridTupleHandling:
     """Test that grids are always tuples, even for 1D."""
 
@@ -1392,6 +1409,7 @@ class TestGridTupleHandling:
         )
 
 
+@final
 class TestEdgeCases:
     """Test edge cases and error handling."""
 
@@ -1494,9 +1512,7 @@ class TestEdgeCases:
         )
 
 
-# It's a design choice to not validate shape on construction,
-# so some tests are commented out.
-# If strict validation is added, they should be re-enabled.
+@final
 class TestErrorHandling:
     """Test error handling and validation for invalid operations."""
 
@@ -1543,18 +1559,14 @@ class TestErrorHandling:
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                100,
                 50,
+                100,
             )
         )
 
-        # Correct structure: tuple of exactly two grids
-        tf_correct = STFT(grid=(times, freqs), entries=entries)
+        # Public API path: stft() always builds a 2-axis time-frequency grid.
+        tf_correct = stft(freqs, times, entries=entries)
         assert len(tf_correct.grid) == 2
-
-        # Wrong number of grids (three): may succeed or fail depending on implementation
-        with contextlib.suppress(ValueError):
-            STFT(grid=(times, freqs, times), entries=entries)
 
     def test_invalid_subset_interval(self):
         """Test that subset intervals are handled gracefully."""
@@ -1592,7 +1604,7 @@ class TestLinspaceExtraProperties:
         ],
     )
     def test_linspace_helpers(self, linspace_helpers, method_name):
-        getattr(linspace_helpers, method_name)()
+        linspace_helpers[method_name]()
 
 
 class TestHelperFunctions:
@@ -1607,7 +1619,7 @@ class TestHelperFunctions:
         ],
     )
     def test_helper_functions(self, representation_helpers, method_name):
-        getattr(representation_helpers, method_name)(np)
+        representation_helpers[method_name](np)
 
 
 class TestAdvancedRepresentationMethods:
@@ -1622,18 +1634,26 @@ class TestAdvancedRepresentationMethods:
         ],
     )
     def test_advanced_representation_methods(
-        self, advanced_representation_helpers, method_name
+        self,
+        advanced_representation_helpers,
+        method_name,
+        stft_make_classmethod_case,
+        stft_times_and_frequencies_case,
     ):
-        method = getattr(advanced_representation_helpers, method_name)
+        method = advanced_representation_helpers[method_name]
         if method_name in {
             "test_stft_make_classmethod",
             "test_stft_times_and_frequencies_properties",
         }:
-            method()
+            if method_name == "test_stft_make_classmethod":
+                method(stft_make_classmethod_case)
+            else:
+                method(stft_times_and_frequencies_case)
             return
         method(np)
 
 
+@final
 class TestArithmeticAddMethods:
     """Test add/iadd/iadd-operator methods on representations."""
 
@@ -1734,6 +1754,7 @@ class TestArithmeticAddMethods:
         assert np.allclose(fs.entries[0, 0, 0, 0, 10:20], 0.0)
 
 
+@final
 class TestPhasor:
     """Test Phasor representation class."""
 
@@ -1845,9 +1866,9 @@ class TestWDMPropertiesAndMethods:
             "test_get_subset_freq",
         ],
     )
-    def test_wdm_helpers(self, wdm_helpers, build_wdm_pair, method_name):
-        wdm = build_wdm_pair(np)["left"]["X"]
-        getattr(wdm_helpers, method_name)(wdm)
+    def test_wdm_helpers(self, wdm_helpers, method_name):
+        wdm = build_wdm_pair(np)["actual"]["left"]["X"]
+        wdm_helpers[method_name](wdm)
 
 
 class TestSparse2DGridRepresentations:
@@ -1868,8 +1889,8 @@ class TestSparse2DGridRepresentations:
         source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
 
         embedding_grid = (
-            np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
-            np.array([3.0, 4.0, 5.0, 6.0, 7.0, 8.0]),
+            axis(np.array([10.0, 20.0, 30.0, 40.0, 50.0])),
+            axis(np.array([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])),
         )
         known_slices = (slice(1, 4), slice(2, 5))
 
@@ -1958,12 +1979,12 @@ class TestSparse2DGridRepresentations:
 
 class TestRepresentationErrorBranches:
     def test_get_subset_slice_rejects_interval_and_slice_together(self):
-        grid = np.linspace(0.0, 1.0, 11)
+        _axis = axis(np.linspace(0.0, 1.0, 11))
         with pytest.raises(ValueError, match=r".+"):
-            _get_subset_slice(grid, interval=(0.2, 0.6), slice=slice(2, 7))
+            _get_subset_slice(_axis, interval=(0.2, 0.6), slice=slice(2, 7))
 
     def test_take_subset_rejects_wrong_number_of_slices(self):
-        grid = (np.linspace(0.0, 1.0, 11), np.linspace(0.0, 2.0, 21))
+        grid = (axis(np.linspace(0.0, 1.0, 11)), axis(np.linspace(0.0, 2.0, 21)))
         entries = np.zeros((1, 1, 1, 1, 11, 21))
 
         with pytest.raises(ValueError, match=r".+"):

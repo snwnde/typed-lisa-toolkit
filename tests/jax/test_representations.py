@@ -44,12 +44,24 @@ from typed_lisa_toolkit.types.representations import (
 if TYPE_CHECKING:
     from conftest import (
         build_canonical_representations,
+        build_stft_make_classmethod_case,
+        build_stft_times_and_frequencies_case,
     )
 
 jax.config.update("jax_enable_x64", val=True)
 
 SEED = 11324214
 rng = np.random.default_rng(SEED)
+
+
+@pytest.fixture
+def stft_make_classmethod_case():
+    return build_stft_make_classmethod_case(jnp)
+
+
+@pytest.fixture
+def stft_times_and_frequencies_case():
+    return build_stft_times_and_frequencies_case(jnp)
 
 
 class TestCanonicalShapeJAX:
@@ -1691,7 +1703,7 @@ class TestLinspaceExtraPropertiesJAX:
         ],
     )
     def test_linspace_helpers(self, linspace_helpers, method_name):
-        getattr(linspace_helpers, method_name)()
+        linspace_helpers[method_name]()
 
 
 class TestHelperFunctionsJAX:
@@ -1706,7 +1718,7 @@ class TestHelperFunctionsJAX:
         ],
     )
     def test_helper_functions(self, representation_helpers, method_name):
-        getattr(representation_helpers, method_name)(jnp)
+        representation_helpers[method_name](jnp)
 
 
 class TestAdvancedRepresentationMethodsJAX:
@@ -1721,14 +1733,21 @@ class TestAdvancedRepresentationMethodsJAX:
         ],
     )
     def test_advanced_representation_methods(
-        self, advanced_representation_helpers, method_name
+        self,
+        advanced_representation_helpers,
+        method_name,
+        stft_make_classmethod_case,
+        stft_times_and_frequencies_case,
     ):
-        method = getattr(advanced_representation_helpers, method_name)
+        method = advanced_representation_helpers[method_name]
         if method_name in {
             "test_stft_make_classmethod",
             "test_stft_times_and_frequencies_properties",
         }:
-            method()
+            if method_name == "test_stft_make_classmethod":
+                method(stft_make_classmethod_case)
+            else:
+                method(stft_times_and_frequencies_case)
             return
         method(jnp)
 
@@ -1942,9 +1961,9 @@ class TestWDMPropertiesAndMethodsJAX:
             "test_get_subset_freq",
         ],
     )
-    def test_wdm_helpers(self, wdm_helpers, build_wdm_pair, method_name):
-        wdm = build_wdm_pair(jnp)["left"]["X"]
-        getattr(wdm_helpers, method_name)(wdm)
+    def test_wdm_helpers(self, wdm_helpers, method_name):
+        wdm = build_wdm_pair(jnp)["actual"]["left"]["X"]
+        wdm_helpers[method_name](wdm)
 
 
 class TestSparse2DGridRepresentationsJAX:

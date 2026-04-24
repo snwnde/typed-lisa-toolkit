@@ -1,67 +1,28 @@
 """Unit tests for shop/conversions.py (JAX backend)."""
 
+from typing import TYPE_CHECKING
+
 import jax
 import jax.numpy as jnp
 import numpy as np
 import numpy.testing as npt
 import pytest
 
-from typed_lisa_toolkit import linspace, shop, time_series, tsdata
-from typed_lisa_toolkit.types import (
-    EvolutionarySpectralDensity,
-    SpectralDensity,
-    TSData,
-)
+from typed_lisa_toolkit import make_sdm, shop
+
+if TYPE_CHECKING:
+    from conftest import (
+        build_xyz_evolutionary_spectral_density,
+        build_xyz_spectral_density,
+        build_xyz_tsdata_case,
+    )
 
 jax.config.update("jax_enable_x64", val=True)
 
 
-def _build_xyz_tsdata_jax(n: int = 8) -> TSData:
-    times = linspace(0.0, 3.5, n)
-    x = jnp.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=jnp.float64)
-    y = jnp.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=jnp.float64)
-    z = jnp.asarray([-0.2, 0.3, -0.1, 0.5, -0.7, 0.9, -0.4, 0.2], dtype=jnp.float64)
-    return tsdata(
-        {
-            "X": time_series(times, x[None, None, None, None, :]),
-            "Y": time_series(times, y[None, None, None, None, :]),
-            "Z": time_series(times, z[None, None, None, None, :]),
-        },
-    )
-
-
-def _build_xyz_spectral_density_jax() -> SpectralDensity:
-    frequencies = jnp.array([0.25, 0.5, 0.75], dtype=jnp.float64)
-    inverse_sdm = jnp.broadcast_to(
-        jnp.array(
-            [[2.0, 0.2, -0.1], [0.2, 1.5, 0.3], [-0.1, 0.3, 1.2]],
-            dtype=jnp.float64,
-        ),
-        (len(frequencies), 3, 3),
-    )
-    return SpectralDensity(frequencies, inverse_sdm, ["X", "Y", "Z"])
-
-
-def _build_xyz_evolutionary_spectral_density_jax() -> EvolutionarySpectralDensity:
-    frequencies = jnp.array([0.25, 0.5], dtype=jnp.float64)
-    times = jnp.array([0.0, 1.0], dtype=jnp.float64)
-    base = jnp.array(
-        [[2.0, 0.2, -0.1], [0.2, 1.5, 0.3], [-0.1, 0.3, 1.2]],
-        dtype=jnp.float64,
-    )
-    scales = jnp.array([[1.0, 1.05], [1.1, 1.15]], dtype=jnp.float64)
-    inverse_esdm = scales[:, :, None, None] * base[None, None, :, :]
-    return EvolutionarySpectralDensity(
-        frequencies,
-        times,
-        inverse_esdm,
-        ["X", "Y", "Z"],
-    )
-
-
 class TestConversionsJax:
     def test_xyz_aet_roundtrip_tsdata(self):
-        xyz = _build_xyz_tsdata_jax()
+        xyz = build_xyz_tsdata_case(jnp)["actual"]["data"]
 
         aet = shop.xyz2aet(xyz)
         recovered = shop.aet2xyz(aet)
@@ -76,7 +37,7 @@ class TestConversionsJax:
         )
 
     def test_xyz_aet_roundtrip_spectral_density(self):
-        xyz_sdm = _build_xyz_spectral_density_jax()
+        xyz_sdm = build_xyz_spectral_density(jnp)
 
         aet_sdm = shop.xyz2aet(xyz_sdm)
         recovered = shop.aet2xyz(aet_sdm)
@@ -90,7 +51,7 @@ class TestConversionsJax:
         )
 
     def test_xyz_aet_roundtrip_evolutionary_spectral_density(self):
-        xyz_esdm = _build_xyz_evolutionary_spectral_density_jax()
+        xyz_esdm = build_xyz_evolutionary_spectral_density(jnp)
 
         aet_esdm = shop.xyz2aet(xyz_esdm)
         recovered = shop.aet2xyz(aet_esdm)
@@ -104,7 +65,7 @@ class TestConversionsJax:
         )
 
     def test_xyz2aet_with_xyz_and_xyz_components_raises(self):
-        xyz = _build_xyz_tsdata_jax()
+        xyz = build_xyz_tsdata_case(jnp)["actual"]["data"]
         with pytest.raises(ValueError, match="Cannot specify both xyz and X, Y, Z"):
             shop.xyz2aet(  # pyright: ignore[reportCallIssue]
                 xyz,
@@ -114,7 +75,7 @@ class TestConversionsJax:
             )
 
     def test_aet2xyz_with_aet_and_aet_components_raises(self):
-        aet = shop.xyz2aet(_build_xyz_tsdata_jax())
+        aet = shop.xyz2aet(build_xyz_tsdata_case(jnp)["actual"]["data"])
         with pytest.raises(ValueError, match="Cannot specify both aet and A, E, T"):
             shop.aet2xyz(  # pyright: ignore[reportCallIssue]
                 aet,
@@ -160,11 +121,19 @@ class TestConversionsJax:
         freqs = jnp.array([0.25, 0.5], dtype=jnp.float64)
         kernel = jnp.broadcast_to(jnp.eye(3, dtype=jnp.float64), (2, 3, 3))
 
-        wrong_xyz_input = SpectralDensity(freqs, kernel, ["A", "E", "T"])
+        wrong_xyz_input = make_sdm(
+            kernel,
+            frequencies=freqs,
+            channel_names=("A", "E", "T"),
+        )
         with pytest.raises(ValueError, match="Expected original channel order"):
             shop.xyz2aet(wrong_xyz_input)
 
-        wrong_aet_input = SpectralDensity(freqs, kernel, ["X", "Y", "Z"])
+        wrong_aet_input = make_sdm(
+            kernel,
+            frequencies=freqs,
+            channel_names=("X", "Y", "Z"),
+        )
         with pytest.raises(ValueError, match="Expected original channel order"):
             shop.aet2xyz(wrong_aet_input)
 

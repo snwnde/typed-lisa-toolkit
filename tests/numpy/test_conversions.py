@@ -1,65 +1,24 @@
 """Unit tests for shop/conversions.py (NumPy backend)."""
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import numpy.testing as npt
 import pytest
 
-from typed_lisa_toolkit import linspace, shop, time_series, tsdata
-from typed_lisa_toolkit.types import (
-    EvolutionarySpectralDensity,
-    SpectralDensity,
-    TSData,
-)
+from typed_lisa_toolkit import make_sdm, shop
 
-
-def _build_xyz_tsdata_numpy(n: int = 8) -> TSData:
-    times = linspace(0.0, 3.5, n)
-    x = np.asarray([0.0, 1.0, -0.5, 0.75, -1.25, 0.5, 0.25, -0.1], dtype=np.float64)
-    y = np.asarray([1.0, -0.5, 0.25, 0.0, 0.4, -0.2, 0.6, -0.8], dtype=np.float64)
-    z = np.asarray([-0.2, 0.3, -0.1, 0.5, -0.7, 0.9, -0.4, 0.2], dtype=np.float64)
-    return tsdata(
-        {
-            "X": time_series(times, x[None, None, None, None, :]),
-            "Y": time_series(times, y[None, None, None, None, :]),
-            "Z": time_series(times, z[None, None, None, None, :]),
-        },
-    )
-
-
-def _build_xyz_spectral_density_numpy() -> SpectralDensity:
-    frequencies = np.array([0.25, 0.5, 0.75], dtype=np.float64)
-    inverse_sdm = np.broadcast_to(
-        np.array(
-            [[2.0, 0.2, -0.1], [0.2, 1.5, 0.3], [-0.1, 0.3, 1.2]],
-            dtype=np.float64,
-        ),
-        (len(frequencies), 3, 3),
-    ).copy()
-    return SpectralDensity(frequencies, inverse_sdm, ["X", "Y", "Z"])
-
-
-def _build_xyz_evolutionary_spectral_density_numpy() -> EvolutionarySpectralDensity:
-    frequencies = np.array([0.25, 0.5], dtype=np.float64)
-    times = np.array([0.0, 1.0], dtype=np.float64)
-    base = np.array(
-        [[2.0, 0.2, -0.1], [0.2, 1.5, 0.3], [-0.1, 0.3, 1.2]],
-        dtype=np.float64,
-    )
-    inverse_esdm = np.zeros((len(frequencies), len(times), 3, 3), dtype=np.float64)
-    for i in range(len(frequencies)):
-        for j in range(len(times)):
-            inverse_esdm[i, j] = base * (1.0 + 0.1 * i + 0.05 * j)
-    return EvolutionarySpectralDensity(
-        frequencies,
-        times,
-        inverse_esdm,
-        ["X", "Y", "Z"],
+if TYPE_CHECKING:
+    from conftest import (
+        build_xyz_evolutionary_spectral_density,
+        build_xyz_spectral_density,
+        build_xyz_tsdata_case,
     )
 
 
 class TestConversionsNumpy:
     def test_xyz_aet_roundtrip_tsdata(self):
-        xyz = _build_xyz_tsdata_numpy()
+        xyz = build_xyz_tsdata_case(np)["actual"]["data"]
 
         aet = shop.xyz2aet(xyz)
         recovered = shop.aet2xyz(aet)
@@ -74,7 +33,7 @@ class TestConversionsNumpy:
         )
 
     def test_xyz_aet_roundtrip_spectral_density(self):
-        xyz_sdm = _build_xyz_spectral_density_numpy()
+        xyz_sdm = build_xyz_spectral_density(np)
 
         aet_sdm = shop.xyz2aet(xyz_sdm)
         recovered = shop.aet2xyz(aet_sdm)
@@ -88,7 +47,7 @@ class TestConversionsNumpy:
         )
 
     def test_xyz_aet_roundtrip_evolutionary_spectral_density(self):
-        xyz_esdm = _build_xyz_evolutionary_spectral_density_numpy()
+        xyz_esdm = build_xyz_evolutionary_spectral_density(np)
 
         aet_esdm = shop.xyz2aet(xyz_esdm)
         recovered = shop.aet2xyz(aet_esdm)
@@ -102,12 +61,12 @@ class TestConversionsNumpy:
         )
 
     def test_xyz2aet_with_xyz_and_xyz_components_raises(self):
-        xyz = _build_xyz_tsdata_numpy()
+        xyz = build_xyz_tsdata_case(np)["actual"]["data"]
         with pytest.raises(ValueError, match="Cannot specify both xyz and X, Y, Z"):
             shop.xyz2aet(xyz, X=np.array([1.0]), Y=np.array([2.0]), Z=np.array([3.0]))  # pyright: ignore[reportCallIssue]
 
     def test_aet2xyz_with_aet_and_aet_components_raises(self):
-        aet = shop.xyz2aet(_build_xyz_tsdata_numpy())
+        aet = shop.xyz2aet(build_xyz_tsdata_case(np)["actual"]["data"])
         with pytest.raises(ValueError, match="Cannot specify both aet and A, E, T"):
             shop.aet2xyz(aet, A=np.array([1.0]), E=np.array([2.0]), T=np.array([3.0]))  # pyright: ignore[reportCallIssue]
 
@@ -148,11 +107,19 @@ class TestConversionsNumpy:
         freqs = np.array([0.25, 0.5], dtype=np.float64)
         kernel = np.broadcast_to(np.eye(3, dtype=np.float64), (2, 3, 3)).copy()
 
-        wrong_xyz_input = SpectralDensity(freqs, kernel, ["A", "E", "T"])
+        wrong_xyz_input = make_sdm(
+            kernel,
+            frequencies=freqs,
+            channel_names=("A", "E", "T"),
+        )
         with pytest.raises(ValueError, match="Expected original channel order"):
             shop.xyz2aet(wrong_xyz_input)
 
-        wrong_aet_input = SpectralDensity(freqs, kernel, ["X", "Y", "Z"])
+        wrong_aet_input = make_sdm(
+            kernel,
+            frequencies=freqs,
+            channel_names=("X", "Y", "Z"),
+        )
         with pytest.raises(ValueError, match="Expected original channel order"):
             shop.aet2xyz(wrong_aet_input)
 
