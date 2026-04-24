@@ -1,5 +1,5 @@
 """Tests for likelihood computations with NumPy arrays."""
-# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
 
 from typing import TYPE_CHECKING
 
@@ -38,8 +38,8 @@ def _build_fsdata(freqs, x_values, y_values):
 
 class TestFDWhittleLikelihoodNumpy:
     def test_classmethod_formulas(self):
-        assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0
-        assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0
+        assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0  # pyright: ignore[reportArgumentType]
+        assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0  # pyright: ignore[reportArgumentType]
 
     def test_cross_product_and_template_square_match_noise_model(
         self,
@@ -93,7 +93,7 @@ class TestFDWhittleLikelihoodNumpy:
         data = fsdata(sum_harmonics(case["wf"]))
         sdm = make_sdm(
             dense_kernel_2ch(np),
-            frequencies=case["frequencies"],
+            frequencies=case["frequencies"].ax,
             channel_names=("X", "Y"),
         )
         model = noise_model(sdm)
@@ -140,7 +140,7 @@ class TestFDWhittleLikelihoodNumpy:
         model = noise_model(
             make_sdm(
                 dense_kernel_2ch(np),
-                frequencies=case["frequencies"],
+                frequencies=case["frequencies"].asarray(np),
                 channel_names=("X", "Y"),
             ),
         )

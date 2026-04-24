@@ -5,9 +5,8 @@ from types import ModuleType
 from typing import Literal, overload
 
 from .. import _constructors  # pyright: ignore[reportPrivateUsage]
-from ..types import Array, Grid2DCartesian, Linspace, data
+from ..types import AnyAxis, Array, Axis, AxLike, Grid2DCartesian, Linspace, data
 from ..types import representations as reps
-from ..types.misc import Axis
 
 
 def _import_wdm_transform() -> ModuleType:
@@ -54,7 +53,7 @@ def time2freq(
 
 @overload
 def time2freq(
-    ts: reps.TimeSeries[Linspace],
+    ts: reps.TimeSeries[Axis[Linspace]],
     /,
     *,
     keep_time: bool = True,
@@ -62,7 +61,7 @@ def time2freq(
 
 
 def time2freq(
-    td: reps.TimeSeries[Linspace] | data.TSData,
+    td: reps.TimeSeries[Axis[Linspace]] | data.TSData,
     /,
     *,
     keep_time: bool = True,
@@ -82,9 +81,9 @@ def time2freq(
             "which are required for `time2freq`."
         )
         raise NotImplementedError(msg) from e
-    _freqs = fft.rfftfreq(len(td.times), d=td.times.step)
+    _freqs = fft.rfftfreq(len(td.times), d=td.times.ax.step)
     freqs = _constructors.linspace(_freqs[0], _freqs[-1], len(_freqs))
-    signal = fft.rfft(td.get_kernel() * td.times.step, axis=-1)
+    signal = fft.rfft(td.get_kernel() * td.times.ax.step, axis=-1)
     if isinstance(td, reps.TimeSeries):
         return _constructors.frequency_series(
             frequencies=freqs,
@@ -102,23 +101,23 @@ def time2freq(
 
 
 @overload
-def freq2time(fsd: data.FSData, /, *, times: Axis) -> data.TSData: ...
+def freq2time(fsd: data.FSData, /, *, times: AnyAxis | AxLike) -> data.TSData: ...
 
 
 @overload
 def freq2time(
-    fsd: reps.FrequencySeries[Linspace],
+    fsd: reps.FrequencySeries[Axis[Linspace]],
     /,
     *,
-    times: Axis,
+    times: AnyAxis | AxLike,
 ) -> reps.UniformTimeSeries: ...
 
 
 def freq2time(
-    fd: reps.FrequencySeries[Linspace] | data.FSData,
+    fd: reps.FrequencySeries[Axis[Linspace]] | data.FSData,
     /,
     *,
-    times: Axis,
+    times: AnyAxis | AxLike,
 ):
     """Convert frequency-domain representation or data to time-domain representation or data using the inverse real FFT."""  # noqa: E501
     xp = fd.xp
@@ -130,12 +129,14 @@ def freq2time(
             "which are required for `freq2time`."
         )
         raise NotImplementedError(msg) from e
-    _times = Linspace.make(times)
+    _times = (
+        Linspace.make(times) if not isinstance(times, Axis) else Linspace.make(times.ax)
+    )
     is_even = len(fd.frequencies) % 2 == 0
     nyquist_freq = (
         fd.frequencies.stop
         if is_even
-        else fd.frequencies.stop + fd.frequencies.step / 2
+        else fd.frequencies.stop + fd.frequencies.ax.step / 2
     )
     nyquist_dt = 1.0 / (2 * nyquist_freq)
     if _times.step < nyquist_dt and not xp.isclose(_times.step, nyquist_dt):
@@ -159,20 +160,26 @@ def time2wdm(
     *,
     Nt: int,  # noqa: N803
     Nf: int,  # noqa: N803
-) -> data.WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> data.WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
 def time2wdm(
-    tseries: reps.TimeSeries[Linspace],
+    tseries: reps.TimeSeries[Axis[Linspace]],
     /,
     *,
     Nt: int,  # noqa: N803
     Nf: int,  # noqa: N803
-) -> reps.WDM[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> reps.WDM[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
-def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf: int):  # noqa: N803
+def time2wdm(
+    tthing: data.TSData | reps.TimeSeries[Axis[Linspace]],
+    /,
+    *,
+    Nt: int,  # noqa: N803
+    Nf: int,  # noqa: N803
+):
     """Transform a time series to WDM.
 
     .. note::
@@ -212,7 +219,7 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
     assert isinstance(tthing, reps.TimeSeries)  # noqa: S101
     tseries = tthing
 
-    if Nt * Nf > tseries.times.num:
+    if Nt * Nf > tseries.times.ax.num:
         msg = "Time series too small for given Nf and Nt"
         raise ValueError(msg)
 
@@ -227,13 +234,13 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
         nf=Nf,
         a=DEFAULT_WINDOW_A,
         d=DEFAULT_WINDOW_D,
-        dt=tseries.times.step,
+        dt=tseries.times.ax.step,
     ).T
     if coeffs.shape != (Nf + 1, Nt):
         msg = "Unexpected shape of WDM coefficients."
         raise ValueError(msg)
 
-    dT = Nf * tseries.times.step  # noqa: N806
+    dT = Nf * tseries.times.ax.step  # noqa: N806
     dF = 0.5 / dT  # noqa: N806
     tgrid = Linspace(start=tseries.times.start, step=dT, num=Nt)
     fgrid = Linspace(start=0, step=dF, num=Nf + 1)
@@ -247,21 +254,21 @@ def time2wdm(tthing: data.TSData | reps.TimeSeries[Linspace], /, *, Nt: int, Nf:
 
 @overload
 def wdm2time(
-    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    wdmdata: data.WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]],
     /,
 ) -> data.TSData: ...
 
 
 @overload
 def wdm2time(
-    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]],
+    wdm: reps.WDM[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]],
     /,
 ) -> reps.UniformTimeSeries: ...
 
 
 def wdm2time(
-    wdmthing: reps.WDM[Grid2DCartesian[Linspace, Linspace]]
-    | data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    wdmthing: reps.WDM[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]
+    | data.WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]],
     /,
 ):
     """Transform WDM expansion to equivalent time series.
@@ -305,13 +312,13 @@ def wdm2time(
 
 @overload
 def freq2wdm(
-    fseries: reps.FrequencySeries[Linspace],
+    fseries: reps.FrequencySeries[Axis[Linspace]],
     /,
     *,
     Nt: int,  # noqa: N803
     Nf: int,  # noqa: N803
     t0: float = 0.0,
-) -> reps.WDM[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> reps.WDM[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
@@ -322,11 +329,11 @@ def freq2wdm(
     Nt: int,  # noqa: N803
     Nf: int,  # noqa: N803
     t0: float = 0.0,
-) -> data.WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> data.WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 def freq2wdm(
-    fthing: reps.FrequencySeries[Linspace] | data.FSData,
+    fthing: reps.FrequencySeries[Axis[Linspace]] | data.FSData,
     /,
     *,
     Nt: int,  # noqa: N803
@@ -362,7 +369,7 @@ def freq2wdm(
     fseries = fthing
     backend = _get_backend()
     tseries_entries = backend.fft.irfft(fseries.entries, n=Nf * Nt)
-    duration = 1 / fseries.frequencies.step
+    duration = 1 / fseries.frequencies.ax.step
     dt = duration / (Nf * Nt)
     tseries_grid = Linspace(start=t0, step=dt, num=Nf * Nt)
     tseries = _constructors.time_series(tseries_grid, tseries_entries)
@@ -371,21 +378,21 @@ def freq2wdm(
 
 @overload
 def wdm2freq(
-    wdmdata: data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    wdmdata: data.WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]],
     /,
 ) -> data.FSData: ...
 
 
 @overload
 def wdm2freq(
-    wdm: reps.WDM[Grid2DCartesian[Linspace, Linspace]],
+    wdm: reps.WDM[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]],
     /,
 ) -> reps.UniformFrequencySeries: ...
 
 
 def wdm2freq(
-    wdmthing: reps.WDM[Grid2DCartesian[Linspace, Linspace]]
-    | data.WDMData[Grid2DCartesian[Linspace, Linspace]],
+    wdmthing: reps.WDM[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]
+    | data.WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]],
     /,
 ):
     """Transform WDM expansion to a frequency series.

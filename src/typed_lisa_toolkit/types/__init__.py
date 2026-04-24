@@ -221,10 +221,12 @@ from .data import (
 )
 from .likelihood import FDWhittleLikelihood, Likelihood, WhittleLikelihood
 from .misc import (
+    AnyAxis,
     AnyGrid,
     Array,
     ArrayFunc,
     Axis,
+    AxLike,
     Domain,
     Grid1D,
     Grid2D,
@@ -278,9 +280,11 @@ __all__ = [
     "QNM",
     "STFT",
     "WDM",
+    "AnyAxis",
     "AnyGrid",
     "Array",
     "ArrayFunc",
+    "AxLike",
     "Axis",
     "DiagonalSpectralDensity",
     "Domain",

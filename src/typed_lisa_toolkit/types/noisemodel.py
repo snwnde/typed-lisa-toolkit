@@ -18,7 +18,7 @@ from .. import utils
 from . import _mixins, waveforms
 from . import data as dm
 from . import representations as reps
-from .misc import Array, Axis, Domain, Grid2D, Linspace
+from .misc import AnyAxis, Array, Axis, Domain, Grid2D, Linspace
 
 
 def _import_quadax() -> ModuleType:
@@ -51,10 +51,10 @@ log = logging.getLogger(__name__)
 
 
 ChnName = str
-FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries[Axis]]
+FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries[AnyAxis]]
 TFEntry = (
-    dm.WDMData[Grid2D[Linspace, Linspace]]
-    | waveforms.ProjectedWaveform[reps.WDM[Grid2D[Linspace, Linspace]]]
+    dm.WDMData[Grid2D[Axis[Linspace], Axis[Linspace]]]
+    | waveforms.ProjectedWaveform[reps.WDM[Grid2D[Axis[Linspace], Axis[Linspace]]]]
 )
 IntegrationMethod = Literal["trapezoid", "simpson"]
 
@@ -333,7 +333,9 @@ class NoiseModelLike[EntryT1: _EntryInDomain[Domain], EntryT2: _EntryInDomain[Do
 
 
 class FDNoiseModel(
-    NoiseModelLike[dm.FSData, waveforms.ProjectedWaveform[reps.FrequencySeries[Axis]]],
+    NoiseModelLike[
+        dm.FSData, waveforms.ProjectedWaveform[reps.FrequencySeries[AnyAxis]]
+    ],
 ):
     """Frequency domain noise model.
 
@@ -543,7 +545,7 @@ class FDNoiseModel(
         """
         xp = _first_entries(left).__array_namespace__()
         two_sided_freq = xp.fft.fftshift(
-            xp.fft.fftfreq(len(left.times), left.times.step),
+            xp.fft.fftfreq(len(left.times), left.times.ax.step),
         )
         _first = next(iter(left.values()))
         frequencies, df = _mixins.to_array(_first.frequencies, xp), _first.df

@@ -15,6 +15,7 @@ import pytest
 
 import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
+    axis,
     construct_fsdata,
     construct_stftdata,
     construct_timed_fsdata,
@@ -210,7 +211,7 @@ class TestDataContainersJAX:
 
     def test_get_embedded_expands_frequency_grid(self):
         case = build_fdata(jnp)
-        embedding = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0, 5.0], dtype=jnp.float64)
+        embedding = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0, 5.0], dtype=jnp.float64))
 
         embedded = case.get_embedded((embedding,))
         got = np.asarray(embedded.get_kernel())

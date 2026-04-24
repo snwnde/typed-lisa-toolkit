@@ -11,6 +11,7 @@ import numpy.testing as npt
 import pytest
 
 from typed_lisa_toolkit import (
+    axis,
     densify_phasor,
     densify_phasor_hpw,
     densify_phasor_hw,
@@ -208,10 +209,11 @@ class TestDenseMakerJAX:
     def test_dense_maker_embed_false_calls_interpolated_only(self):
         # Full frequency grid (JAX array) passed to `make`;
         # each phasor covers a sub-range.
-        frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        frequencies = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64))
+        entries = jnp.asarray([10.0, 20.0, 30.0, 40.0, 50.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
         wf, handles = build_harmonic_projected_phasor_waveform()
-        self._bind_entries(handles, frequencies)
+        self._bind_entries(handles, entries)
 
         # Build the two-level closure: get_dense_maker binds the interpolator,
         # maker(frequencies) binds the target grid and embed flag.
@@ -248,10 +250,11 @@ class TestDenseMakerJAX:
                 interpolated.get_embedded.assert_not_called()
 
     def test_dense_maker_embed_true_calls_embedded(self):
-        frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        frequencies = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64))
+        entries = jnp.asarray([10.0, 20.0, 30.0, 40.0, 50.0], dtype=jnp.float64)
         interpolator = MagicMock(name="interpolator")
         wf, handles = build_harmonic_projected_phasor_waveform()
-        self._bind_entries(handles, frequencies)
+        self._bind_entries(handles, entries)
 
         maker = get_dense_maker(interpolator)
         fn = maker(frequencies, embed=True)
@@ -291,7 +294,7 @@ class TestDenseMakerJAX:
 
 class TestDensifyHelpersJAX:
     def test_densify_phasor_embed_false(self):
-        frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        frequencies = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64))
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, _ = make_mock_phasor(
             f_min=1.0,
@@ -310,7 +313,7 @@ class TestDensifyHelpersJAX:
         assert out is interpolated
 
     def test_densify_phasor_embed_true(self):
-        frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        frequencies = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64))
         interpolator = MagicMock(name="interpolator")
         phasor, interpolated, embedded = make_mock_phasor(
             f_min=1.0,
@@ -328,7 +331,7 @@ class TestDensifyHelpersJAX:
         assert out is embedded
 
     def test_densify_phasor_pw_preserves_channels(self):
-        frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        frequencies = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64))
         interpolator = MagicMock(name="interpolator")
         fake_hpw, handles = build_harmonic_projected_phasor_waveform(
             frequencies=frequencies,
@@ -348,7 +351,7 @@ class TestDensifyHelpersJAX:
             assert out[channel] is interpolated
 
     def test_densify_phasor_hw_preserves_harmonics(self):
-        frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        frequencies = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64))
         interpolator = MagicMock(name="interpolator")
         mode_22 = modes.Harmonic(2, 2)
         mode_33 = modes.Harmonic(3, 3)
@@ -364,7 +367,7 @@ class TestDensifyHelpersJAX:
         assert out[mode_33] is i33
 
     def test_densify_phasor_hpw_returns_homogeneous_container(self):
-        frequencies = jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
+        frequencies = axis(jnp.asarray([0.5, 1.0, 2.0, 3.0, 4.0], dtype=jnp.float64))
         interpolator = MagicMock(name="interpolator")
         wf, handles = build_harmonic_projected_phasor_waveform(frequencies=frequencies)
 

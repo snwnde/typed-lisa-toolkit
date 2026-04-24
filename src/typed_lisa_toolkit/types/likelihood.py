@@ -5,10 +5,11 @@ import logging
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from . import data as dm
+from . import modes
 from . import noisemodel as nm
 from . import representations as reps
 from . import waveforms as wf
-from .misc import AnyGrid, Array, Linspace
+from .misc import AnyGrid, Array, Axis, Linspace
 
 if TYPE_CHECKING:
     AnyReps = reps.Representation[AnyGrid]
@@ -17,11 +18,14 @@ if TYPE_CHECKING:
 
 ChnName = str
 Mode = tuple[int, int] | tuple[int, int, int]
-FDUniformHomogeneous = (
-    dm.Data[reps.FrequencySeries[Linspace]]
-    | wf.ProjectedWaveform[reps.FrequencySeries[Linspace]]
-    | wf.HomogeneousHarmonicProjectedWaveform[Mode, reps.FrequencySeries[Linspace]]
+type _FDUniformHomogeneous[ModeT: Mode] = (
+    dm.Data[reps.FrequencySeries[Axis[Linspace]]]
+    | wf.ProjectedWaveform[reps.FrequencySeries[Axis[Linspace]]]
+    | wf.HomogeneousHarmonicProjectedWaveform[
+        ModeT, reps.FrequencySeries[Axis[Linspace]]
+    ]
 )
+FDUniformHomogeneous = _FDUniformHomogeneous[modes.Harmonic]
 
 
 log = logging.getLogger(__name__)

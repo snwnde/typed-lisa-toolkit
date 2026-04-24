@@ -7,6 +7,7 @@ from typing import Any, Literal, cast, overload
 import array_api_compat as xpc
 
 from ..types import (
+    AnyAxis,
     Array,
     Axis,
     EvolutionarySpectralDensity,
@@ -21,10 +22,10 @@ from ..types import (
 from ..types._mixins import ChannelMapping
 
 ConvertibleReps = (
-    reps.FrequencySeries[Axis]
-    | reps.TimeSeries[Axis]
-    | reps.WDM[Grid2D[Linspace, Linspace]]
-    | reps.STFT[Grid2D[Axis, Axis]]
+    reps.FrequencySeries[AnyAxis]
+    | reps.TimeSeries[AnyAxis]
+    | reps.WDM[Grid2D[Axis[Linspace], Axis[Linspace]]]
+    | reps.STFT[Grid2D[AnyAxis, AnyAxis]]
 )
 
 

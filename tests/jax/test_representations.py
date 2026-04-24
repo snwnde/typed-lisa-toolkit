@@ -6,10 +6,10 @@ that is compatible with JAX's immutability requirements.
 
 All tests should pass with JAX arrays.
 """
-# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportArgumentType=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false, reportUninitializedInstanceVariable=false, reportUnannotatedClassAttribute=false
 
 import contextlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, final
 
 import jax
 import jax.numpy as jnp
@@ -19,14 +19,15 @@ import pytest
 
 import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
+    axis,
     build_grid2d,
     frequency_series,
+    phasor,
     stft,
     time_series,
     utils,
 )
 from typed_lisa_toolkit.types import (
-    STFT,
     FrequencySeries,
     Grid2DSparse,
     Linspace,
@@ -303,8 +304,8 @@ class TestSubsetOperationsJAX:
 
     def test_get_subset_slice_helper(self):
         """Test _get_subset_slice helper function."""
-        grid = jnp.linspace(0, 10, 101)
-        ls = Linspace(0, 0.1, 101)
+        grid = axis(jnp.linspace(0, 10, 101))
+        ls = axis(Linspace(0, 0.1, 101))
 
         # Test with interval
         slice_obj = _get_subset_slice(grid, interval=(2.0, 5.0))
@@ -349,7 +350,7 @@ class TestSubsetOperationsJAX:
     def test_take_subset_1d(self):
         """Test _take_subset with 1D grid and canonical shape using JAX arrays."""
         # Create grid and canonical entries with JAX using parameterized shape
-        grid = (jnp.linspace(0, 10, self.len_grid_small),)
+        grid = (axis(jnp.linspace(0, 10, self.len_grid_small)),)
         entries = jnp.array(
             rng.standard_normal(
                 (
@@ -392,7 +393,7 @@ class TestSubsetOperationsJAX:
         fs_sub = self.fs_large.get_subset(interval=(1e-3, 5e-2))
 
         # Check grid is subset (convert to array if Linspace)
-        grid_array = np.array(fs_sub.grid[0])
+        grid_array = np.array(fs_sub.grid[0].ax)
         assert grid_array[0] >= 0.001
         assert grid_array[-1] <= 0.05
 
@@ -421,7 +422,7 @@ class TestSubsetOperationsJAX:
         ts_sub = self.ts_ls.get_subset(interval=(2.0, 5.0))
 
         # Check Linspace is maintained
-        assert isinstance(ts_sub.grid[0], Linspace)
+        assert isinstance(ts_sub.grid[0].ax, Linspace)
 
         # Check shape - leading dimensions preserved
         assert ts_sub.entries.shape[0] == self.n_batches
@@ -477,7 +478,7 @@ class TestSubsetOperationsJAX:
                 )
             ),
         )
-        tf = STFT(grid=(freqs, times), entries=entries)
+        tf = stft(frequencies=freqs, times=times, entries=entries)
 
         # Subset by time interval
         tf_sub = tf.get_subset(time_interval=(2.0, 5.0))
@@ -513,7 +514,7 @@ class TestSubsetOperationsJAX:
                 )
             ),
         )
-        tf = STFT(grid=(freqs, times), entries=entries)
+        tf = stft(frequencies=freqs, times=times, entries=entries)
 
         # Subset by frequency interval
         tf_sub = tf.get_subset(freq_interval=(0.2, 0.8))
@@ -579,8 +580,10 @@ class TestEmbedOperationsJAX:
         fs_small = frequency_series(freqs_small, entries=entries_small)
 
         # Create large grid with JAX
-        freqs_large = jnp.array(
-            [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
+        freqs_large = axis(
+            jnp.array(
+                [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
+            )
         )
 
         # Embed
@@ -611,7 +614,7 @@ class TestEmbedOperationsJAX:
         ts_small = time_series(times=times_small, entries=entries_small)
 
         # Large grid (Linspace)
-        times_large = Linspace(0.0, 0.1, 100)
+        times_large = axis(Linspace(0.0, 0.1, 100))
 
         # Embed
         ts_large = ts_small.get_embedded((times_large,))
@@ -619,7 +622,7 @@ class TestEmbedOperationsJAX:
         # Check helper-based construction preserves Linspace semantics
         assert isinstance(ts_large.grid, tuple)
         assert len(ts_large.grid) == 1
-        assert isinstance(ts_large.grid[0], Linspace)
+        assert isinstance(ts_large.grid[0].ax, Linspace)
         assert ts_large.grid[0] == times_large
 
         # Check shape
@@ -653,12 +656,14 @@ class TestArithmeticOperationsJAX:
                     self.n_channels,
                     self.n_harmonics,
                     self.n_features,
-                    100,
                     50,
+                    100,
                 )
             ),
         )
-        self.tf_large = STFT(grid=(times_large, freqs_large), entries=entries_tf)
+        self.tf_large = stft(
+            frequencies=freqs_large, times=times_large, entries=entries_tf
+        )
 
     def test_addition_same_grid(self):
         """Test adding two series with same grid and canonical shape using JAX."""
@@ -744,7 +749,7 @@ class TestArithmeticOperationsJAX:
             np.array(ts_scaled.entries),
             np.array(entries * 2.5),
         )
-        assert isinstance(ts_scaled.grid[0], Linspace)
+        assert isinstance(ts_scaled.grid[0].ax, Linspace)
         assert ts_scaled.entries.shape[0:4] == (
             self.n_batches,
             self.n_channels,
@@ -827,10 +832,10 @@ class TestArithmeticOperationsJAX:
         fs_new = fs_old.create_like(entries_new)
 
         # Check grid is the same
-        assert isinstance(fs_new.grid[0], Linspace)
-        assert fs_new.grid[0].start == freqs.start
-        assert fs_new.grid[0].step == freqs.step
-        assert fs_new.grid[0].num == freqs.num
+        assert isinstance(fs_new.grid[0].ax, Linspace)
+        assert fs_new.grid[0].ax.start == freqs.start
+        assert fs_new.grid[0].ax.step == freqs.step
+        assert fs_new.grid[0].ax.num == freqs.num
 
         # Check entries are new
         npt.assert_array_equal(np.array(fs_new.entries), np.array(entries_new))
@@ -967,16 +972,18 @@ class TestArithmeticOperationsJAX:
     def test_timefrequency_arithmetic(self):
         """Test STFT arithmetic operations with JAX."""
         # Addition
-        times = jnp.linspace(0, 10, 100)
-        freqs = jnp.linspace(0, 1, 50)
+        n_times = 100
+        n_freqs = 50
+        times = jnp.linspace(0, 10, n_times)
+        freqs = jnp.linspace(0, 1, n_freqs)
         entries1_np = rng.standard_normal(
             (
                 self.n_batches,
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                100,
-                50,
+                n_freqs,
+                n_times,
             )
         )
         entries2_np = rng.standard_normal(
@@ -985,15 +992,15 @@ class TestArithmeticOperationsJAX:
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                100,
-                50,
+                n_freqs,
+                n_times,
             )
         )
         entries1 = jnp.array(entries1_np)
         entries2 = jnp.array(entries2_np)
 
-        tf1 = STFT(grid=(times, freqs), entries=entries1)
-        tf2 = STFT(grid=(times, freqs), entries=entries2)
+        tf1 = stft(frequencies=freqs, times=times, entries=entries1)
+        tf2 = stft(frequencies=freqs, times=times, entries=entries2)
 
         # Add
         tf_sum = tf1 + tf2
@@ -1003,30 +1010,30 @@ class TestArithmeticOperationsJAX:
             np.array(tf_sum.entries),
             entries1_np + entries2_np,
         )
-        npt.assert_array_almost_equal(np.array(tf_sum.grid[0]), np.array(times))
-        npt.assert_array_almost_equal(np.array(tf_sum.grid[1]), np.array(freqs))
+        npt.assert_array_almost_equal(np.array(tf_sum.grid[1]), np.array(times))
+        npt.assert_array_almost_equal(np.array(tf_sum.grid[0]), np.array(freqs))
         assert tf_sum.entries.shape[0:4] == (
             self.n_batches,
             self.n_channels,
             self.n_harmonics,
             self.n_features,
         )
-        assert tf_sum.entries.shape[4:] == (100, 50)
+        assert tf_sum.entries.shape[4:] == (n_freqs, n_times)
 
         # Scalar multiplication
         tf_scaled = tf1 * 2.5
 
         # Check
         npt.assert_array_almost_equal(np.array(tf_scaled.entries), entries1_np * 2.5)
-        npt.assert_array_almost_equal(np.array(tf_scaled.grid[0]), np.array(times))
-        npt.assert_array_almost_equal(np.array(tf_scaled.grid[1]), np.array(freqs))
+        npt.assert_array_almost_equal(np.array(tf_scaled.grid[1]), np.array(times))
+        npt.assert_array_almost_equal(np.array(tf_scaled.grid[0]), np.array(freqs))
         assert tf_scaled.entries.shape[0:4] == (
             self.n_batches,
             self.n_channels,
             self.n_harmonics,
             self.n_features,
         )
-        assert tf_scaled.entries.shape[4:] == (100, 50)
+        assert tf_scaled.entries.shape[4:] == (n_freqs, n_times)
 
 
 class TestPropertiesAndAliasesJAX:
@@ -1204,10 +1211,10 @@ class TestGridTupleHandlingJAX:
         fs = frequency_series(freqs, entries=entries)
 
         # Should be converted to Linspace
-        assert isinstance(fs.grid[0], Linspace)
-        assert fs.grid[0].start == pytest.approx(0.0)
-        assert fs.grid[0].step == pytest.approx(1.0 / (self.len_grid_large - 1))
-        assert fs.grid[0].num == self.len_grid_large
+        assert isinstance(fs.grid[0].ax, Linspace)
+        assert fs.grid[0].ax.start == pytest.approx(0.0)
+        assert fs.grid[0].ax.step == pytest.approx(1.0 / (self.len_grid_large - 1))
+        assert fs.grid[0].ax.num == self.len_grid_large
         assert fs.entries.shape[0:4] == (
             self.n_batches,
             self.n_channels,
@@ -1640,17 +1647,14 @@ class TestErrorHandlingJAX:
                     self.n_channels,
                     self.n_harmonics,
                     self.n_features,
-                    100,
                     50,
+                    100,
                 )
             ),
         )
 
-        tf_correct = STFT(grid=(times, freqs), entries=entries)
+        tf_correct = stft(freqs, times, entries=entries)
         assert len(tf_correct.grid) == 2
-
-        with contextlib.suppress(ValueError):
-            STFT(grid=(times, freqs, times), entries=entries)
 
     def test_invalid_subset_interval(self):
         """Test that subset intervals are handled gracefully."""
@@ -1684,7 +1688,6 @@ class TestLinspaceExtraPropertiesJAX:
             "test_eq_returns_false_for_step_mismatch",
             "test_array_with_copy_false",
             "test_getitem_invalid_type_raises",
-            "test_make_from_linspace_like",
         ],
     )
     def test_linspace_helpers(self, linspace_helpers, method_name):
@@ -1815,6 +1818,7 @@ class TestArithmeticAddMethodsJAX:
         npt.assert_allclose(np.asarray(fs.entries), before)
 
 
+@final
 class TestPhasorJAX:
     def setup_method(self):
         self.freqs = jnp.linspace(1e-4, 1e-2, 20, dtype=jnp.float64)
@@ -1829,7 +1833,9 @@ class TestPhasorJAX:
         entries = jnp.zeros((1, 1, 1, 2, 20), dtype=jnp.complex128)
         entries = entries.at[:, :, :, slice(0, 1), :].set(self.amps)
         entries = entries.at[:, :, :, slice(1, 2), :].set(self.phases)
-        self.phasor = Phasor(grid=(self.freqs,), entries=entries)
+        self.phasor = phasor(
+            frequencies=self.freqs, amplitudes=self.amps, phases=self.phases
+        )
 
     def test_domain_and_kind(self):
         assert self.phasor.domain == "frequency"
@@ -1871,7 +1877,7 @@ class TestPhasorJAX:
         entries = jnp.zeros((1, 1, 1, 2, 10), dtype=jnp.complex128)
         entries = entries.at[:, :, :, slice(0, 1), :].set(amps)
         entries = entries.at[:, :, :, slice(1, 2), :].set(phases)
-        phasor_obj = Phasor(grid=(freqs,), entries=entries)
+        phasor_obj = phasor(frequencies=freqs, amplitudes=amps, phases=phases)
 
         returned_amps = np.asarray(phasor_obj.amplitudes)
         amps_np = np.asarray(amps)
@@ -1917,7 +1923,7 @@ class TestPhasorJAX:
         )
 
     def test_get_interpolated(self):
-        from scipy.interpolate import interp1d  # type: ignore[import]
+        from scipy.interpolate import interp1d
 
         new_freqs = np.linspace(float(self.freqs[2]), float(self.freqs[-3]), 8)
         interpolated = self.phasor.get_interpolated(new_freqs, interp1d)
@@ -2020,8 +2026,8 @@ class TestSparse2DGridRepresentationsJAX:
         npt.assert_array_equal(np.asarray(new_entries), expected_entries)
 
     def test_embed_entries_to_grid_2d_sparse_computes_slices_when_missing(self):
-        source_freqs = jnp.array([20.0, 30.0, 40.0])
-        source_times = jnp.array([5.0, 6.0, 7.0])
+        source_freqs = axis(jnp.array([20.0, 30.0, 40.0]))
+        source_times = axis(jnp.array([5.0, 6.0, 7.0]))
         source_indices = np.array([[0, 0], [1, 1], [2, 2]], dtype=int)
         source_grid = build_grid2d(
             source_freqs,
@@ -2031,8 +2037,8 @@ class TestSparse2DGridRepresentationsJAX:
         source_entries = jnp.array([[[[1.0, 2.0, 3.0]]]])
 
         embedding_grid = (
-            jnp.array([10.0, 20.0, 30.0, 40.0, 50.0]),
-            jnp.array([4.0, 5.0, 6.0, 7.0, 8.0]),
+            axis(jnp.array([10.0, 20.0, 30.0, 40.0, 50.0])),
+            axis(jnp.array([4.0, 5.0, 6.0, 7.0, 8.0])),
         )
 
         new_grid, new_entries = _embed_entries_to_grid_2d_sparse(

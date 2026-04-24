@@ -14,7 +14,7 @@ dependencies = [
     "scipy >= 1.12.0",
     "h5py",
     "array-api-compat >= 1.13.0",
-    "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@7b9d6994b8fec58df6eb729a5fa79022de9ea209",
+    "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@c7897cc5cf01aea7a488c37c77f6959c39a2bd3f",
 ]
 
 [project.optional-dependencies]

@@ -53,7 +53,7 @@ class TestTransformsNumpy:
         fs = shop.time2freq(ts)
 
         assert isinstance(fs, reps.UniformFrequencySeries)
-        expected = np.fft.rfft(entries * ts.times.step)
+        expected = np.fft.rfft(entries * ts.times.ax.step)
         npt.assert_allclose(np.asarray(fs.entries).squeeze(), expected)
 
     def test_time2freq_tsdata_keep_time_switches_type(self):

@@ -1,7 +1,8 @@
 """Tests for canonical shape functionality in representations."""
-# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false
+# pyright: reportPrivateUsage=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportUnknownParameterType=false, reportMissingParameterType=false, reportCallIssue=false, reportUninitializedInstanceVariable=false
 
 import contextlib
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.testing as npt
@@ -12,6 +13,7 @@ from l2d_interface.validators import (
 
 import typed_lisa_toolkit as tlt
 from typed_lisa_toolkit import (
+    axis,
     build_grid2d,
     frequency_series,
     phasor,
@@ -34,6 +36,9 @@ from typed_lisa_toolkit.types.representations import (
     _subset_grid_2d_sparse,
     _take_subset,
 )
+
+if TYPE_CHECKING:
+    from conftest import build_canonical_representations
 
 SEED = 11324214
 rng = np.random.default_rng(SEED)
@@ -70,8 +75,8 @@ class TestL2DContractNumpy(TestCanonicalShape):
     """Test l2d-interface runtime contract compliance with NumPy backend."""
 
     def test_representation_contract(self):
-        times = np.linspace(0.0, 1.0, 16)
-        freqs = np.fft.rfftfreq(len(times), d=times[1] - times[0])
+        times = axis(np.linspace(0.0, 1.0, 16))
+        freqs = axis(np.fft.rfftfreq(len(times), d=times[1] - times[0]))
 
         ts = time_series(
             times,
@@ -81,18 +86,19 @@ class TestL2DContractNumpy(TestCanonicalShape):
             freqs,
             entries=rng.standard_normal((1, 1, 1, 1, len(freqs))),
         )
-        stft = STFT(
-            grid=(freqs, times),
+        _stft = stft(
+            freqs,
+            times,
             entries=rng.standard_normal((1, 1, 1, 1, len(freqs), len(times))),
         )
 
         validate_representation(ts)
         validate_representation(fs)
-        validate_representation(stft)
+        validate_representation(_stft)
 
         assert ts.domain == "time"
         assert fs.domain == "frequency"
-        assert stft.domain == "time-frequency"
+        assert _stft.domain == "time-frequency"
         assert ts.kind is None
         assert fs.kind is None
 
@@ -339,8 +345,8 @@ class TestSubsetOperations:
 
     def test_get_subset_slice_helper(self):
         """Test _get_subset_slice helper function."""
-        grid = np.linspace(0, 10, 101)
-        ls = Linspace(0, 0.1, 101)
+        grid = axis(np.linspace(0, 10, 101))
+        ls = axis(Linspace(0, 0.1, 101))
 
         # Test with interval
         slice_obj = _get_subset_slice(grid, interval=(2.0, 5.0))
@@ -452,7 +458,7 @@ class TestSubsetOperations:
         ts_sub = self.ts_ls.get_subset(interval=(2.0, 5.0))
 
         # Check Linspace is maintained
-        assert isinstance(ts_sub.grid[0], Linspace)
+        assert isinstance(ts_sub.grid[0].ax, Linspace)
 
         # Check shape - leading dimensions preserved
         assert ts_sub.entries.shape[0] == self.n_batches
@@ -580,8 +586,10 @@ class TestEmbedOperations:
         fs_small = frequency_series(freqs_small, entries=entries_small)
 
         # Create large grid that contains small grid exactly
-        freqs_large = np.array(
-            [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
+        freqs_large = axis(
+            np.array(
+                [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
+            )
         )
 
         # Embed
@@ -589,7 +597,7 @@ class TestEmbedOperations:
 
         # Check grid
         assert len(fs_large.grid) == 1
-        npt.assert_array_almost_equal(fs_large.frequencies, freqs_large)
+        npt.assert_array_almost_equal(fs_large.frequencies.ax, freqs_large.ax)
 
         # Check shape
         assert fs_large.entries.shape == (1, 1, 1, 1, 11)
@@ -607,12 +615,12 @@ class TestEmbedOperations:
     def test_time_series_get_embedded_linspace(self):
         """Test TimeSeries.get_embedded with Linspace grids."""
         # Small grid (Linspace)
-        times_small = Linspace(2.0, 0.1, 30)
+        times_small = axis(Linspace(2.0, 0.1, 30))
         entries_small = rng.standard_normal((2, 1, 1, 1, 30))
         ts_small = time_series(times_small, entries=entries_small)
 
         # Large grid (Linspace)
-        times_large = Linspace(0.0, 0.1, 100)
+        times_large = axis(Linspace(0.0, 0.1, 100))
 
         # Embed
         ts_large = ts_small.get_embedded((times_large,))
@@ -620,7 +628,7 @@ class TestEmbedOperations:
         # Check helper-based construction preserves Linspace semantics
         assert isinstance(ts_large.grid, tuple)
         assert len(ts_large.grid) == 1
-        assert isinstance(ts_large.grid[0], Linspace)
+        assert isinstance(ts_large.grid[0].ax, Linspace)
         assert ts_large.grid[0] == times_large
 
         # Check shape
@@ -645,19 +653,23 @@ class TestArithmeticOperations:
         self.times_short = Linspace(0.0, 0.01, self.len_time)
 
         # STFT fixture
-        times_large = np.linspace(0, 10, 100)
-        freqs_large = np.linspace(0, 1, 50)
+        times_large = np.linspace(0, 10, self.len_time)
+        freqs_large = np.linspace(0, 1, self.len_freq)
         entries_tf = rng.standard_normal(
             (
                 self.n_batches,
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                100,
-                50,
+                self.len_freq,
+                self.len_time,
             )
         )
-        self.tf_large = STFT(grid=(times_large, freqs_large), entries=entries_tf)
+        self.tf_large = stft(
+            freqs_large,
+            times_large,
+            entries=entries_tf,
+        )
 
     def test_addition_same_grid(self):
         """Test adding two series with same grid and canonical shape."""
@@ -730,7 +742,7 @@ class TestArithmeticOperations:
 
         # Check
         npt.assert_array_almost_equal(ts_scaled.entries, entries * 2.5)
-        assert isinstance(ts_scaled.times, Linspace)
+        assert isinstance(ts_scaled.times.ax, Linspace)
         assert ts_scaled.entries.shape[0:4] == (
             self.n_batches,
             self.n_channels,
@@ -804,10 +816,10 @@ class TestArithmeticOperations:
         fs_new = fs_old.create_like(entries_new)
 
         # Check grid is the same
-        assert isinstance(fs_new.grid[0], Linspace)
-        assert fs_new.grid[0].start == freqs.start
-        assert fs_new.grid[0].step == freqs.step
-        assert fs_new.grid[0].num == freqs.num
+        assert isinstance(fs_new.grid[0].ax, Linspace)
+        assert fs_new.grid[0].ax.start == freqs.start
+        assert fs_new.grid[0].ax.step == freqs.step
+        assert fs_new.grid[0].ax.num == freqs.num
 
         # Check entries are new
         npt.assert_array_equal(fs_new.entries, entries_new)
@@ -948,16 +960,18 @@ class TestArithmeticOperations:
     def test_timefrequency_arithmetic(self):
         """Test STFT arithmetic operations."""
         # Addition
-        times = np.linspace(0, 10, 100)
-        freqs = np.linspace(0, 1, 50)
+        n_times = 100
+        n_freqs = 50
+        times = np.linspace(0, 10, n_times)
+        freqs = np.linspace(0, 1, n_freqs)
         entries1 = rng.standard_normal(
             (
                 self.n_batches,
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                50,
-                100,
+                n_freqs,
+                n_times,
             )
         )
         entries2 = rng.standard_normal(
@@ -966,13 +980,13 @@ class TestArithmeticOperations:
                 self.n_channels,
                 self.n_harmonics,
                 self.n_features,
-                50,
-                100,
+                n_freqs,
+                n_times,
             )
         )
 
-        tf1 = STFT(grid=(freqs, times), entries=entries1)
-        tf2 = STFT(grid=(freqs, times), entries=entries2)
+        tf1 = stft(freqs, times, entries=entries1)
+        tf2 = stft(freqs, times, entries=entries2)
 
         # Add
         tf_sum = tf1 + tf2
@@ -987,7 +1001,7 @@ class TestArithmeticOperations:
             self.n_harmonics,
             self.n_features,
         )
-        assert tf_sum.entries.shape[4:] == (50, 100)
+        assert tf_sum.entries.shape[4:] == (n_freqs, n_times)
 
         # Scalar multiplication
         tf_scaled = tf1 * 2.5
@@ -1002,7 +1016,7 @@ class TestArithmeticOperations:
             self.n_harmonics,
             self.n_features,
         )
-        assert tf_scaled.entries.shape[4:] == (50, 100)
+        assert tf_scaled.entries.shape[4:] == (n_freqs, n_times)
 
 
 class TestLinspace:
@@ -1368,8 +1382,8 @@ class TestGridTupleHandling:
         fs = frequency_series(freqs, entries=entries)
 
         # Should remain as array
-        assert isinstance(fs.grid[0], np.ndarray)
-        npt.assert_array_equal(fs.grid[0], freqs)
+        assert isinstance(fs.grid[0].ax, np.ndarray)
+        npt.assert_array_equal(fs.grid[0].ax, freqs)
         assert fs.entries.shape[0:4] == (
             self.n_batches,
             self.n_channels,
@@ -1575,7 +1589,6 @@ class TestLinspaceExtraProperties:
             "test_eq_returns_false_for_step_mismatch",
             "test_array_with_copy_false",
             "test_getitem_invalid_type_raises",
-            "test_make_from_linspace_like",
         ],
     )
     def test_linspace_helpers(self, linspace_helpers, method_name):
@@ -1717,8 +1730,8 @@ class TestArithmeticAddMethods:
         freqs = Linspace(0.0, 0.1, 50)
         entries = np.ones((1, 1, 1, 1, 50))
         fs = frequency_series(freqs, entries=entries)
-        with pytest.raises(ValueError, match=r".+"):
-            fs[10:20] = np.zeros((1, 1, 1, 1, 10))
+        fs[10:20] = np.zeros((1, 1, 1, 1, 10))
+        assert np.allclose(fs.entries[0, 0, 0, 0, 10:20], 0.0)
 
 
 class TestPhasor:
@@ -1917,8 +1930,8 @@ class TestSparse2DGridRepresentations:
         npt.assert_array_equal(np.asarray(new_entries), expected_entries)
 
     def test_embed_entries_to_grid_2d_sparse_computes_slices_when_missing(self):
-        source_freqs = np.array([20.0, 30.0, 40.0])
-        source_times = np.array([5.0, 6.0, 7.0])
+        source_freqs = axis(np.array([20.0, 30.0, 40.0]))
+        source_times = axis(np.array([5.0, 6.0, 7.0]))
         source_indices = np.array([[0, 0], [1, 1], [2, 2]], dtype=int)
         source_grid = build_grid2d(
             source_freqs,
@@ -1928,8 +1941,8 @@ class TestSparse2DGridRepresentations:
         source_entries = np.array([[[[1.0, 2.0, 3.0]]]])
 
         embedding_grid = (
-            np.array([10.0, 20.0, 30.0, 40.0, 50.0]),
-            np.array([4.0, 5.0, 6.0, 7.0, 8.0]),
+            axis(np.array([10.0, 20.0, 30.0, 40.0, 50.0])),
+            axis(np.array([4.0, 5.0, 6.0, 7.0, 8.0])),
         )
 
         new_grid, new_entries = _embed_entries_to_grid_2d_sparse(
