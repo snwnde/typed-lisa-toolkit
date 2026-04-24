@@ -685,6 +685,12 @@ class TimedFSData(FSData):
             name=self.name,
         )
 
+    @classmethod
+    def from_dict(cls, data_dict: Mapping[str, AnyReps], /, **kwargs: Any) -> Self:  # noqa: D102
+        times = kwargs.pop("times", None)
+        obj = super().from_dict(data_dict, **kwargs)
+        return obj.set_times(times) if times is not None else obj
+
     def to_tsdata(
         self,
         times: npt.NDArray[np.floating[Any]] | Linspace | None = None,

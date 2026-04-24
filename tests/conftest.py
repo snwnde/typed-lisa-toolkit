@@ -1273,11 +1273,11 @@ def hhpw_phasor_fixture(
 def linear_interpolator_fixture(xp: ModuleType):  # pyright: ignore[reportUnknownParameterType]
 
     def _linear_interpolator(x, y):  # pyright: ignore[reportUnknownParameterType, reportMissingParameterType]
-        x_arr = xp.asarray(x, dtype=np.float64)
+        x_arr = xp.asarray(x, dtype=xp.float64)
         y_arr = xp.asarray(y)
 
         def _interp(x_new):  # pyright: ignore[reportUnknownParameterType, reportMissingParameterType]
-            return np.interp(xp.asarray(x_new, dtype=xp.float64), x_arr, y_arr)  # pyright: ignore[reportUnknownVariableType]
+            return xp.interp(xp.asarray(x_new, dtype=xp.float64), x_arr, y_arr)
 
         return _interp  # pyright: ignore[reportUnknownVariableType]
 

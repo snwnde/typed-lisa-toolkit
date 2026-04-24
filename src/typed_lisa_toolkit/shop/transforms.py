@@ -1,5 +1,6 @@
 """Functions for transforming data and waveforms between time-domain, frequency-domain, and time-frequency plane."""  # noqa: E501
 
+import os
 import warnings
 from types import ModuleType
 from typing import Literal, overload
@@ -81,8 +82,10 @@ def time2freq(
             "which are required for `time2freq`."
         )
         raise NotImplementedError(msg) from e
-    _freqs = fft.rfftfreq(len(td.times), d=td.times.ax.step)
-    freqs = _constructors.linspace(_freqs[0], _freqs[-1], len(_freqs))
+    n_times = len(td.times)
+    last_freq = (n_times // 2) / n_times / td.times.ax.step
+    n_freq = n_times // 2 + 1
+    freqs = _constructors.axis(_constructors.linspace(0.0, last_freq, n_freq))
     signal = fft.rfft(td.get_kernel() * td.times.ax.step, axis=-1)
     if isinstance(td, reps.TimeSeries):
         return _constructors.frequency_series(
@@ -153,6 +156,22 @@ def freq2time(
     )
 
 
+def _set_wdm_backend(xp: "ModuleType") -> None:
+    if xp.__name__ == "numpy":
+        pass
+    elif xp.__name__.startswith("jax"):
+        _backend = os.environ.get("WDM_BACKEND")
+        if _backend is None:
+            os.environ["WDM_BACKEND"] = "jax"
+        elif _backend != "jax":
+            msg = (
+                f"WDM_BACKEND is set to {_backend!r}, "
+                "but the input data uses JAX arrays. "
+                "Please set WDM_BACKEND to 'jax' or unset it to use the JAX backend."
+            )
+            raise ValueError(msg)
+
+
 @overload
 def time2wdm(
     tdata: data.TSData,
@@ -210,6 +229,8 @@ def time2wdm(
     from wdm_transform.transforms import (
         forward_wdm as _forward_wdm,
     )
+
+    _set_wdm_backend(tthing.xp)
 
     if isinstance(tthing, data.TSData):
         return _constructors.wdmdata(
@@ -358,6 +379,8 @@ def freq2wdm(
         get_backend as _get_backend,
     )
 
+    _set_wdm_backend(fthing.xp)
+
     if isinstance(fthing, data.FSData):
         return _constructors.wdmdata(
             {key: freq2wdm(val, Nt=Nt, Nf=Nf, t0=t0) for (key, val) in fthing.items()},
@@ -405,6 +428,8 @@ def wdm2freq(
     from wdm_transform.transforms import (
         frequency_wdm as _frequency_wdm,
     )
+
+    _set_wdm_backend(wdmthing.xp)
 
     if isinstance(wdmthing, data.WDMData):
         return _constructors.fsdata(

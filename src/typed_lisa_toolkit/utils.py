@@ -6,6 +6,7 @@ Functions
 ---------
 
 .. autofunction:: get_subset_slice
+.. autofunction:: get_subset_mask
 .. autofunction:: get_support_slice
 .. autofunction:: extend_to
 
@@ -106,7 +107,19 @@ def get_subset_slice(increasing_array: Array, /, min: float, max: float):
     xp = xpc.get_namespace(increasing_array)
     start_idx = xp.searchsorted(increasing_array, min, side="left")
     end_idx = xp.searchsorted(increasing_array, max, side="right")
-    return slice(int(start_idx), int(end_idx))
+    return slice(start_idx, end_idx)
+
+
+def get_subset_mask[ArrayT: Array](array: ArrayT, /, min: float, max: float) -> ArrayT:
+    """Return a boolean mask for the subset [min, max] of the array.
+
+    Examples
+    --------
+    >>> get_subset_mask(0.5 * np.arange(10), 1.0, 3.0)
+    array([False, False,  True,  True,  True,  True,  True, False, False, False])
+    """
+    xp = xpc.get_namespace(array)
+    return xp.logical_and(array >= min, array <= max)
 
 
 def get_support_slice(array: Array):

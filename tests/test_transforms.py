@@ -92,7 +92,6 @@ def test_freq2time_warns_for_denser_than_nyquist_times(
     lin_time_series: TimeSeries[Axis[Linspace]],
 ):
     fs = shop.time2freq(lin_time_series)
-
     dense_times = np.linspace(
         float(lin_time_series.times.start),
         float(lin_time_series.times.stop),

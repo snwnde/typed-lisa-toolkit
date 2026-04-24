@@ -200,7 +200,7 @@ class Linspace:
 
 
 @final
-class Axis[T: Array | Linspace]:
+class Axis[T: Array | Linspace]:  # noqa: PLW1641
     """An axis of a grid."""
 
     def __init__(self, ax: ArrayLike | Linspace, *, xp: ModuleType):
@@ -214,16 +214,17 @@ class Axis[T: Array | Linspace]:
         """Return the string representation of the axis."""
         return f"Axis({self.ax!r})"
 
-    def __hash__(self) -> int:
-        """Return the hash of the axis."""
-        if isinstance(self.ax, Linspace):
-            return hash(self.ax)
-        return hash(self.ax.tobytes())
-
     def __eq__(self, other: object) -> bool:
         """Check if two Axis instances are equal."""
         if isinstance(other, Axis):
-            return hash(self) == hash(other)
+            if isinstance(self.ax, Linspace) and isinstance(other.ax, Linspace):
+                return self.ax == other.ax
+            if isinstance(self.ax, Linspace) and not isinstance(other.ax, Linspace):
+                return False
+            if not isinstance(self.ax, Linspace) and isinstance(other.ax, Linspace):
+                return False
+            xp = xpc.get_namespace(self.ax)
+            return xp.array_equal(self.ax, other.ax)
         return False
 
     def __array__(
@@ -270,12 +271,12 @@ class Axis[T: Array | Linspace]:
     @property
     def start(self) -> float:
         """The first point of the axis."""
-        return float(self.ax[0])
+        return cast("float", self.ax[0])
 
     @property
     def stop(self) -> float:
         """The last point of the axis."""
-        return float(self.ax[-1])
+        return cast("float", self.ax[-1])
 
     def asarray(
         self,
@@ -329,7 +330,7 @@ def axis[AT: Array | Linspace](ax: AT, /) -> Axis[AT]:
     return Axis[AT](ax, xp=xp)
 
 
-class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:
+class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:  # noqa: PLW1641
     """Class for a sparse 2D grid."""
 
     indices: Array
@@ -385,14 +386,16 @@ class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:
         """Return the string representation of the grid."""
         return f"Grid2DSparse({self.axis0!r}, {self.axis1!r}, indices={self.indices!r})"
 
-    def __hash__(self) -> int:
-        """Return the hash of the grid."""
-        _idx = self.indices.tobytes()
-        return hash((self.axis0, self.axis1, _idx))
-
     def __eq__(self, other: object) -> bool:
         """Check if two Grid2DSparse instances are equal."""
-        return hash(self) == hash(other)
+        if not isinstance(other, Grid2DSparse):
+            return False
+        if self.axis0 != other.axis0:
+            return False
+        if self.axis1 != other.axis1:
+            return False
+        xp = xpc.get_namespace(self.indices)
+        return xp.array_equal(self.indices, other.indices)
 
 
 type Grid1D[AxisT: "AnyAxis"] = tuple[AxisT]
