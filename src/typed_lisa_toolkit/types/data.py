@@ -803,7 +803,14 @@ def _enforce_uniform_mapping[RepT: AnyReps](
                 yield _enforce_uniform(_axis)
 
     def new_grid(grid: AnyGrid) -> AnyGrid:
-        return tuple(axis_gen(grid))  # pyright: ignore[reportReturnType]
+        _grid = tuple(axis_gen(grid))
+        if isinstance(grid, Grid2DSparse):
+            _grid = Grid2DSparse[Axis[Linspace], Axis[Linspace]](
+                _grid[0],
+                _grid[1],
+                sparse_indices=grid.indices,
+            )
+        return _grid  # pyright: ignore[reportReturnType]
 
     return {
         ch: type(rep)(new_grid(rep.grid), rep.entries) for ch, rep in mapping.items()
