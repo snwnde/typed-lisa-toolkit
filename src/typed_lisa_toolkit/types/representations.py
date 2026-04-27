@@ -1467,9 +1467,25 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
         """Create a time-frequency representation from time and frequency grids and entries."""  # noqa: E501
         return cls(grid=(frequencies, times), entries=entries)
 
-    def get_embedded[AT0: "AnyAxis", AT1: "AnyAxis"](
+    @overload
+    def get_embedded[A0: AnyAxis, A1: AnyAxis](
+        self: STFT[Grid2DSparse[AnyAxis, AnyAxis]],
+        embedding_grid: Grid2D[A0, A1],
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ) -> STFT[Grid2DSparse[A0, A1]]: ...
+
+    @overload
+    def get_embedded[A0: AnyAxis, A1: AnyAxis](
+        self: STFT[Grid2DCartesian[AnyAxis, AnyAxis]],
+        embedding_grid: Grid2D[A0, A1],
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ) -> STFT[Grid2DCartesian[A0, A1]]: ...
+
+    def get_embedded(
         self,
-        embedding_grid: Grid2D[AT0, AT1],
+        embedding_grid: Grid2D[AnyAxis, AnyAxis],
         *,
         known_slices: tuple[slice, ...] | None = None,
     ):

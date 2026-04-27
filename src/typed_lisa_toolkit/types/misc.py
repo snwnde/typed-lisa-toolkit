@@ -211,6 +211,18 @@ class Axis[T: Array | Linspace]:
         """Return the string representation of the axis."""
         return f"Axis({self.ax!r})"
 
+    def __hash__(self) -> int:
+        """Return the hash of the axis."""
+        if isinstance(self.ax, Linspace):
+            return hash(self.ax)
+        return hash(self.ax.tobytes())
+
+    def __eq__(self, other: object) -> bool:
+        """Check if two Axis instances are equal."""
+        if isinstance(other, Axis):
+            return hash(self) == hash(other)
+        return False
+
     def __array__(
         self,
         dtype: "npt.DTypeLike | jax.typing.DTypeLike | None" = None,
@@ -365,6 +377,19 @@ class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:
         """Return an iterator over the axes."""
         yield self.axis0
         yield self.axis1
+
+    def __repr__(self):
+        """Return the string representation of the grid."""
+        return f"Grid2DSparse({self.axis0!r}, {self.axis1!r}, indices={self.indices!r})"
+
+    def __hash__(self) -> int:
+        """Return the hash of the grid."""
+        _idx = self.indices.tobytes()
+        return hash((self.axis0, self.axis1, _idx))
+
+    def __eq__(self, other: object) -> bool:
+        """Check if two Grid2DSparse instances are equal."""
+        return hash(self) == hash(other)
 
 
 type Grid1D[AxisT: "AnyAxis"] = tuple[AxisT]

@@ -771,7 +771,7 @@ def make_sdm(
     inverse_sdm: "Array",
     /,
     *,
-    frequencies: "Array",
+    frequencies: Array | AnyAxis,
     channel_names: Sequence[ChnName],
     times: None = None,
     is_diagonal: Literal[False] = False,
@@ -781,7 +781,7 @@ def make_sdm(
     inverse_sdm: "Array",
     /,
     *,
-    frequencies: "Array",
+    frequencies: Array | AnyAxis,
     channel_names: Sequence[ChnName],
     is_diagonal: Literal[True],
     times: None = None,
@@ -791,17 +791,17 @@ def make_sdm(
     inverse_sdm: "Array",
     /,
     *,
-    frequencies: "Array",
-    times: "Array",
+    frequencies: Array | AnyAxis,
+    times: Array | AnyAxis,
     channel_names: Sequence[ChnName],
 ) -> EvolutionarySpectralDensity: ...
 def make_sdm(
     inverse_sdm: Array,
     /,
     *,
-    frequencies: Array,
+    frequencies: Array | AnyAxis,
     channel_names: Sequence[ChnName],
-    times: Array | None = None,
+    times: Array | AnyAxis | None = None,
     is_diagonal: bool = False,
 ):
     """Make a :class:`~types.SpectralDensity`, a :class:`~types.DiagonalSpectralDensity` or an :class:`~types.EvolutionarySpectralDensity`.
@@ -829,6 +829,8 @@ def make_sdm(
         Whether the SDM is diagonal. Only relevant if `times` is None. If True, a :class:`~types.DiagonalSpectralDensity`
         will be constructed. Defaults to False.
     """  # noqa: E501
+    _freqs = frequencies.asarray() if isinstance(frequencies, Axis) else frequencies
+
     if times is None:
         if not is_diagonal:
             _validate_shape(
@@ -839,13 +841,13 @@ def make_sdm(
                     len(channel_names),
                 ),
             )
-            return SpectralDensity(frequencies, inverse_sdm, channel_names)
+            return SpectralDensity(_freqs, inverse_sdm, channel_names)
         xp = xpc.get_namespace(inverse_sdm)
         _inverse_sdm = inverse_sdm[:, :, None] * xp.eye(
             len(channel_names),
             dtype=inverse_sdm.dtype,
         )
-        return DiagonalSpectralDensity(frequencies, _inverse_sdm, channel_names)
+        return DiagonalSpectralDensity(_freqs, _inverse_sdm, channel_names)
     _validate_shape(
         inverse_sdm,
         expected_shape=(
@@ -855,9 +857,10 @@ def make_sdm(
             len(channel_names),
         ),
     )
+    _times = times.asarray() if isinstance(times, Axis) else times
     return EvolutionarySpectralDensity(
-        frequencies,
-        times,
+        _freqs,
+        _times,
         inverse_sdm,
         channel_names,
     )
