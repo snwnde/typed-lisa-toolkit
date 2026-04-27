@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Protocol,
-    cast,
     overload,
 )
 
@@ -17,7 +16,7 @@ import array_api_compat as xpc
 from .. import utils
 from . import _mixins, modes
 from . import representations as reps
-from .misc import AnyGrid, Array, Axis, Interpolator
+from .misc import AnyAxis, AnyGrid, Array, Interpolator
 
 Mode = tuple[int, int] | tuple[int, int, int]
 
@@ -369,7 +368,7 @@ hhpw = homogeneous_harmonic_projected_waveform
 """Alias for :func:`~homogeneous_harmonic_projected_waveform`."""
 
 
-def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
+def sum_harmonics[ModeT: Mode, AxisT: "AnyAxis"](
     wf: HomogeneousHarmonicProjectedWaveform[ModeT, reps.FrequencySeries[AxisT]],
 ) -> ProjectedWaveform[reps.FrequencySeries[AxisT]]:
     """Sum over modes."""
@@ -383,8 +382,8 @@ def sum_harmonics[ModeT: Mode, AxisT: "Axis"](
     )
 
 
-def densify_phasor_hw[ModeT: Mode, AxisT: "Axis"](
-    wf: HarmonicWaveform[ModeT, reps.Phasor[Axis]],
+def densify_phasor_hw[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[ModeT, reps.Phasor[AnyAxis]],
     interpolator: Interpolator,
     frequencies: AxisT,
     *,
@@ -411,7 +410,7 @@ def densify_phasor_hw[ModeT: Mode, AxisT: "Axis"](
     )
 
 
-def densify_phasor_pw[RepT: reps.Phasor["Axis"], AxisT: "Axis"](
+def densify_phasor_pw[RepT: reps.Phasor["AnyAxis"], AxisT: "AnyAxis"](
     wf: ProjectedWaveform[RepT],
     interpolator: Interpolator,
     frequencies: AxisT,
@@ -444,8 +443,8 @@ def densify_phasor_pw[RepT: reps.Phasor["Axis"], AxisT: "Axis"](
     )
 
 
-def densify_phasor_hpw[ModeT: Mode, AxisT: "Axis"](
-    wf: HarmonicProjectedWaveform[ModeT, reps.Phasor[Axis]],
+def densify_phasor_hpw[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[ModeT, reps.Phasor[AnyAxis]],
     interpolator: Interpolator,
     frequencies: AxisT,
     *,
@@ -486,18 +485,18 @@ class _HHPWLike[ModeT: "Mode", RepT: "AnyReps"](_HPWLike[ModeT, RepT], Protocol)
 
 
 @overload
-def phasor_to_fs_hw[MT: Mode, AxisT: "Axis"](
+def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
     wf: _HHWLike[MT, reps.Phasor[AxisT]],
 ) -> HomogeneousHarmonicWaveform[MT, reps.FrequencySeries[AxisT]]: ...
 
 
 @overload
-def phasor_to_fs_hw[MT: Mode, AxisT: "Axis"](
+def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
     wf: _HWLike[MT, reps.Phasor[AxisT]],
 ) -> HarmonicWaveform[MT, reps.FrequencySeries[AxisT]]: ...
 
 
-def phasor_to_fs_hw[MT: Mode, AxisT: "Axis"](
+def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
     wf: _HWLike[MT, reps.Phasor[AxisT]],
 ):
     """Convert :class:`~types.Phasor`-valued :class:`~types.HarmonicWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.HarmonicWaveform`."""  # noqa: E501
@@ -507,7 +506,7 @@ def phasor_to_fs_hw[MT: Mode, AxisT: "Axis"](
     return harmonic_waveform(_mapping)
 
 
-def phasor_to_fs_pw[AxisT: "Axis"](
+def phasor_to_fs_pw[AxisT: "AnyAxis"](
     wf: _PWLike[reps.Phasor[AxisT]],
 ):
     """Convert :class:`~types.Phasor`-valued :class:`~types.ProjectedWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.ProjectedWaveform`."""  # noqa: E501
@@ -517,18 +516,18 @@ def phasor_to_fs_pw[AxisT: "Axis"](
 
 
 @overload
-def phasor_to_fs_hpw[MT: Mode, AxisT: "Axis"](
+def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
     wf: _HHPWLike[MT, reps.Phasor[AxisT]],
 ) -> HomogeneousHarmonicProjectedWaveform[MT, reps.FrequencySeries[AxisT]]: ...
 
 
 @overload
-def phasor_to_fs_hpw[MT: Mode, AxisT: "Axis"](
+def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
     wf: _HPWLike[MT, reps.Phasor[AxisT]],
 ) -> HomogeneousHarmonicProjectedWaveform[MT, reps.FrequencySeries[AxisT]]: ...
 
 
-def phasor_to_fs_hpw[MT: Mode, AxisT: "Axis"](
+def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
     wf: _HPWLike[MT, reps.Phasor[AxisT]],
 ):
     """Convert :class:`~types.Phasor`-valued :class:`~types.HarmonicProjectedWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.HarmonicProjectedWaveform`."""  # noqa: E501
@@ -569,34 +568,33 @@ def get_dense_maker(
         or :func:`~densify_phasor_hpw` instead.
     """  # noqa: E501
 
-    def make[MT: Mode, AxisT: "Axis"](
+    def make[MT: Mode, AxisT: "AnyAxis"](
         frequencies: AxisT,
         *,
         embed: bool = False,
     ) -> Callable[
-        [HarmonicProjectedWaveform[MT, reps.Phasor[Axis]]],
+        [HarmonicProjectedWaveform[MT, reps.Phasor[AnyAxis]]],
         HarmonicProjectedWaveform[MT, reps.Phasor[AxisT]],
     ]:
 
-        def do_phasor(wf: reps.Phasor[Axis]):
-            _frequencies = _mixins.to_array(frequencies, xpc.get_namespace(wf.entries))
+        def do_phasor(wf: reps.Phasor[AnyAxis]):
+            _frequencies = frequencies.asarray(xpc.get_namespace(wf.entries))
 
             _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
-            freqs = cast(
-                "AxisT",
-                frequencies[utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)],
-            )
+            freqs = frequencies[
+                utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
+            ]
             nwf = wf.get_interpolated(freqs, interpolator)
             if not embed:
                 return nwf
             return nwf.get_embedded((frequencies,), known_slices=(_slice,))
 
-        def do_response(resp: ProjectedWaveform[reps.Phasor[Axis]]):
+        def do_response(resp: ProjectedWaveform[reps.Phasor[AnyAxis]]):
             return ProjectedWaveform[reps.Phasor[AxisT]].from_dict(
                 {chnname: do_phasor(resp[chnname]) for chnname in resp.channel_names},
             )
 
-        def do[ModeT: Mode](wf: HarmonicProjectedWaveform[ModeT, reps.Phasor[Axis]]):
+        def do[ModeT: Mode](wf: HarmonicProjectedWaveform[ModeT, reps.Phasor[AnyAxis]]):
             return HarmonicProjectedWaveform[ModeT, reps.Phasor[AxisT]](
                 {mode: do_response(wf[mode]) for mode in wf.harmonics},
             )

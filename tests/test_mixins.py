@@ -25,13 +25,13 @@ class _Probe(NDArrayMixin):
         *,
         reflected: bool = False,
         inplace: bool = False,
-        **kwargs,
+        **kwargs,  # pyright: ignore[reportMissingParameterType]
     ):
         del other, kwargs
         self.calls.append(("binary", op, reflected, inplace))
         return self if inplace else _Probe()
 
-    def _unary_op(self, op: object, /, *args, **kwargs):
+    def _unary_op(self, op: object, /, *args, **kwargs):  # pyright: ignore[reportMissingParameterType]
         del args, kwargs
         self.calls.append(("unary", op, False, False))
         return _Probe()
@@ -100,9 +100,9 @@ class TestNDArrayMixinDelegates:
         assert any(op == operator.add for _, op, _, _ in reflected_ops)
         assert any(op == operator.sub for _, op, _, _ in reflected_ops)
         assert any(op == operator.mul for _, op, _, _ in reflected_ops)
-        assert any(op == operator.iadd for _, op, _, _ in inplace_ops)
-        assert any(op == operator.isub for _, op, _, _ in inplace_ops)
-        assert any(op == operator.imul for _, op, _, _ in inplace_ops)
+        assert any(op == operator.iadd for _, op, _, _ in inplace_ops)  # pyright: ignore[reportUnknownMemberType]
+        assert any(op == operator.isub for _, op, _, _ in inplace_ops)  # pyright: ignore[reportUnknownMemberType]
+        assert any(op == operator.imul for _, op, _, _ in inplace_ops)  # pyright: ignore[reportUnknownMemberType]
 
     def test_unary_and_namespace_method_delegation(self):
         probe = _Probe()

@@ -19,11 +19,10 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, cast, overload
 import array_api_compat as xpc
 import l2d_interface.validators as l2dv
 import numpy as np
-from l2d_interface.contract import LinspaceLike
 
 from .. import utils
 from . import modes
-from .misc import AnyGrid, Array, Axis, Domain, Linspace
+from .misc import AnyAxis, AnyGrid, Array, Domain, Linspace
 
 _ModeHM = tuple[int, int]
 _ModeQNM = tuple[int, int, int]
@@ -294,12 +293,12 @@ def check_grid_compatibility(grid1: "AnyGrid", grid2: "AnyGrid") -> bool:
     if len(grid1) != len(grid2):
         return False
     for g1, g2 in zip(grid1, grid2, strict=True):
-        if isinstance(g1, Linspace) and isinstance(g2, Linspace):
-            if g1 != g2:
+        if isinstance(g1.ax, Linspace) and isinstance(g2.ax, Linspace):
+            if g1.ax != g2.ax:
                 return False
         else:
-            xp = xpc.get_namespace(g1)
-            if not xp.array_equal(g1, g2):
+            xp = xpc.get_namespace(g1.ax, g2.ax)
+            if not xp.array_equal(g1.ax, g2.ax):
                 return False
     return True
 
@@ -522,11 +521,9 @@ def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"], /):
             raise ValueError(msg) from error
 
 
-def to_array(ary: "Axis", xp: ModuleType = np) -> "Array":
+def to_array(ary: "AnyAxis", xp: ModuleType = np) -> "Array":
     """Convert an axis to an array if it is a Linspace, otherwise return it as is."""
-    if isinstance(ary, LinspaceLike):
-        return Linspace.make(ary).asarray(xp)
-    return ary
+    return ary.asarray(xp)
 
 
 def embed_entries_to_grid[GT: "AnyGrid"](

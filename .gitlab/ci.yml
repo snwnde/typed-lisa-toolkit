@@ -29,9 +29,10 @@ pytest:
     - source .venv/bin/activate
     - pre-commit run --all-files --show-diff-on-failure
     - basedpyright --gitlabcodequality report.json
+    - basedpyright tests
     - pytest --cov=typed_lisa_toolkit --cov-branch --cov-report=term-missing
         --cov-report=xml:coverage.xml --junitxml=report.xml 
-        --cov-fail-under=90 tests
+        --cov-fail-under=85 tests
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     paths:

@@ -17,15 +17,18 @@ from ..utils import deprecated, warn_external
 from . import _mixins, tapering
 from . import representations as reps
 from .misc import (
+    AnyAxis,
     AnyGrid,
     Array,
     Axis,
+    AxLike,
     Domain,
     Grid1D,
     Grid2D,
     Grid2DCartesian,
     Grid2DSparse,
     Linspace,
+    axis,
     build_grid2d,
 )
 
@@ -59,17 +62,17 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def _save_axis(grp: h5py.Group, name: str, axis: Axis) -> None:
+def _save_axis(grp: h5py.Group, name: str, axis: AnyAxis) -> None:
     """Serialize one grid axis, preserving Linspace compactness."""
     axis_grp = grp.create_group(name)
-    if isinstance(axis, Linspace):
+    if isinstance(axis.ax, Linspace):
         axis_grp.attrs["linspace"] = True
         axis_grp.attrs["start"] = axis.start
-        axis_grp.attrs["step"] = axis.step
-        axis_grp.attrs["num"] = axis.num
+        axis_grp.attrs["step"] = axis.ax.step
+        axis_grp.attrs["num"] = axis.ax.num
         return
 
-    axis_grp.create_dataset("values", data=np.asarray(axis))
+    axis_grp.create_dataset("values", data=np.asarray(axis.ax))
 
 
 def _attr_float(attrs: Any, key: str) -> float:
@@ -84,22 +87,24 @@ def _attr_bool(attrs: Any, key: str, *, default: bool = False) -> bool:
     return bool(attrs.get(key, default))
 
 
-def _load_axis(node: h5py.Group | h5py.Dataset) -> Axis:
+def _load_axis(node: h5py.Group | h5py.Dataset) -> AnyAxis:
     """Deserialize one grid axis.
 
     Supports both new grouped axis format and old raw-dataset axis format.
     """
     if isinstance(node, h5py.Dataset):
-        return cast("Axis", node[()])
+        return cast("AnyAxis", node[()])
 
     linspace = _attr_bool(node.attrs, "linspace", default=False)
     if linspace:
-        return Linspace(
-            start=_attr_float(node.attrs, "start"),
-            step=_attr_float(node.attrs, "step"),
-            num=_attr_int(node.attrs, "num"),
+        return axis(
+            Linspace(
+                start=_attr_float(node.attrs, "start"),
+                step=_attr_float(node.attrs, "step"),
+                num=_attr_int(node.attrs, "num"),
+            )
         )
-    return cast("Axis", cast("h5py.Dataset", node["values"])[()])
+    return cast("AnyAxis", axis(cast("h5py.Dataset", node["values"])[()]))
 
 
 def _save_grid(grp: h5py.Group, grid: AnyGrid) -> None:
@@ -348,7 +353,7 @@ class _SeriesData[RepT: reps.UniformTimeSeries | reps.UniformFrequencySeries](  
 ):
     def get_embedded(
         self,
-        embedding_grid: Grid1D[Axis],
+        embedding_grid: Grid1D[AnyAxis],
         *,
         known_slices: tuple[slice, ...] | None = None,
     ):
@@ -382,7 +387,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     def from_entries(
         cls,
         *,
-        times: Axis,
+        times: AnyAxis,
         entries: Array,
         channels: tuple[str, ...],
         name: str | None = None,
@@ -410,7 +415,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     @property
     def dt(self) -> float:
         """Return the time step."""
-        return self.times.step
+        return self.times.ax.step
 
     @property
     def t_start(self) -> float:
@@ -521,7 +526,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     def from_entries(
         cls,
         *,
-        frequencies: Axis,
+        frequencies: AnyAxis,
         entries: Array,
         channels: tuple[str, ...],
         name: str | None = None,
@@ -549,7 +554,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
     @property
     def df(self):
         """Return the frequency step."""
-        return self.frequencies.step
+        return self.frequencies.ax.step
 
     @property
     def f_min(self):
@@ -561,7 +566,13 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         """Return the maximum frequency."""
         return self.frequencies.stop
 
-    def set_times(self, times: Axis) -> TimedFSData:
+    @overload
+    def set_times(self, times: AxLike) -> TimedFSData: ...
+
+    @overload
+    def set_times(self, times: AnyAxis) -> TimedFSData: ...
+
+    def set_times(self, times: AxLike | AnyAxis) -> TimedFSData:
         """Return a :class:`.TimedFSData` with the time grid set."""
         return TimedFSData(
             self.grid,
@@ -617,7 +628,7 @@ class TimedFSData(FSData):
 
     def get_embedded(  # noqa: D102
         self,
-        embedding_grid: Grid1D[Axis],
+        embedding_grid: Grid1D[AnyAxis],
         *,
         known_slices: tuple[slice, ...] | None = None,
     ) -> Self:
@@ -638,14 +649,21 @@ class TimedFSData(FSData):
         times_data = cast("h5py.Dataset", f["times"])[()]
         return {"times": times_data}
 
-    def set_times(self, times: Axis) -> Self:
+    @overload
+    def set_times(self, times: AxLike) -> Self: ...
+
+    @overload
+    def set_times(self, times: AnyAxis) -> Self: ...
+
+    def set_times(self, times: AxLike | AnyAxis) -> Self:
         """Set the time grid.
 
         .. note::
             This method returns ``self`` to allow for fluent method chaining.
         """
-        self._times: Linspace = Linspace.make(times)
-        self._dt: float = self._times.step
+        _times = axis(times) if not isinstance(times, Axis) else times
+        self._times: Axis[Linspace] = axis(Linspace.make(_times.ax))
+        self._dt: float = self._times.ax.step
         return self
 
     @property
@@ -684,7 +702,8 @@ class TimedFSData(FSData):
 
 
 class _Grid2DData[  # pyright: ignore[reportUnsafeMultipleInheritance]
-    RepT: reps.STFT[Grid2D[Linspace, Linspace]] | reps.WDM[Grid2D[Linspace, Linspace]],
+    RepT: reps.STFT[Grid2D[Axis[Linspace], Axis[Linspace]]]
+    | reps.WDM[Grid2D[Axis[Linspace], Axis[Linspace]]],
 ](
     Data[RepT],
     _SubsetMixin2D[RepT],
@@ -694,8 +713,8 @@ class _Grid2DData[  # pyright: ignore[reportUnsafeMultipleInheritance]
     def from_entries(
         cls,
         *,
-        frequencies: Axis,
-        times: Axis,
+        frequencies: AnyAxis,
+        times: AnyAxis,
         entries: Array,
         channels: tuple[str, ...],
         sparse_indices: Array | None = None,
@@ -711,7 +730,9 @@ class _Grid2DData[  # pyright: ignore[reportUnsafeMultipleInheritance]
         return plotters.TFDataPlotter
 
 
-class STFTData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.STFT[GridT]]):
+class STFTData[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
+    _Grid2DData[reps.STFT[GridT]]
+):
     """Multi-channel short-time Fourier transform data container.
 
     .. note::
@@ -727,7 +748,9 @@ class STFTData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.STFT[GridT]])
         return "stft"
 
 
-class WDMData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.WDM[GridT]]):
+class WDMData[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
+    _Grid2DData[reps.WDM[GridT]]
+):
     """Multi-channel wavelet domain model data container.
 
     .. note::
@@ -743,10 +766,10 @@ class WDMData[GridT: Grid2D[Linspace, Linspace]](_Grid2DData[reps.WDM[GridT]]):
         return "wdm"
 
 
-def _enforce_uniform(ary: Axis, /) -> Linspace:
+def _enforce_uniform(ary: AnyAxis, /) -> Axis[Linspace]:
     """Enforce that the given array is uniform and return it as a Linspace."""
     try:
-        return Linspace.make(ary)
+        return axis(Linspace.make(ary.ax))
     except ValueError as e:
         msg = "To construct data objects, the grid axes must be uniform"
         raise ValueError(msg) from e
@@ -767,20 +790,27 @@ def _enforce_uniform_mapping[RepT: AnyReps](
 ) -> Mapping[str, RepT]:
 
     def axis_gen(grid: AnyGrid):
-        for axis in grid:
-            if isinstance(axis, Linspace):
-                yield axis
+        for _axis in grid:
+            if isinstance(_axis.ax, Linspace):
+                yield _axis
             else:
                 msg = (
-                    f"Linspace axes expected; found array axis {axis}"
+                    f"Linspace axes expected; found array axis {_axis}"
                     "Convert the axes to Linspace with `tlt.linsapce_from_array`"
                     "before constructing the data object."
                 )
                 warn_external(msg, category=UserWarning)
-                yield _enforce_uniform(axis)
+                yield _enforce_uniform(_axis)
 
     def new_grid(grid: AnyGrid) -> AnyGrid:
-        return tuple(axis_gen(grid))  # pyright: ignore[reportReturnType]
+        _grid = tuple(axis_gen(grid))
+        if isinstance(grid, Grid2DSparse):
+            _grid = Grid2DSparse[Axis[Linspace], Axis[Linspace]](
+                _grid[0],
+                _grid[1],
+                sparse_indices=grid.indices,
+            )
+        return _grid  # pyright: ignore[reportReturnType]
 
     return {
         ch: type(rep)(new_grid(rep.grid), rep.entries) for ch, rep in mapping.items()
@@ -796,7 +826,7 @@ _func_deprecation_msg = (
 
 @overload
 def tsdata(
-    mapping: Mapping[str, reps.TimeSeries[Linspace]],
+    mapping: Mapping[str, reps.TimeSeries[Axis[Linspace]]],
     /,
     *,
     name: str | None = None,
@@ -806,7 +836,7 @@ def tsdata(
 @overload
 def tsdata(
     *,
-    times: Axis,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     name: str | None = None,
@@ -814,10 +844,10 @@ def tsdata(
 
 
 def tsdata(
-    mapping: Mapping[str, reps.TimeSeries[Linspace]] | None = None,
+    mapping: Mapping[str, reps.TimeSeries[Axis[Linspace]]] | None = None,
     /,
     *,
-    times: Axis | None = None,
+    times: AnyAxis | AxLike | None = None,
     entries: Array | None = None,
     channels: tuple[str, ...] | None = None,
     name: str | None = None,
@@ -875,9 +905,10 @@ def tsdata(
     )
     if not (times is not None and entries is not None and channels is not None):
         raise ValueError(_msg)
-    times = _enforce_uniform(times)
+    _times = axis(times) if not isinstance(times, Axis) else times
+    _times = _enforce_uniform(_times)
     return TSData.from_entries(
-        times=times,
+        times=_times,
         entries=entries,
         channels=channels,
         name=name,
@@ -886,17 +917,17 @@ def tsdata(
 
 @overload
 def fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
+    mapping: Mapping[str, reps.FrequencySeries[Axis[Linspace]]],
     /,
     *,
-    times: Axis,
+    times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData: ...
 
 
 @overload
 def fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
+    mapping: Mapping[str, reps.FrequencySeries[Axis[Linspace]]],
     /,
     *,
     name: str | None = None,
@@ -906,7 +937,7 @@ def fsdata(
 @overload
 def fsdata(
     *,
-    frequencies: Axis,
+    frequencies: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     times: None = None,
@@ -917,22 +948,22 @@ def fsdata(
 @overload
 def fsdata(
     *,
-    frequencies: Axis,
+    frequencies: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
-    times: Axis,
+    times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData: ...
 
 
 def fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]] | None = None,
+    mapping: Mapping[str, reps.FrequencySeries[Axis[Linspace]]] | None = None,
     /,
     *,
-    frequencies: Axis | None = None,
+    frequencies: AnyAxis | AxLike | None = None,
     entries: Array | None = None,
     channels: tuple[str, ...] | None = None,
-    times: Axis | None = None,
+    times: AnyAxis | AxLike | None = None,
     name: str | None = None,
 ):
     """Construct :class:`~types.FSData` or :class:`.TimedFSData`.
@@ -1008,23 +1039,25 @@ def fsdata(
             frequencies is not None and entries is not None and channels is not None
         ):
             raise ValueError(_msg)
-        frequencies = _enforce_uniform(frequencies)
+        _freqs = axis(frequencies) if not isinstance(frequencies, Axis) else frequencies
+        _freqs = _enforce_uniform(_freqs)
         _fsdata = FSData.from_entries(
-            frequencies=frequencies,
+            frequencies=_freqs,
             entries=entries,
             channels=channels,
             name=name,
         )
     if times is not None:
-        times = _enforce_uniform(times)
-        return _fsdata.set_times(times)
+        _times = axis(times) if not isinstance(times, Axis) else times
+        _times = _enforce_uniform(_times)
+        return _fsdata.set_times(_times)
     return _fsdata
 
 
 @deprecated("timed_fsdata", "function", "0.8.0", alternative="fsdata")
 def timed_fsdata(
-    mapping: Mapping[str, reps.FrequencySeries[Linspace]],
-    times: Linspace | npt.NDArray[np.floating[Any]],
+    mapping: Mapping[str, reps.FrequencySeries[Axis[Linspace]]],
+    times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData:
     """Construct :class:`~types.TimedFSData` (*Deprecated*).
@@ -1038,7 +1071,7 @@ def timed_fsdata(
 
 
 @overload
-def stftdata[GridT: Grid2D[Linspace, Linspace]](
+def stftdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     mapping: Mapping[str, reps.STFT[GridT]],
     /,
     *,
@@ -1049,33 +1082,33 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
 @overload
 def stftdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
-) -> STFTData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> STFTData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
 def stftdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: Array,
     name: str | None = None,
-) -> STFTData[Grid2DSparse[Linspace, Linspace]]: ...
+) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
 
-def stftdata[GridT: Grid2D[Linspace, Linspace]](
+def stftdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     mapping: Mapping[str, reps.STFT[GridT]] | None = None,
     /,
     *,
-    frequencies: Axis | None = None,
-    times: Axis | None = None,
+    frequencies: AnyAxis | AxLike | None = None,
+    times: AnyAxis | AxLike | None = None,
     entries: Array | None = None,
     channels: tuple[str, ...] | None = None,
     sparse_indices: Array | None = None,
@@ -1153,20 +1186,13 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
         and channels is not None
     ):
         raise ValueError(_msg)
-    frequencies = _enforce_uniform(frequencies)
-    times = _enforce_uniform(times)
-    if sparse_indices is None:
-        return STFTData[Grid2DCartesian[Linspace, Linspace]].from_entries(
-            frequencies=frequencies,
-            times=times,
-            entries=entries,
-            channels=channels,
-            sparse_indices=sparse_indices,
-            name=name,
-        )
-    return STFTData[Grid2DSparse[Linspace, Linspace]].from_entries(
-        frequencies=frequencies,
-        times=times,
+    _freqs = axis(frequencies) if not isinstance(frequencies, Axis) else frequencies
+    _times = axis(times) if not isinstance(times, Axis) else times
+    _freqs = _enforce_uniform(_freqs)
+    _times = _enforce_uniform(_times)
+    return STFTData[Any].from_entries(
+        frequencies=_freqs,
+        times=_times,
         entries=entries,
         channels=channels,
         sparse_indices=sparse_indices,
@@ -1175,7 +1201,7 @@ def stftdata[GridT: Grid2D[Linspace, Linspace]](
 
 
 @overload
-def wdmdata[GridT: Grid2D[Linspace, Linspace]](
+def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     mapping: Mapping[str, reps.WDM[GridT]],
     /,
     *,
@@ -1186,33 +1212,33 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
 @overload
 def wdmdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
-) -> WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
 def wdmdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: Array,
     name: str | None = None,
-) -> WDMData[Grid2DSparse[Linspace, Linspace]]: ...
+) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
 
-def wdmdata[GridT: Grid2D[Linspace, Linspace]](
+def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     mapping: Mapping[str, reps.WDM[GridT]] | None = None,
     /,
     *,
-    frequencies: Axis | None = None,
-    times: Axis | None = None,
+    frequencies: AnyAxis | AxLike | None = None,
+    times: AnyAxis | AxLike | None = None,
     entries: Array | None = None,
     channels: tuple[str, ...] | None = None,
     sparse_indices: Array | None = None,
@@ -1290,20 +1316,13 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
         and channels is not None
     ):
         raise ValueError(_msg)
-    frequencies = _enforce_uniform(frequencies)
-    times = _enforce_uniform(times)
-    if sparse_indices is None:
-        return WDMData[Grid2DCartesian[Linspace, Linspace]].from_entries(
-            frequencies=frequencies,
-            times=times,
-            entries=entries,
-            channels=channels,
-            sparse_indices=sparse_indices,
-            name=name,
-        )
-    return WDMData[Grid2DSparse[Linspace, Linspace]].from_entries(
-        frequencies=frequencies,
-        times=times,
+    _freqs = axis(frequencies) if not isinstance(frequencies, Axis) else frequencies
+    _times = axis(times) if not isinstance(times, Axis) else times
+    _freqs = _enforce_uniform(_freqs)
+    _times = _enforce_uniform(_times)
+    return WDMData[Any].from_entries(
+        frequencies=_freqs,
+        times=_times,
         entries=entries,
         channels=channels,
         sparse_indices=sparse_indices,
@@ -1314,7 +1333,7 @@ def wdmdata[GridT: Grid2D[Linspace, Linspace]](
 @deprecated("construct_tsdata", "function", "0.8.0", alternative="tsdata")
 def construct_tsdata(
     *,
-    times: Axis,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     name: str | None = None,
@@ -1351,10 +1370,10 @@ def construct_tsdata(
 @overload
 def construct_fsdata(
     *,
-    frequencies: Axis,
+    frequencies: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
-    times: Axis,
+    times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData: ...
 
@@ -1362,7 +1381,7 @@ def construct_fsdata(
 @overload
 def construct_fsdata(
     *,
-    frequencies: Axis,
+    frequencies: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     name: str | None = None,
@@ -1372,11 +1391,11 @@ def construct_fsdata(
 @deprecated("construct_fsdata", "function", "0.8.0", alternative="fsdata")
 def construct_fsdata(
     *,
-    frequencies: Axis,
+    frequencies: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     name: str | None = None,
-    times: Axis | None = None,
+    times: AnyAxis | AxLike | None = None,
 ) -> FSData:
     """Construct an :class:`~types.data.FSData` (*Deprecated*).
 
@@ -1415,10 +1434,10 @@ def construct_fsdata(
 @deprecated("construct_timed_fsdata", "function", "0.8.0", alternative="fsdata")
 def construct_timed_fsdata(
     *,
-    frequencies: Axis,
+    frequencies: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
-    times: Linspace | npt.NDArray[np.floating[Any]],
+    times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData:
     """Construct a :class:`~types.data.TimedFSData` (*Deprecated*).
@@ -1468,32 +1487,32 @@ def construct_timed_fsdata(
 @overload
 def construct_stftdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
-) -> STFTData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> STFTData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
 def construct_stftdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: Array,
     name: str | None = None,
-) -> STFTData[Grid2DSparse[Linspace, Linspace]]: ...
+) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @deprecated("construct_stftdata", "function", "0.8.0", alternative="stftdata")
 def construct_stftdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: Array | None = None,
@@ -1547,32 +1566,32 @@ def construct_stftdata(
 @overload
 def construct_wdmdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
-) -> WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
 def construct_wdmdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: Array,
     name: str | None = None,
-) -> WDMData[Grid2DSparse[Linspace, Linspace]]: ...
+) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @deprecated("construct_wdmdata", "function", "0.8.0", alternative="wdmdata")
 def construct_wdmdata(
     *,
-    frequencies: Axis,
-    times: Axis,
+    frequencies: AnyAxis | AxLike,
+    times: AnyAxis | AxLike,
     entries: Array,
     channels: tuple[str, ...],
     sparse_indices: Array | None = None,
@@ -1664,7 +1683,7 @@ def load_data(
     kind: Literal["stft"],
     sparse: Literal[False] = False,
     legacy: bool = False,
-) -> STFTData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> STFTData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
@@ -1675,7 +1694,7 @@ def load_data(
     kind: Literal["stft"],
     sparse: Literal[True],
     legacy: bool = False,
-) -> STFTData[Grid2DSparse[Linspace, Linspace]]: ...
+) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
@@ -1686,7 +1705,7 @@ def load_data(
     kind: Literal["wdm"],
     sparse: Literal[False] = False,
     legacy: bool = False,
-) -> WDMData[Grid2DCartesian[Linspace, Linspace]]: ...
+) -> WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 @overload
@@ -1697,7 +1716,7 @@ def load_data(
     kind: Literal["wdm"],
     sparse: Literal[True],
     legacy: bool = False,
-) -> WDMData[Grid2DSparse[Linspace, Linspace]]: ...
+) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
 
 def load_data(
@@ -1767,11 +1786,17 @@ def load_data(
         ("frequency", "None", False): FSData,
         ("frequency", "timed", False): TimedFSData,
         ("time-frequency", "stft", False): STFTData[
-            Grid2DCartesian[Linspace, Linspace]
+            Grid2DCartesian[Axis[Linspace], Axis[Linspace]]
         ],
-        ("time-frequency", "stft", True): STFTData[Grid2DSparse[Linspace, Linspace]],
-        ("time-frequency", "wdm", False): WDMData[Grid2DCartesian[Linspace, Linspace]],
-        ("time-frequency", "wdm", True): WDMData[Grid2DSparse[Linspace, Linspace]],
+        ("time-frequency", "stft", True): STFTData[
+            Grid2DSparse[Axis[Linspace], Axis[Linspace]]
+        ],
+        ("time-frequency", "wdm", False): WDMData[
+            Grid2DCartesian[Axis[Linspace], Axis[Linspace]]
+        ],
+        ("time-frequency", "wdm", True): WDMData[
+            Grid2DSparse[Axis[Linspace], Axis[Linspace]]
+        ],
     }
     cls = classes.get((domain_attr, kind_attr, sparse))
     if cls is None:
@@ -1826,7 +1851,7 @@ def load_sangria(
             tsdata = TSData.from_dict(
                 {
                     chnname: reps.time_series(
-                        _enforce_uniform(dataset[domain].squeeze()),
+                        _enforce_uniform(axis(dataset[domain].squeeze())),
                         entries=dataset[chnname].squeeze()[None, None, None, None, :],
                     )
                     for chnname in channel_names
@@ -1849,7 +1874,7 @@ def load_mojito(processed_data: SignalProcessor):
     _data = cast("dict[str, Array]", processed_data.data)
     _mapping = {
         chnname: reps.time_series(
-            _enforce_uniform(processed_data.t),
+            _enforce_uniform(axis(processed_data.t)),
             _data[chnname][None, None, None, None, :],
         )
         for chnname in channel_names

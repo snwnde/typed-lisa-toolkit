@@ -18,7 +18,7 @@ from .. import utils
 from . import _mixins, waveforms
 from . import data as dm
 from . import representations as reps
-from .misc import Array, Axis, Domain, Grid2D, Linspace
+from .misc import AnyAxis, Array, Axis, Domain, Grid2D, Linspace
 
 
 def _import_quadax() -> ModuleType:
@@ -51,10 +51,10 @@ log = logging.getLogger(__name__)
 
 
 ChnName = str
-FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries[Axis]]
+FDEntry = dm.FSData | waveforms.ProjectedWaveform[reps.FrequencySeries[AnyAxis]]
 TFEntry = (
-    dm.WDMData[Grid2D[Linspace, Linspace]]
-    | waveforms.ProjectedWaveform[reps.WDM[Grid2D[Linspace, Linspace]]]
+    dm.WDMData[Grid2D[Axis[Linspace], Axis[Linspace]]]
+    | waveforms.ProjectedWaveform[reps.WDM[Grid2D[Axis[Linspace], Axis[Linspace]]]]
 )
 IntegrationMethod = Literal["trapezoid", "simpson"]
 
@@ -333,7 +333,9 @@ class NoiseModelLike[EntryT1: _EntryInDomain[Domain], EntryT2: _EntryInDomain[Do
 
 
 class FDNoiseModel(
-    NoiseModelLike[dm.FSData, waveforms.ProjectedWaveform[reps.FrequencySeries[Axis]]],
+    NoiseModelLike[
+        dm.FSData, waveforms.ProjectedWaveform[reps.FrequencySeries[AnyAxis]]
+    ],
 ):
     """Frequency domain noise model.
 
@@ -543,7 +545,7 @@ class FDNoiseModel(
         """
         xp = _first_entries(left).__array_namespace__()
         two_sided_freq = xp.fft.fftshift(
-            xp.fft.fftfreq(len(left.times), left.times.step),
+            xp.fft.fftfreq(len(left.times), left.times.ax.step),
         )
         _first = next(iter(left.values()))
         frequencies, df = _mixins.to_array(_first.frequencies, xp), _first.df
@@ -769,7 +771,7 @@ def make_sdm(
     inverse_sdm: "Array",
     /,
     *,
-    frequencies: "Array",
+    frequencies: Array | AnyAxis,
     channel_names: Sequence[ChnName],
     times: None = None,
     is_diagonal: Literal[False] = False,
@@ -779,7 +781,7 @@ def make_sdm(
     inverse_sdm: "Array",
     /,
     *,
-    frequencies: "Array",
+    frequencies: Array | AnyAxis,
     channel_names: Sequence[ChnName],
     is_diagonal: Literal[True],
     times: None = None,
@@ -789,17 +791,17 @@ def make_sdm(
     inverse_sdm: "Array",
     /,
     *,
-    frequencies: "Array",
-    times: "Array",
+    frequencies: Array | AnyAxis,
+    times: Array | AnyAxis,
     channel_names: Sequence[ChnName],
 ) -> EvolutionarySpectralDensity: ...
 def make_sdm(
     inverse_sdm: Array,
     /,
     *,
-    frequencies: Array,
+    frequencies: Array | AnyAxis,
     channel_names: Sequence[ChnName],
-    times: Array | None = None,
+    times: Array | AnyAxis | None = None,
     is_diagonal: bool = False,
 ):
     """Make a :class:`~types.SpectralDensity`, a :class:`~types.DiagonalSpectralDensity` or an :class:`~types.EvolutionarySpectralDensity`.
@@ -827,6 +829,8 @@ def make_sdm(
         Whether the SDM is diagonal. Only relevant if `times` is None. If True, a :class:`~types.DiagonalSpectralDensity`
         will be constructed. Defaults to False.
     """  # noqa: E501
+    _freqs = frequencies.asarray() if isinstance(frequencies, Axis) else frequencies
+
     if times is None:
         if not is_diagonal:
             _validate_shape(
@@ -837,13 +841,13 @@ def make_sdm(
                     len(channel_names),
                 ),
             )
-            return SpectralDensity(frequencies, inverse_sdm, channel_names)
+            return SpectralDensity(_freqs, inverse_sdm, channel_names)
         xp = xpc.get_namespace(inverse_sdm)
         _inverse_sdm = inverse_sdm[:, :, None] * xp.eye(
             len(channel_names),
             dtype=inverse_sdm.dtype,
         )
-        return DiagonalSpectralDensity(frequencies, _inverse_sdm, channel_names)
+        return DiagonalSpectralDensity(_freqs, _inverse_sdm, channel_names)
     _validate_shape(
         inverse_sdm,
         expected_shape=(
@@ -853,9 +857,10 @@ def make_sdm(
             len(channel_names),
         ),
     )
+    _times = times.asarray() if isinstance(times, Axis) else times
     return EvolutionarySpectralDensity(
-        frequencies,
-        times,
+        _freqs,
+        _times,
         inverse_sdm,
         channel_names,
     )

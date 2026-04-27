@@ -95,7 +95,7 @@ def deprecated(
     return _deprecated(message, package_prefix=package_prefix)
 
 
-def get_subset_slice(increasing_array: Array, min: float, max: float):
+def get_subset_slice(increasing_array: Array, /, min: float, max: float):
     """Return the index slice for the subset [min, max] of the increasing array.
 
     Examples

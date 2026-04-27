@@ -165,6 +165,7 @@ but are useful helpers for constructing the above objects.
    :template: base.rst
    :nosignatures:
 
+   axis
    linspace
    linspace_from_step
    linspace_from_array
@@ -174,6 +175,7 @@ but are useful helpers for constructing the above objects.
 
 from . import shop, types, utils, viz
 from ._constructors import (
+    axis,
     build_grid2d,
     cast_mode,
     construct_fsdata,
@@ -222,6 +224,7 @@ from ._constructors import (
 from ._loaders import load_data, load_ldc_data, load_mojito, load_sangria
 
 __all__ = [
+    "axis",
     "build_grid2d",
     "cast_mode",
     "construct_fsdata",

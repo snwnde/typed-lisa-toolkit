@@ -49,7 +49,16 @@ import matplotlib.figure
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..types import AnyGrid, Axis, Grid2D, Linspace, _mixins, data, representations
+from ..types import (
+    AnyAxis,
+    AnyGrid,
+    Axis,
+    Grid2D,
+    Linspace,
+    _mixins,
+    data,
+    representations,
+)
 
 if TYPE_CHECKING:
     AnyReps = representations.Representation[AnyGrid]
@@ -193,7 +202,7 @@ class _Plotter1D[RepT: AnyReps](abc.ABC):
         return fig
 
 
-class TSPlotter(_Plotter1D[representations.TimeSeries["Axis"]]):
+class TSPlotter(_Plotter1D[representations.TimeSeries["AnyAxis"]]):
     """Plotter for :class:`~types.TimeSeries`."""
 
     def plot(
@@ -235,7 +244,7 @@ class TSPlotter(_Plotter1D[representations.TimeSeries["Axis"]]):
         return ax
 
 
-class FSPlotter(_Plotter1D[representations.FrequencySeries["Axis"]]):
+class FSPlotter(_Plotter1D[representations.FrequencySeries["AnyAxis"]]):
     """Plotter for :class:`~types.FrequencySeries`."""
 
     def plot(
@@ -309,7 +318,7 @@ class FSPlotter(_Plotter1D[representations.FrequencySeries["Axis"]]):
         return fig
 
 
-class PhasorPlotter[AxisT: "Axis"](_Plotter1D[representations.Phasor[AxisT]]):
+class PhasorPlotter[AxisT: "AnyAxis"](_Plotter1D[representations.Phasor[AxisT]]):
     """Plotter for :class:`~types.Phasor`."""
 
     def plot(
@@ -382,7 +391,7 @@ class PhasorPlotter[AxisT: "Axis"](_Plotter1D[representations.Phasor[AxisT]]):
         return fig
 
 
-class STFTPlotter[GridT: Grid2D[Axis, Axis]]:
+class STFTPlotter[GridT: Grid2D[AnyAxis, AnyAxis]]:
     """Plotter for :class:`~types.STFT`."""
 
     def __init__(self, representation: representations.STFT[GridT]) -> None:
@@ -426,7 +435,7 @@ class STFTPlotter[GridT: Grid2D[Axis, Axis]]:
         return ax
 
 
-class WDMPlotter[GridT: Grid2D[Linspace, Linspace]]:
+class WDMPlotter[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]]:
     """Plotter for :class:`~types.WDM`."""
 
     def __init__(self, representation: representations.WDM[GridT]) -> None:
@@ -443,7 +452,7 @@ class WDMPlotter[GridT: Grid2D[Linspace, Linspace]]:
     ) -> matplotlib.axes.Axes:
         """Plot the time-frequency representation on the provided Axes."""
         _kwargs = sieve_kwargs(imshow_kwargs, **kwargs)
-        dT, dF = self.representation.times.step, self.representation.dF  # noqa: N806
+        dT, dF = self.representation.times.ax.step, self.representation.dF  # noqa: N806
 
         times_extent = (
             self.representation.times.start / 3600,
@@ -472,7 +481,8 @@ class WDMPlotter[GridT: Grid2D[Linspace, Linspace]]:
 
 
 class _DataPlotter1D[
-    RepT: representations.TimeSeries["Axis"] | representations.FrequencySeries["Axis"],
+    RepT: representations.TimeSeries["AnyAxis"]
+    | representations.FrequencySeries["AnyAxis"],
 ](abc.ABC):
     def __init__(self, data: data.Data[RepT]) -> None:
         self.data: data.Data[RepT] = copy.deepcopy(data)
@@ -566,7 +576,7 @@ class _DataPlotter1D[
     def compare(self, other: Self, **kwargs: Any) -> matplotlib.figure.Figure: ...
 
 
-class TSDataPlotter(_DataPlotter1D["representations.TimeSeries[Axis]"]):
+class TSDataPlotter(_DataPlotter1D["representations.TimeSeries[AnyAxis]"]):
     """Plotter for :class:`.containers.data.TSData`."""
 
     def draw(
@@ -587,7 +597,7 @@ class TSDataPlotter(_DataPlotter1D["representations.TimeSeries[Axis]"]):
         return self._compare(plotter=TSPlotter, other=other, **kwargs)
 
 
-class FSDataPlotter(_DataPlotter1D["representations.FrequencySeries[Axis]"]):
+class FSDataPlotter(_DataPlotter1D["representations.FrequencySeries[AnyAxis]"]):
     """Plotter for :class:`.containers.data.FSData`."""
 
     def _draw_angle(
@@ -706,8 +716,8 @@ class FSDataPlotter(_DataPlotter1D["representations.FrequencySeries[Axis]"]):
 
 
 class TFDataPlotter[
-    DataT: data.WDMData[Grid2D[Linspace, Linspace]]
-    | data.STFTData[Grid2D[Linspace, Linspace]],
+    DataT: data.WDMData[Grid2D[Axis[Linspace], Axis[Linspace]]]
+    | data.STFTData[Grid2D[Axis[Linspace], Axis[Linspace]]],
 ]:
     """Plotter for :class:`.containers.data.TFData`."""
 
