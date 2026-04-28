@@ -1328,15 +1328,37 @@ def densify_phasor[AT: "AnyAxis"](
         The frequencies at which to evaluate the densified phasor.
     embed :
         Whether to embed the densified phasor on the original frequency grid.
-    """
-    _frequencies = to_array(frequencies, xpc.get_namespace(wf.entries))
 
-    _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
-    freqs = frequencies[utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)]
-    nwf = wf.get_interpolated(freqs, interpolator)
+    Attention
+    ---------
+    The branch with `embed=False` does not support JIT compilation.
+    """
+    xp = xpc.get_namespace(wf.entries)
+    _frequencies = to_array(frequencies, xp=xp)
     if not embed:
-        return nwf
-    return nwf.get_embedded((frequencies,), known_slices=(_slice,))
+        _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
+        freqs = frequencies[_slice]
+        return wf.get_interpolated(freqs, interpolator)
+    mask = utils.get_subset_mask(_frequencies, wf.f_min, wf.f_max)
+    nwf = wf.get_interpolated(frequencies, interpolator)
+    _amp = xp.where(mask, nwf.amplitudes, 0)
+    _phase = xp.where(mask, nwf.phases, 0)
+    return phasor(frequencies, _amp, _phase)
+
+    # if embed:
+    #     freqs = xp.where(mask, _frequencies, 0)
+    #     nwf = wf.get_interpolated(freqs, interpolator)
+    #     return nwf
+    # freqs = _frequencies[mask]
+    # nwf = wf.get_interpolated(freqs, interpolator)
+    # return nwf
+
+    # _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
+    # freqs = frequencies[_slice]
+    # nwf = wf.get_interpolated(freqs, interpolator)
+    # if not embed:
+    #     return nwf
+    # return nwf.get_embedded((frequencies,), known_slices=(_slice,))
 
 
 class _FreqProperty2D:

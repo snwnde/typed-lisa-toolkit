@@ -278,3 +278,11 @@ __all__ = [
     "wdmdata",
     "whittle",
 ]
+
+# Register JAX pytree handlers when JAX is installed.
+try:
+    from ._jit import enable_jax_pytree_registration
+
+    enable_jax_pytree_registration()
+except ImportError:
+    pass
