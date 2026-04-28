@@ -2,6 +2,22 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.4 - 2026-04-28
+#### Features
+- make jittable - (c72e899) - Senwen Deng
+#### Bug Fixes
+- enforce lin grid - (40fd57e) - Senwen Deng
+#### Tests
+- further cleaning - (9f17823) - Senwen Deng
+- further cleaned tests - (d2f5013) - Senwen Deng
+- improved tests - (57f40c2) - Senwen Deng
+#### Refactoring
+- new axis contract - (0580e44) - Senwen Deng
+#### Miscellaneous Chores
+- dependency - (7a9f1b5) - Senwen Deng
+
+- - -
+
 ## 0.6.3 - 2026-04-23
 #### Bug Fixes
 - <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>linspace - (b8410a6) - Senwen Deng
