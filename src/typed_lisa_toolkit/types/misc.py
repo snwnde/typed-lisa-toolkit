@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
     type JaxArrayLike = jpt.ArrayLike
     type JaxArray = jax.Array
+else:
+    type JaxArrayLike = npt.ArrayLike
+    type JaxArray = npt.NDArray[np.number]
 
 type ArrayLike = JaxArrayLike | npt.ArrayLike
 type Array = JaxArray | npt.NDArray[np.number]
