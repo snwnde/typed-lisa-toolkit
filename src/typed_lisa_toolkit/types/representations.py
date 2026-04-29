@@ -944,7 +944,8 @@ class FrequencySeries[AxisT: "AnyAxis"](_Series1D[AxisT]):
         )
         return frequency_series(grid[0], entries)
 
-    def get_plotter(self):
+    @property
+    def plot(self):
         """Return the plotter for the series."""
         from ..viz import plotters
 
@@ -1038,7 +1039,8 @@ class TimeSeries[AxisT: "AnyAxis"](_Series1D[AxisT]):
         """The end time of the series."""
         return _get_axis_end(self.times)
 
-    def get_plotter(self):
+    @property
+    def plot(self):
         """Return the plotter for the series."""
         from ..viz import plotters
 
@@ -1302,7 +1304,8 @@ class Phasor[AxisT: "AnyAxis"](
             self.amplitudes * xp.exp(1j * self.phases),
         )
 
-    def get_plotter(self):
+    @property
+    def plot(self):
         """Return the plotter for the phasor."""
         from ..viz import plotters
 
@@ -1505,7 +1508,7 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
         known_slices: tuple[slice, ...] | None = None,
     ) -> STFT[Grid2DCartesian[A0, A1]]: ...
 
-    def get_embedded(
+    def get_embedded(  # pyright: ignore[reportInconsistentOverload]
         self,
         embedding_grid: Grid2D[AnyAxis, AnyAxis],
         *,
@@ -1528,7 +1531,8 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
         )
         return stft(grid[0], grid[1], entries)
 
-    def get_plotter(self):
+    @property
+    def plot(self):
         """Return the plotter for the representation."""
         from ..viz import plotters
 
@@ -1639,7 +1643,8 @@ class WilsonDaubechiesMeyer[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
         """Nyquist frequency (half the sampling rate)."""
         return self.fs / 2
 
-    def get_plotter(self):
+    @property
+    def plot(self):
         """Return the plotter for the representation."""
         from ..viz import plotters
 

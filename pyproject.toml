@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-wdm = ["wdm-transform>=0.1.1"]
+wdm = ["wdm-transform==0.1.1"]
 jax = ["jax"]
 quadax = ["quadax"]
 mojito = [

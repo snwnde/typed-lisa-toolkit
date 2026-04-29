@@ -188,31 +188,31 @@ class _SubsetMixin1D[RepT: _SubsettableRep1D](_mixins.ChannelMapping[RepT], abc.
         }
         return type(self).from_dict(subset_dict).set_name(self.name)
 
-    def draw(
-        self,
-        compare_to: Self | None = None,
-        *,
-        interval: tuple[float, float] | None = None,
-        **kwargs: Any,
-    ):
-        """Plot the data.
+    # def draw(
+    #     self,
+    #     compare_to: Self | None = None,
+    #     *,
+    #     interval: tuple[float, float] | None = None,
+    #     **kwargs: Any,
+    # ):
+    #     """Plot the data.
 
-        If `compare_to` is not `None`, the method draws both
-        the data and the data in `compare_to`.
-        """
-        plotter = self._get_plotter()
+    #     If `compare_to` is not `None`, the method draws both
+    #     the data and the data in `compare_to`.
+    #     """
+    #     plotter = self._get_plotter()
 
-        if compare_to is None:
-            return plotter(self.get_subset(interval=interval)).draw(**kwargs)
-        return plotter(self.get_subset(interval=interval)).compare(
-            plotter(compare_to.get_subset(interval=interval)),
-            **kwargs,
-        )
+    #     if compare_to is None:
+    #         return plotter(self.get_subset(interval=interval)).draw(**kwargs)
+    #     return plotter(self.get_subset(interval=interval)).compare(
+    #         plotter(compare_to.get_subset(interval=interval)),
+    #         **kwargs,
+    #     )
 
-    def _get_plotter(self) -> type[Any]:
-        """Return the plotter class."""
-        msg = "The method _get_plotter() must be implemented in the subclass."
-        raise NotImplementedError(msg)
+    # def _get_plotter(self) -> type[Any]:
+    #     """Return the plotter class."""
+    #     msg = "The method _get_plotter() must be implemented in the subclass."
+    #     raise NotImplementedError(msg)
 
 
 class _SubsetMixin2D[RepT: _SubsettableRep2D](_mixins.ChannelMapping[RepT], abc.ABC):
@@ -236,39 +236,39 @@ class _SubsetMixin2D[RepT: _SubsettableRep2D](_mixins.ChannelMapping[RepT], abc.
         }
         return type(self).from_dict(subset_dict).set_name(self.name)
 
-    def draw(
-        self,
-        compare_to: Self | None = None,
-        *,
-        time_interval: tuple[float, float] | None = None,
-        freq_interval: tuple[float, float] | None = None,
-        **kwargs: Any,
-    ):
-        """Plot the data.
+    # def draw(
+    #     self,
+    #     compare_to: Self | None = None,
+    #     *,
+    #     time_interval: tuple[float, float] | None = None,
+    #     freq_interval: tuple[float, float] | None = None,
+    #     **kwargs: Any,
+    # ):
+    #     """Plot the data.
 
-        If `compare_to` is not `None`, the method draws both
-        the data and the data in `compare_to`.
-        """
-        plotter = self._get_plotter()
+    #     If `compare_to` is not `None`, the method draws both
+    #     the data and the data in `compare_to`.
+    #     """
+    #     plotter = self._get_plotter()
 
-        if compare_to is None:
-            return plotter(
-                self.get_subset(
-                    time_interval=time_interval,
-                    freq_interval=freq_interval,
-                ),
-            ).draw(**kwargs)
-        return plotter(
-            self.get_subset(time_interval=time_interval, freq_interval=freq_interval),
-        ).compare(
-            plotter(
-                compare_to.get_subset(
-                    time_interval=time_interval,
-                    freq_interval=freq_interval,
-                ),
-            ),
-            **kwargs,
-        )
+    #     if compare_to is None:
+    #         return plotter(
+    #             self.get_subset(
+    #                 time_interval=time_interval,
+    #                 freq_interval=freq_interval,
+    #             ),
+    #         ).draw(**kwargs)
+    #     return plotter(
+    #         self.get_subset(time_interval=time_interval, freq_interval=freq_interval),
+    #     ).compare(
+    #         plotter(
+    #             compare_to.get_subset(
+    #                 time_interval=time_interval,
+    #                 freq_interval=freq_interval,
+    #             ),
+    #         ),
+    #         **kwargs,
+    #     )
 
     def _get_plotter(self) -> type[Any]:
         """Return the plotter class."""
@@ -505,10 +505,10 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
             name=self.name,
         )
 
-    def _get_plotter(self):
-        from ..viz import plotters
+    # def _get_plotter(self):
+    #     from ..viz import plotters
 
-        return plotters.TSDataPlotter
+    #     return plotters.TSDataPlotter
 
 
 class FSData(_SeriesData[reps.UniformFrequencySeries]):
@@ -599,10 +599,10 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         _window = tapering(self.xp.asarray(times)) if tapering is not None else 1
         return freq2time(self * _window, times=times)
 
-    def _get_plotter(self):
-        from ..viz import plotters
+    # def _get_plotter(self):
+    #     from ..viz import plotters
 
-        return plotters.FSDataPlotter
+    #     return plotters.FSDataPlotter
 
 
 class TimedFSData(FSData):
@@ -730,10 +730,10 @@ class _Grid2DData[  # pyright: ignore[reportUnsafeMultipleInheritance]
         grid2d = build_grid2d(frequencies, times, sparse_indices=sparse_indices)
         return cls(grid2d, entries, channels=channels, name=name)
 
-    def _get_plotter(self):
-        from ..viz import plotters
+    # def _get_plotter(self):
+    #     from ..viz import plotters
 
-        return plotters.TFDataPlotter
+    #     return plotters.TFDataPlotter
 
 
 class STFTData[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
