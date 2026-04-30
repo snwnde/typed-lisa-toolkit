@@ -8,6 +8,7 @@ from types import ModuleType
 from typing import (
     TYPE_CHECKING,
     Any,
+    Final,
     Literal,
     Protocol,
     Self,
@@ -894,15 +895,18 @@ class FrequencySeries[AxisT: "AnyAxis"](_Series1D[AxisT]):
 
     """
 
+    DOMAIN: Final = "frequency"
+    KIND: Final = None
+
     @property
     def domain(self) -> Literal["frequency"]:
         """The physical domain of the representation."""
-        return "frequency"
+        return self.DOMAIN
 
     @property
     def kind(self) -> None:
         """The semantic kind of the representation."""
-        return None
+        return self.KIND
 
     def angle(self, **kwargs: Any):
         """Return the angle of the series."""
@@ -943,13 +947,6 @@ class FrequencySeries[AxisT: "AnyAxis"](_Series1D[AxisT]):
             known_slices=known_slices,
         )
         return frequency_series(grid[0], entries)
-
-    @property
-    def plot(self):
-        """Return the plotter for the series."""
-        from ..viz import plotters
-
-        return plotters.FSPlotter(self)
 
 
 class UniformFrequencySeries(FrequencySeries[Axis[Linspace]], _Uniform1DMixin):
@@ -1014,15 +1011,18 @@ class TimeSeries[AxisT: "AnyAxis"](_Series1D[AxisT]):
         function :func:`~typed_lisa_toolkit.time_series`.
     """
 
+    DOMAIN: Final = "time"
+    KIND: Final = None
+
     @property
     def domain(self) -> Literal["time"]:
         """The physical domain of the representation."""
-        return "time"
+        return self.DOMAIN
 
     @property
     def kind(self) -> None:
         """The semantic kind of the representation."""
-        return None
+        return self.KIND
 
     @property
     def times(self) -> AxisT:
@@ -1038,13 +1038,6 @@ class TimeSeries[AxisT: "AnyAxis"](_Series1D[AxisT]):
     def t_end(self) -> float:
         """The end time of the series."""
         return _get_axis_end(self.times)
-
-    @property
-    def plot(self):
-        """Return the plotter for the series."""
-        from ..viz import plotters
-
-        return plotters.TSPlotter(self)
 
     def get_embedded[AT: "AnyAxis"](
         self,
@@ -1148,15 +1141,18 @@ class Phasor[AxisT: "AnyAxis"](
     .. note:: The so-called amplitude is itself complex number in general.
     """
 
+    DOMAIN: Final = "frequency"
+    KIND: Final = "phasor"
+
     @property
     def domain(self) -> Literal["frequency"]:
         """The physical domain of the representation."""
-        return "frequency"
+        return self.DOMAIN
 
     @property
     def kind(self) -> Literal["phasor"]:
         """The semantic kind of the representation."""
-        return "phasor"
+        return self.KIND
 
     @property
     def phases(self) -> Array:
@@ -1304,13 +1300,6 @@ class Phasor[AxisT: "AnyAxis"](
             self.amplitudes * xp.exp(1j * self.phases),
         )
 
-    @property
-    def plot(self):
-        """Return the plotter for the phasor."""
-        from ..viz import plotters
-
-        return plotters.PhasorPlotter(self)
-
 
 def densify_phasor[AT: "AnyAxis"](
     wf: Phasor[AnyAxis],
@@ -1387,15 +1376,12 @@ class _TFRep[  # pyright: ignore[reportUnsafeMultipleInheritance]
     _InitMixin[GridT],
     abc.ABC,
 ):
+    DOMAIN: Final = "time-frequency"
+
     @property
     def domain(self) -> Literal["time-frequency"]:
         """The physical domain of the representation."""
-        return "time-frequency"
-
-    @property
-    def kind(self) -> str:
-        """The semantic kind of the representation."""
-        return "stft"
+        return self.DOMAIN
 
     @property
     def times(self):  # pyright: ignore[reportRedeclaration]
@@ -1476,10 +1462,12 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
         :func:`~typed_lisa_toolkit.stft`.
     """
 
+    KIND: Final = "stft"
+
     @property
     def kind(self) -> str:
         """The semantic kind of the representation."""
-        return "stft"
+        return self.KIND
 
     @classmethod
     def make(
@@ -1508,7 +1496,7 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
         known_slices: tuple[slice, ...] | None = None,
     ) -> STFT[Grid2DCartesian[A0, A1]]: ...
 
-    def get_embedded(  # pyright: ignore[reportInconsistentOverload]
+    def get_embedded(
         self,
         embedding_grid: Grid2D[AnyAxis, AnyAxis],
         *,
@@ -1530,13 +1518,6 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
             known_slices=known_slices,
         )
         return stft(grid[0], grid[1], entries)
-
-    @property
-    def plot(self):
-        """Return the plotter for the representation."""
-        from ..viz import plotters
-
-        return plotters.STFTPlotter(self)
 
 
 STFT = ShortTimeFourierTransform
@@ -1565,10 +1546,12 @@ class WilsonDaubechiesMeyer[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     .. _wdm-transform: https://github.com/pywavelet/wdm_transform
     """
 
+    KIND: Final = "wdm"
+
     @property
     def kind(self) -> str:
         """The semantic kind of the representation."""
-        return "wdm"
+        return self.KIND
 
     @property
     def dT(self) -> float:  # noqa: N802
@@ -1642,13 +1625,6 @@ class WilsonDaubechiesMeyer[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     def nyquist(self) -> float:
         """Nyquist frequency (half the sampling rate)."""
         return self.fs / 2
-
-    @property
-    def plot(self):
-        """Return the plotter for the representation."""
-        from ..viz import plotters
-
-        return plotters.WDMPlotter(self)
 
     def get_embedded[AT0: "Axis[Linspace]", AT1: "Axis[Linspace]"](
         self,

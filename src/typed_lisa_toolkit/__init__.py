@@ -26,6 +26,20 @@ Functions that load data from disk or memory in common formats.
    load_mojito
    load_ldc_data
 
+
+Plotting
+--------
+
+Functions for visualizing objects.
+
+.. autosummary::
+   :toctree: _generated
+   :template: base.rst
+   :nosignatures:
+
+   plot
+   plot_compare
+
 Factory Functions
 -----------------
 
@@ -173,7 +187,7 @@ but are useful helpers for constructing the above objects.
 
 """
 
-from . import shop, types, utils, viz
+from . import shop, types, utils
 from ._constructors import (
     axis,
     build_grid2d,
@@ -222,6 +236,7 @@ from ._constructors import (
     whittle,
 )
 from ._loaders import load_data, load_ldc_data, load_mojito, load_sangria
+from ._viz.plotting import plot, plot_compare
 
 __all__ = [
     "axis",
@@ -261,6 +276,8 @@ __all__ = [
     "phasor_to_fs_hpw",
     "phasor_to_fs_hw",
     "phasor_to_fs_pw",
+    "plot",
+    "plot_compare",
     "plus_cross_waveform",
     "projected_waveform",
     "pw",
@@ -273,7 +290,6 @@ __all__ = [
     "tsdata",
     "types",
     "utils",
-    "viz",
     "wdm",
     "wdmdata",
     "whittle",

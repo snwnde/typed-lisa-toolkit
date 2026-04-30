@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "Typed LISA Toolkit"
-copyright = "2024, Sen-wen Deng"
+copyright = "2024-2026, Sen-wen Deng"
 author = "Sen-wen Deng"
 
 import importlib.metadata

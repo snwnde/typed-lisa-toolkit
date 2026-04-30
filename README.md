@@ -13,3 +13,11 @@ for installation and usage instructions. **It is thoroughly written!**
 ## For developers
 - Linting, import sorting, and formatting: [ruff](https://docs.astral.sh/ruff/)
 - Type checking: [basedpyright](https://docs.basedpyright.com/latest/)
+
+### Maintainer
+- Sen-wen Deng
+
+### Contributers
+- Sen-wen Deng
+- Solano Sousa Felicio
+- Gaël Servignat

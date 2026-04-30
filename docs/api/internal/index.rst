@@ -9,4 +9,3 @@ notice.
    :maxdepth: 2
 
    utils
-   viz
