@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.5 - 2026-05-06
+#### Features
+- better plot - (fe2c551) - Senwen Deng
+#### Documentation
+- correct sampling GB tutorial - (d2c4c3a) - Senwen Deng
+#### Refactoring
+- further cleaning of viz - (0bf6f49) - Senwen Deng
+
+- - -
+
 ## 0.6.4 - 2026-04-28
 #### Features
 - make jittable - (c72e899) - Senwen Deng
