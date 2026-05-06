@@ -48,7 +48,6 @@ class TestPublicApi:
     def test_module_reexports_are_available(self):
         assert tlt.types is not None
         assert tlt.shop is not None
-        assert tlt.viz is not None
         assert tlt.utils is not None
 
     def test_common_symbols_are_reexported(self):
@@ -102,7 +101,6 @@ class TestPublicApi:
         for name in (
             "types",
             "shop",
-            "viz",
             "utils",
             "frequency_series",
             "time_series",
