@@ -180,7 +180,6 @@ Miscellaneous
    Array
    ArrayFunc
    Interpolator
-   Axis
    Grid1D
    Grid2DCartesian
    Grid2DSparse
@@ -196,6 +195,7 @@ Miscellaneous
    :template: type.rst
    :nosignatures:
 
+   Axis
    Linspace
    IntegrationMethod
    IntegrationPolicy

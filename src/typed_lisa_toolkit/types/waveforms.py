@@ -42,7 +42,7 @@ class HarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](_mixins.ModeMapping[ModeT, 
 
     Note
     ----
-    To build a :class:`~types.HarmonicWaveform`, use the factory functions:
+    To build a :class:`.HarmonicWaveform`, use the factory functions:
     :func:`~typed_lisa_toolkit.harmonic_waveform` or :func:`~typed_lisa_toolkit.hw`.
     """
 
@@ -54,7 +54,7 @@ class HomogeneousHarmonicWaveform[ModeT: Mode, RepT: "AnyReps"](
 
     Note
     ----
-    To build a :class:`~types.HomogeneousHarmonicWaveform`, use the factory functions:
+    To build a :class:`.HomogeneousHarmonicWaveform`, use the factory functions:
     :func:`~typed_lisa_toolkit.homogeneous_harmonic_waveform`
     or :func:`~typed_lisa_toolkit.hhw`.
     """
@@ -76,7 +76,7 @@ class PlusCrossWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
 
     Note
     ----
-    To build a :class:`~types.PlusCrossWaveform`, use the factory function
+    To build a :class:`.PlusCrossWaveform`, use the factory function
     :func:`~typed_lisa_toolkit.plus_cross_waveform`
     or :func:`~typed_lisa_toolkit.pcw`.
     """
@@ -106,7 +106,7 @@ class ProjectedWaveform[RepT: "AnyReps"](_mixins.ChannelMapping[RepT]):
 
     Note
     ----
-    To build a :class:`~types.ProjectedWaveform`, use the factory function:
+    To build a :class:`.ProjectedWaveform`, use the factory function:
     :func:`~typed_lisa_toolkit.projected_waveform`
     or :func:`~typed_lisa_toolkit.pw`.
     """  # noqa: E501
@@ -128,7 +128,7 @@ class HarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
 
     Note
     ----
-    To build a :class:`~types.HarmonicProjectedWaveform`, use the factory function:
+    To build a :class:`.HarmonicProjectedWaveform`, use the factory function:
     :func:`~typed_lisa_toolkit.harmonic_projected_waveform`
     or :func:`~typed_lisa_toolkit.hpw`.
     """
@@ -150,7 +150,7 @@ class HomogeneousHarmonicProjectedWaveform[ModeT: Mode, RepT: "AnyReps"](
 
     Note
     ----
-    To build a :class:`~types.HomogeneousHarmonicProjectedWaveform`, use the factory function:
+    To build a :class:`.HomogeneousHarmonicProjectedWaveform`, use the factory function:
     :func:`~typed_lisa_toolkit.homogeneous_harmonic_projected_waveform`
     or :func:`~typed_lisa_toolkit.hhpw`.
     """  # noqa: E501

@@ -13,7 +13,7 @@ Import TLT from python:
 
    import typed_lisa_toolkit as tlt
 
-(See the :ref:`installation guide` for other installation methods.)
+(See :ref:`installation guide` for other installation methods.)
 
 Load Mojito data
 ~~~~~~~~~~~~~~~~

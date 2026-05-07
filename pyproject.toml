@@ -41,6 +41,8 @@ doc = [
     "anybadge",
     "ipywidgets",
     "lovelyplots",
+    "phentax @ git+https://github.com/asantini29/phentax.git; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "mojito",
 ]
 dev = [
     { include-group = "doc" },
@@ -75,13 +77,13 @@ style = "semver"
 vcs = "git"
 pattern = "default-unprefixed"
 
-[tool.uv]
-required-environments = [
-    "sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "sys_platform == 'linux' and platform_machine == 'aarch64'",
-    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    "sys_platform == 'darwin' and platform_machine == 'arm64'",
-]
+# [tool.uv]
+# required-environments = [
+#     "sys_platform == 'linux' and platform_machine == 'x86_64'",
+#     "sys_platform == 'linux' and platform_machine == 'aarch64'",
+#     "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+#     "sys_platform == 'darwin' and platform_machine == 'arm64'",
+# ]
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning"]

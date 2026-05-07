@@ -13,6 +13,8 @@ By basing your code on TLT objects, you get:
    Numpy, JAX, ...
 - Semantically rich building blocks
    Get a TLT object and you are ready to work with it.
+- Just-in-time compilation support
+   Functions that operate on TLT objects can be JIT-compiled.
 - No performance overhead
    Arrays remain first-class citizens and references are privileged over copies.
 - Type safety and hints

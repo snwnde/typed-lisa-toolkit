@@ -14,7 +14,7 @@ import logging
 import operator
 from collections.abc import Callable, Iterator, Mapping
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Protocol, Self, cast, overload
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast, overload, runtime_checkable
 
 import array_api_compat as xpc
 import l2d_interface.validators as l2dv
@@ -245,6 +245,11 @@ class NDArrayMixin(abc.ABC):  # noqa: PLW1641
 
     def unwrap(self, **kwargs: Any) -> Self:
         return self._unary_op(self.xp.unwrap, **kwargs)
+
+
+@runtime_checkable
+class HasUnaryOp(Protocol):
+    def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self: ...
 
 
 class BinaryUnaryOpMixin(NDArrayMixin, abc.ABC):
@@ -668,5 +673,11 @@ class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayM
         return type(self)(_mapping)
 
     def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self:
-        _mapping = {mode: op(rep, **kwargs) for mode, rep in self._mapping.items()}
+
+        def _op(rep: VT, **kwargs: Any) -> Any:
+            if isinstance(rep, HasUnaryOp):
+                return rep._unary_op(op, **kwargs)  # pyright: ignore[reportPrivateUsage]
+            return op(rep, **kwargs)
+
+        _mapping = {mode: _op(rep, **kwargs) for mode, rep in self._mapping.items()}
         return type(self)(_mapping)
