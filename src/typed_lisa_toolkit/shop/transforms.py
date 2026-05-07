@@ -26,7 +26,7 @@ def _import_wdm_transform() -> ModuleType:
 
 
 def _conventionaize(ary: "Array") -> "Array":
-    return ary[None, None, None, None, ...]
+    return ary[:, None, None, None, ...]
 
 
 # Meyer window default parameters
@@ -245,10 +245,11 @@ def time2wdm(
         raise ValueError(msg)
 
     tseries = tseries[: Nt * Nf]
-    _entries = tseries.entries.squeeze()
-    if _entries.ndim != 1:
+    n_batches = tseries.entries.shape[0]
+    if tseries.entries.shape[1:4] != (1, 1, 1):
         msg = "Currently only single-channel time series are supported by time2wdm."
         raise ValueError(msg)
+    _entries = tseries.entries[:, 0, 0, 0]
     coeffs = _forward_wdm(
         _entries,
         nt=Nt,
@@ -256,9 +257,13 @@ def time2wdm(
         a=DEFAULT_WINDOW_A,
         d=DEFAULT_WINDOW_D,
         dt=tseries.times.ax.step,
-    ).T
-    if coeffs.shape != (Nf + 1, Nt):
-        msg = "Unexpected shape of WDM coefficients."
+    ).swapaxes(-2, -1)
+    expected_shape = (n_batches, Nf + 1, Nt)
+    if coeffs.shape != expected_shape:
+        msg = (
+            "Unexpected shape of WDM coefficients: "
+            f"expected {expected_shape}, got {coeffs.shape}"
+        )
         raise ValueError(msg)
 
     dT = Nf * tseries.times.ax.step  # noqa: N806
@@ -316,13 +321,12 @@ def wdm2time(
         )
     assert isinstance(wdmthing, reps.WDM)  # noqa: S101
     wdm = wdmthing
-    _coeffs = wdm.entries.squeeze()
-    if _coeffs.ndim != 2:  # noqa: PLR2004
-        msg = "Currently only single-batch WDMs are supported by wdm2time."
+    if wdm.entries.shape[1:4] != (1, 1, 1):
+        msg = "Currently only single-channel WDMs are supported by wdm2time."
         raise ValueError(msg)
-
+    _coeffs = wdm.entries[:, 0, 0, 0].swapaxes(-2, -1)
     entries = _inverse_wdm(
-        coeffs=_coeffs.T,
+        coeffs=_coeffs,
         dt=wdm.dt,
         a=DEFAULT_WINDOW_A,
         d=DEFAULT_WINDOW_D,
@@ -438,14 +442,14 @@ def wdm2freq(
         )
     assert isinstance(wdmthing, reps.WDM)  # noqa: S101
     wdm = wdmthing
-    _coeffs = wdm.entries.squeeze()
-    if _coeffs.ndim != 2:  # noqa: PLR2004
-        msg = "Currently only single-batch WDMs are supported by wdm2freq."
+    if wdm.entries.shape[1:4] != (1, 1, 1):
+        msg = "Currently only single-channel WDMs are supported by wdm2freq."
         raise ValueError(msg)
-
-    wtfs = _frequency_wdm(_coeffs.T, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
+    _coeffs = wdm.entries[:, 0, 0, 0].swapaxes(-2, -1)
+    wtfs = _frequency_wdm(_coeffs, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
     # wtfs is on a grid from fftfreq but we want rfftfreq
-    _num = wtfs.n // 2 + 1 if wtfs.n % 2 == 0 else (wtfs.n + 1) // 2
+    _n = wtfs.shape[1]
+    _num = _n // 2 + 1 if _n % 2 == 0 else (_n + 1) // 2
     freqs = _constructors.linspace_from_step(start=0.0, step=wdm.df, num=_num)
-    _entries = _conventionaize(wtfs.data[:_num])
+    _entries = _conventionaize(wtfs[:, :_num])
     return _constructors.frequency_series(freqs, entries=_entries)
