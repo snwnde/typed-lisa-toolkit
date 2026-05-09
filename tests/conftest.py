@@ -239,7 +239,7 @@ def ary_ary_cartesian_fixture(ary_freq_axis: Axis[Array], ary_time_axis: Axis[Ar
 def lin_lin_sparse_fixture(
     xp: ModuleType, lin_freq_axis: Axis[Linspace], lin_time_axis: Axis[Linspace]
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
@@ -249,7 +249,7 @@ def lin_uni_sparse_fixture(
     lin_freq_axis: Axis[Linspace],
     uni_ary_time_axis: Axis[Array],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, uni_ary_time_axis, sparse_indices=sparse_indices)
 
 
@@ -259,7 +259,7 @@ def lin_ary_sparse_fixture(
     lin_freq_axis: Axis[Linspace],
     ary_time_axis: Axis[Array],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, ary_time_axis, sparse_indices=sparse_indices)
 
 
@@ -269,7 +269,7 @@ def uni_lin_sparse_fixture(
     uni_ary_freq_axis: Axis[Array],
     lin_time_axis: Axis[Linspace],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(uni_ary_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
@@ -279,7 +279,7 @@ def uni_uni_sparse_fixture(
     uni_ary_freq_axis: Axis[Array],
     uni_ary_time_axis: Axis[Array],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(
         uni_ary_freq_axis, uni_ary_time_axis, sparse_indices=sparse_indices
     )
@@ -291,7 +291,7 @@ def uni_ary_sparse_fixture(
     uni_ary_freq_axis: Axis[Array],
     ary_time_axis: Axis[Array],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(uni_ary_freq_axis, ary_time_axis, sparse_indices=sparse_indices)
 
 
@@ -301,7 +301,7 @@ def ary_lin_sparse_fixture(
     ary_freq_axis: Axis[Array],
     lin_time_axis: Axis[Linspace],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(ary_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
@@ -311,7 +311,7 @@ def ary_uni_sparse_fixture(
     ary_freq_axis: Axis[Array],
     uni_ary_time_axis: Axis[Array],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(ary_freq_axis, uni_ary_time_axis, sparse_indices=sparse_indices)
 
 
@@ -321,7 +321,7 @@ def ary_ary_sparse_fixture(
     ary_freq_axis: Axis[Array],
     ary_time_axis: Axis[Array],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(ary_freq_axis, ary_time_axis, sparse_indices=sparse_indices)
 
 
@@ -331,7 +331,7 @@ def lin_lin_sparse_cartesian_fixture(
     lin_freq_axis: Axis[Linspace],
     lin_time_axis: Axis[Linspace],
 ):
-    sparse_indices = cast("Array", xp.array([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
@@ -1309,7 +1309,7 @@ def sdm_fixture(xp: ModuleType, lin_freq_axis: Axis[Linspace]):
 def esdm_fixture(
     xp: ModuleType, lin_freq_axis: Axis[Linspace], short_time_axis: Axis[Linspace]
 ):
-    invevsdm = xp.array(
+    invevsdm = xp.asarray(
         [
             [
                 [[2.0, 0.3, 0.1], [0.3, 1.2, -0.05], [0.1, -0.05, 1.4]],

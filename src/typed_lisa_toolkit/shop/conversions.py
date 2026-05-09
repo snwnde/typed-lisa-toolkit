@@ -31,8 +31,8 @@ ConvertibleReps = (
 
 def get_xyz2aet_matrix(xp: ModuleType):
     """Get the matrix that converts from XYZ to AET channels."""
-    matrix = xp.array([[-1.0, 0.0, 1.0], [1.0, -2.0, 1.0], [1.0, 1.0, 1.0]])
-    scales = xp.array([xp.sqrt(2.0), xp.sqrt(6.0), xp.sqrt(3.0)])
+    matrix = xp.asarray([[-1.0, 0.0, 1.0], [1.0, -2.0, 1.0], [1.0, 1.0, 1.0]])
+    scales = xp.asarray([xp.sqrt(2.0), xp.sqrt(6.0), xp.sqrt(3.0)])
     return matrix / scales[:, None]
 
 

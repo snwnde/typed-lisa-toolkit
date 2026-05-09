@@ -73,8 +73,8 @@ def test_sdm_whitening_matrix_invalid_kind_raises(sdm: SpectralDensity):
 
 def test_make_integration_policy_numpy(xp: ModuleType):
     ip = _make_integration_policy(np)
-    y = xp.array([0.0, 1.0, 2.0])
-    x = xp.array([0.0, 0.5, 1.0])
+    y = xp.asarray([0.0, 1.0, 2.0])
+    x = xp.asarray([0.0, 0.5, 1.0])
     assert ip.integrate(y, x=x) == 1.0
 
 
@@ -176,8 +176,8 @@ def test_esdm_invalid_shape_raises(xp: ModuleType):
     with pytest.raises(ValueError, match=r".+"):
         make_sdm(
             xp.eye(2),
-            frequencies=xp.array([0.1, 0.2]),
-            times=xp.array([0.0, 1.0]),
+            frequencies=xp.asarray([0.1, 0.2]),
+            times=xp.asarray([0.0, 1.0]),
             channel_names=("X", "Y", "Z"),
         )
 
@@ -186,8 +186,8 @@ def test_esdm_duplicate_channel_names_raise(xp: ModuleType):
     with pytest.raises(ValueError, match=r".+"):
         make_sdm(
             xp.broadcast_to(xp.eye(2), (2, 2, 2, 2)).copy(),
-            frequencies=xp.array([0.1, 0.2]),
-            times=xp.array([0.0, 1.0]),
+            frequencies=xp.asarray([0.1, 0.2]),
+            times=xp.asarray([0.0, 1.0]),
             channel_names=("X", "X"),
         )
 
