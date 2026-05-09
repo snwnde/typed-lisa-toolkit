@@ -52,7 +52,7 @@ SEED = 11324214
 rng = np.random.default_rng(SEED)
 
 
-@pytest.fixture(scope="session", name="xp", params=["numpy", "jax"])
+@pytest.fixture(scope="session", name="xp", params=["numpy", "jax", "pytorch"])
 def xp_fixture(request) -> ModuleType:  # pyright: ignore[reportUnknownParameterType, reportMissingParameterType]
     """Fixture to parametrize tests over different array libraries."""
     xp_name = request.param  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
@@ -67,6 +67,11 @@ def xp_fixture(request) -> ModuleType:  # pyright: ignore[reportUnknownParameter
         jax.config.update("jax_enable_x64", val=True)  # pyright: ignore[reportUnknownMemberType]
 
         return jnp
+    if xp_name == "pytorch":
+        import torch
+
+        torch.set_default_dtype(torch.float64)  # pyright: ignore[reportPrivateImportUsage]
+        return torch
     msg = f"Unsupported array library: {xp_name}"
     raise ValueError(msg)
 
