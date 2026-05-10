@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.6 - 2026-05-10
+#### Features
+- time phasor - (c8ece68) - Senwen Deng
+#### Bug Fixes
+- array compat api - (7a2ee27) - Senwen Deng
+- adapted to new wdm-transform - (32e4f77) - Senwen Deng
+#### Documentation
+- another tutorial - (fb44146) - Senwen Deng
+#### Continuous Integration
+- no latex - (9995be7) - Senwen Deng
+
+- - -
+
 ## 0.6.5 - 2026-05-06
 #### Features
 - better plot - (fe2c551) - Senwen Deng
