@@ -35,7 +35,8 @@ semantic subsetting and embedding.
    UniformTimeSeries
    FrequencySeries
    UniformFrequencySeries
-   Phasor
+   TimePhasor
+   FrequencyPhasor
    ShortTimeFourierTransform
    WilsonDaubechiesMeyer
    STFT
@@ -247,9 +248,11 @@ from .noisemodel import (
     TFNoiseModel,
 )
 from .representations import (
+    FrequencyPhasor,
     FrequencySeries,
     Phasor,
     ShortTimeFourierTransform,
+    TimePhasor,
     TimeSeries,
     UniformFrequencySeries,
     UniformTimeSeries,
@@ -292,6 +295,7 @@ __all__ = [
     "FDNoiseModel",
     "FDWhittleLikelihood",
     "FSData",
+    "FrequencyPhasor",
     "FrequencySeries",
     "Grid1D",
     "Grid2D",
@@ -315,6 +319,7 @@ __all__ = [
     "SpectralDensity",
     "TFNoiseModel",
     "TSData",
+    "TimePhasor",
     "TimeSeries",
     "TimedFSData",
     "UniformFrequencySeries",

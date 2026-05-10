@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Mapping
 from typing import (
     TYPE_CHECKING,
     Any,
-    Protocol,
     overload,
 )
 
@@ -16,7 +15,8 @@ import array_api_compat as xpc
 from .. import utils
 from . import _mixins, modes
 from . import representations as reps
-from .misc import AnyAxis, AnyGrid, Array, Interpolator
+from .misc import AnyAxis, AnyGrid, Interpolator
+from .representations import FrequencyPhasor, FrequencySeries, TimePhasor, TimeSeries
 
 Mode = tuple[int, int] | tuple[int, int, int]
 
@@ -369,8 +369,8 @@ hhpw = homogeneous_harmonic_projected_waveform
 
 
 def sum_harmonics[ModeT: Mode, AxisT: "AnyAxis"](
-    wf: HomogeneousHarmonicProjectedWaveform[ModeT, reps.FrequencySeries[AxisT]],
-) -> ProjectedWaveform[reps.FrequencySeries[AxisT]]:
+    wf: HomogeneousHarmonicProjectedWaveform[ModeT, FrequencySeries[AxisT]],
+) -> ProjectedWaveform[FrequencySeries[AxisT]]:
     """Sum over modes."""
     entries = wf.get_kernel().sum(axis=2, keepdims=True)  # c.f. shape convention
     _first = wf._first  # pyright: ignore[reportPrivateUsage]
@@ -382,14 +382,235 @@ def sum_harmonics[ModeT: Mode, AxisT: "AnyAxis"](
     )
 
 
-def densify_phasor_hw[ModeT: Mode, AxisT: "AnyAxis"](
-    wf: HarmonicWaveform[ModeT, reps.Phasor[AnyAxis]],
+_PhasorWaveTypes = (
+    HomogeneousHarmonicWaveform[Mode, FrequencyPhasor[AnyAxis]]
+    | HarmonicWaveform[Mode, FrequencyPhasor[AnyAxis]]
+    | HomogeneousHarmonicWaveform[Mode, TimePhasor[AnyAxis]]
+    | HarmonicWaveform[Mode, TimePhasor[AnyAxis]]
+    | ProjectedWaveform[FrequencyPhasor[AnyAxis]]
+    | ProjectedWaveform[TimePhasor[AnyAxis]]
+    | HomogeneousHarmonicProjectedWaveform[Mode, FrequencyPhasor[AnyAxis]]
+    | HarmonicProjectedWaveform[Mode, FrequencyPhasor[AnyAxis]]
+    | HomogeneousHarmonicProjectedWaveform[Mode, TimePhasor[AnyAxis]]
+    | HarmonicProjectedWaveform[Mode, TimePhasor[AnyAxis]]
+)
+
+
+@overload
+def densify_phasor[AT: "AnyAxis"](
+    wf: TimePhasor[AnyAxis],
+    /,
     interpolator: Interpolator,
-    frequencies: AxisT,
+    axis: AT,
     *,
     embed: bool = False,
-) -> HomogeneousHarmonicWaveform[ModeT, reps.Phasor[AxisT]]:
-    """Densify :class:`~types.HarmonicWaveform` with sparse :class:`~types.Phasor` by interpolation.
+) -> TimePhasor[AT]: ...
+@overload
+def densify_phasor[AT: "AnyAxis"](
+    wf: FrequencyPhasor[AnyAxis],
+    /,
+    interpolator: Interpolator,
+    axis: AT,
+    *,
+    embed: bool = False,
+) -> FrequencyPhasor[AT]: ...
+@overload
+def densify_phasor[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[ModeT, TimePhasor[AnyAxis]],
+    /,
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> HomogeneousHarmonicWaveform[ModeT, TimePhasor[AxisT]]: ...
+@overload
+def densify_phasor[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[ModeT, FrequencyPhasor[AnyAxis]],
+    /,
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> HomogeneousHarmonicWaveform[ModeT, FrequencyPhasor[AxisT]]: ...
+@overload
+def densify_phasor[RepT: TimePhasor["AnyAxis"], AxisT: "AnyAxis"](
+    wf: ProjectedWaveform[RepT],
+    /,
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> ProjectedWaveform[TimePhasor[AxisT]]: ...
+@overload
+def densify_phasor[RepT: FrequencyPhasor["AnyAxis"], AxisT: "AnyAxis"](
+    wf: ProjectedWaveform[RepT],
+    /,
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> ProjectedWaveform[FrequencyPhasor[AxisT]]: ...
+@overload
+def densify_phasor[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[ModeT, TimePhasor[AnyAxis]],
+    /,
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> HomogeneousHarmonicProjectedWaveform[ModeT, TimePhasor[AxisT]]: ...
+@overload
+def densify_phasor[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[ModeT, FrequencyPhasor[AnyAxis]],
+    /,
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> HomogeneousHarmonicProjectedWaveform[ModeT, FrequencyPhasor[AxisT]]: ...
+
+
+def densify_phasor[AT: "AnyAxis"](
+    wf: FrequencyPhasor[AnyAxis] | TimePhasor[AnyAxis] | _PhasorWaveTypes,
+    /,
+    interpolator: Interpolator,
+    axis: AT,
+    *,
+    embed: bool = False,
+    frequencies: AT | None = None,
+):
+    """Densify a sparse phasor representation by interpolation.
+
+    Parameters
+    ----------
+    wf :
+        The phasor representation or waveform to densify.
+    interpolator :
+        The interpolator to use for densification.
+    axis :
+        The axis at which to evaluate the densified phasor.
+    embed :
+        If False, the returned phasor is restricted to the subset of `axis`
+        that overlaps with the support of `wf`.
+
+    Attention
+    ---------
+    The branch with `embed=False` does not support JIT compilation.
+    """
+    if frequencies is not None:
+        msg = (
+            "The `frequencies` argument of `densify_phasor` is deprecated "
+            "and will be removed in 0.8.0; "
+            "pass the frequencies as the `axis` argument instead."
+        )
+        utils.warn_external(
+            msg,
+            DeprecationWarning,
+        )
+        axis = frequencies
+
+    if isinstance(wf, (TimePhasor, FrequencyPhasor)):
+        xp = xpc.get_namespace(wf.entries)
+        _axis = _mixins.to_array(axis, xp=xp)
+        if not embed:
+            _slice = utils.get_subset_slice(_axis, wf.axis_onset, wf.axis_end)
+            freqs = axis[_slice]
+            return wf.get_interpolated(freqs, interpolator)
+        mask = utils.get_subset_mask(_axis, wf.axis_onset, wf.axis_end)
+        nwf = wf.get_interpolated(axis, interpolator)
+        _amp = xp.where(mask, nwf.amplitudes, 0)
+        _phase = xp.where(mask, nwf.phases, 0)
+        if isinstance(wf, TimePhasor):
+            return reps.time_phasor(times=axis, amplitudes=_amp, phases=_phase)
+        return reps.frequency_phasor(frequencies=axis, amplitudes=_amp, phases=_phase)
+    if isinstance(wf, HarmonicWaveform):
+        return hhw(
+            {
+                mode: densify_phasor(
+                    wf[mode],
+                    interpolator,
+                    axis,
+                    embed=embed,
+                )
+                for mode in wf
+            },
+        )
+    if isinstance(wf, ProjectedWaveform):
+        return pw(
+            {
+                chnname: densify_phasor(
+                    wf[chnname],
+                    interpolator,
+                    axis,
+                    embed=embed,
+                )
+                for chnname in wf.channel_names
+            },
+        )
+    # Must be a HarmonicProjectedWaveform at this point
+    return hhpw(
+        {
+            mode: projected_waveform(
+                {
+                    chnname: densify_phasor(
+                        wf[mode][chnname],
+                        interpolator,
+                        axis,
+                        embed=embed,
+                    )
+                    for chnname in wf._first.channel_names  # pyright: ignore[reportPrivateUsage]
+                },
+            )
+            for mode in wf.harmonics
+        },
+    )
+
+    # if embed:
+    #     freqs = xp.where(mask, _frequencies, 0)
+    #     nwf = wf.get_interpolated(freqs, interpolator)
+    #     return nwf
+    # freqs = _frequencies[mask]
+    # nwf = wf.get_interpolated(freqs, interpolator)
+    # return nwf
+
+    # _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
+    # freqs = frequencies[_slice]
+    # nwf = wf.get_interpolated(freqs, interpolator)
+    # if not embed:
+    #     return nwf
+    # return nwf.get_embedded((frequencies,), known_slices=(_slice,))
+
+
+@overload
+def densify_phasor_hw[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[ModeT, TimePhasor[AnyAxis]],
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> HomogeneousHarmonicWaveform[ModeT, TimePhasor[AxisT]]: ...
+@overload
+def densify_phasor_hw[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[ModeT, FrequencyPhasor[AnyAxis]],
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> HomogeneousHarmonicWaveform[ModeT, FrequencyPhasor[AxisT]]: ...
+
+
+@utils.deprecated(
+    "densify_phasor_hw", "function", "0.8.0", alternative="densify_phasor"
+)
+def densify_phasor_hw[ModeT: Mode](
+    wf: HarmonicWaveform[ModeT, FrequencyPhasor[AnyAxis]]
+    | HarmonicWaveform[ModeT, TimePhasor[AnyAxis]],
+    interpolator: Interpolator,
+    axis: AnyAxis,
+    *,
+    embed: bool = False,
+):
+    """Densify :class:`~types.HarmonicWaveform` with sparse :class:`~types.TimePhasor` or :class:`~types.FrequencyPhasor` by interpolation (*Deprecated*).
 
     Parameters
     ----------
@@ -397,27 +618,49 @@ def densify_phasor_hw[ModeT: Mode, AxisT: "AnyAxis"](
         The harmonic waveform to densify.
     interpolator :
         The interpolator to use for densification.
-    frequencies :
-        The frequencies at which to evaluate the densified phasor.
+    axis :
+        The axis on which to interpolate.
     embed :
         Whether to embed the densified phasor on the original frequency grid.
+
+    .. deprecated:: 0.6.6
+        Will be removed in 0.8.0; use :func:`densify_phasor` instead.
     """  # noqa: E501
-    return homogeneous_harmonic_waveform(
-        {
-            mode: reps.densify_phasor(wf[mode], interpolator, frequencies, embed=embed)
-            for mode in wf
-        },
-    )
+    return densify_phasor(wf, interpolator, axis, embed=embed)
 
 
-def densify_phasor_pw[RepT: reps.Phasor["AnyAxis"], AxisT: "AnyAxis"](
+@overload
+def densify_phasor_pw[RepT: TimePhasor["AnyAxis"], AxisT: "AnyAxis"](
     wf: ProjectedWaveform[RepT],
     interpolator: Interpolator,
-    frequencies: AxisT,
+    axis: AxisT,
     *,
     embed: bool = False,
-) -> ProjectedWaveform[reps.Phasor[AxisT]]:
-    """Densify :class:`~types.ProjectedWaveform` with sparse :class:`~types.Phasor` representations by interpolation.
+) -> ProjectedWaveform[TimePhasor[AxisT]]: ...
+@overload
+def densify_phasor_pw[RepT: FrequencyPhasor["AnyAxis"], AxisT: "AnyAxis"](
+    wf: ProjectedWaveform[RepT],
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> ProjectedWaveform[FrequencyPhasor[AxisT]]: ...
+
+
+@utils.deprecated(
+    "densify_phasor_pw", "function", "0.8.0", alternative="densify_phasor"
+)
+def densify_phasor_pw[
+    AxisT: "AnyAxis",
+](
+    wf: ProjectedWaveform[TimePhasor[AnyAxis]]
+    | ProjectedWaveform[FrequencyPhasor[AnyAxis]],
+    interpolator: Interpolator,
+    axis: AnyAxis,
+    *,
+    embed: bool = False,
+):
+    """Densify :class:`~types.ProjectedWaveform` with sparse :class:`~types.TimePhasor` or :class:`~types.FrequencyPhasor` representations by interpolation (*Deprecated*).
 
     Parameters
     ----------
@@ -425,120 +668,203 @@ def densify_phasor_pw[RepT: reps.Phasor["AnyAxis"], AxisT: "AnyAxis"](
         The projected waveform to densify.
     interpolator :
         The interpolator to use for densification.
-    frequencies :
-        The frequencies at which to evaluate the densified phasor.
+    axis :
+        The axis on which to interpolate.
     embed :
         Whether to embed the densified phasor on the original frequency grid.
+
+    .. deprecated:: 0.6.6
+        Will be removed in 0.8.0; use :func:`densify_phasor` instead.
     """  # noqa: E501
-    return projected_waveform(
-        {
-            chnname: reps.densify_phasor(
-                wf[chnname],
-                interpolator,
-                frequencies,
-                embed=embed,
-            )
-            for chnname in wf.channel_names
-        },
-    )
+    return densify_phasor(wf, interpolator, axis, embed=embed)
 
 
+@overload
 def densify_phasor_hpw[ModeT: Mode, AxisT: "AnyAxis"](
-    wf: HarmonicProjectedWaveform[ModeT, reps.Phasor[AnyAxis]],
+    wf: HarmonicProjectedWaveform[ModeT, TimePhasor[AnyAxis]],
     interpolator: Interpolator,
-    frequencies: AxisT,
+    axis: AxisT,
     *,
     embed: bool = False,
-) -> HomogeneousHarmonicProjectedWaveform[ModeT, reps.Phasor[AxisT]]:
-    """Densify :class:`~types.HarmonicProjectedWaveform` with sparse :class:`~types.Phasor` representations by interpolation."""  # noqa: E501
-    return homogeneous_harmonic_projected_waveform(
-        {
-            mode: densify_phasor_pw(wf[mode], interpolator, frequencies, embed=embed)
-            for mode in wf
-        },
-    )
-
-
-class _HWLike[ModeT: "Mode", RepT: "AnyReps"](Protocol):
-    def __getitem__(self, key: ModeT) -> RepT: ...
-    def __iter__(self) -> Iterator[ModeT]: ...
-
-
-class _HHWLike[ModeT: "Mode", RepT: "AnyReps"](_HWLike[ModeT, RepT], Protocol):
-    def get_kernel(self) -> Array: ...
-
-
-class _PWLike[RepT: "AnyReps"](Protocol):
-    @property
-    def channel_names(self) -> tuple[str, ...]: ...
-
-    def __getitem__(self, key: str) -> RepT: ...
-
-
-class _HPWLike[ModeT: "Mode", RepT: "AnyReps"](Protocol):
-    def __getitem__(self, key: ModeT) -> ProjectedWaveform[RepT]: ...
-    def __iter__(self) -> Iterator[ModeT]: ...
-
-
-class _HHPWLike[ModeT: "Mode", RepT: "AnyReps"](_HPWLike[ModeT, RepT], Protocol):
-    def get_kernel(self) -> Array: ...
-
-
+) -> HomogeneousHarmonicProjectedWaveform[ModeT, TimePhasor[AxisT]]: ...
 @overload
-def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
-    wf: _HHWLike[MT, reps.Phasor[AxisT]],
-) -> HomogeneousHarmonicWaveform[MT, reps.FrequencySeries[AxisT]]: ...
+def densify_phasor_hpw[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[ModeT, FrequencyPhasor[AnyAxis]],
+    interpolator: Interpolator,
+    axis: AxisT,
+    *,
+    embed: bool = False,
+) -> HomogeneousHarmonicProjectedWaveform[ModeT, FrequencyPhasor[AxisT]]: ...
 
 
-@overload
-def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
-    wf: _HWLike[MT, reps.Phasor[AxisT]],
-) -> HarmonicWaveform[MT, reps.FrequencySeries[AxisT]]: ...
-
-
-def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
-    wf: _HWLike[MT, reps.Phasor[AxisT]],
+@utils.deprecated(
+    "densify_phasor_hpw", "function", "0.8.0", alternative="densify_phasor"
+)
+def densify_phasor_hpw[ModeT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[ModeT, TimePhasor[AnyAxis]]
+    | HarmonicProjectedWaveform[ModeT, FrequencyPhasor[AnyAxis]],
+    interpolator: Interpolator,
+    axis: AnyAxis,
+    *,
+    embed: bool = False,
 ):
-    """Convert :class:`~types.Phasor`-valued :class:`~types.HarmonicWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.HarmonicWaveform`."""  # noqa: E501
-    _mapping = {mode: wf[mode].to_frequency_series() for mode in wf}
-    if isinstance(wf, HomogeneousHarmonicWaveform):
-        return homogeneous_harmonic_waveform(_mapping)
-    return harmonic_waveform(_mapping)
+    """Densify :class:`~types.HarmonicProjectedWaveform` with sparse :class:`~types.TimePhasor` or :class:`~types.FrequencyPhasor` representations by interpolation (*Deprecated*).
 
-
-def phasor_to_fs_pw[AxisT: "AnyAxis"](
-    wf: _PWLike[reps.Phasor[AxisT]],
-):
-    """Convert :class:`~types.Phasor`-valued :class:`~types.ProjectedWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.ProjectedWaveform`."""  # noqa: E501
-    return projected_waveform(
-        {chnname: wf[chnname].to_frequency_series() for chnname in wf.channel_names},
-    )
+    .. deprecated:: 0.6.6
+        Will be removed in 0.8.0; use :func:`densify_phasor` instead.
+    """  # noqa: E501
+    return densify_phasor(wf, interpolator, axis, embed=embed)
 
 
 @overload
-def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
-    wf: _HHPWLike[MT, reps.Phasor[AxisT]],
-) -> HomogeneousHarmonicProjectedWaveform[MT, reps.FrequencySeries[AxisT]]: ...
-
-
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HomogeneousHarmonicWaveform[MT, FrequencyPhasor[AxisT]],
+    /,
+) -> HomogeneousHarmonicWaveform[MT, FrequencySeries[AxisT]]: ...
 @overload
-def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
-    wf: _HPWLike[MT, reps.Phasor[AxisT]],
-) -> HomogeneousHarmonicProjectedWaveform[MT, reps.FrequencySeries[AxisT]]: ...
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[MT, FrequencyPhasor[AxisT]],
+    /,
+) -> HarmonicWaveform[MT, FrequencySeries[AxisT]]: ...
+@overload
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HomogeneousHarmonicWaveform[MT, TimePhasor[AxisT]],
+    /,
+) -> HomogeneousHarmonicWaveform[MT, TimeSeries[AxisT]]: ...
+@overload
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[MT, TimePhasor[AxisT]],
+    /,
+) -> HarmonicWaveform[MT, TimeSeries[AxisT]]: ...
+@overload
+def phasor_to_series[AxisT: "AnyAxis"](
+    wf: ProjectedWaveform[FrequencyPhasor[AxisT]],
+    /,
+) -> ProjectedWaveform[FrequencySeries[AxisT]]: ...
+@overload
+def phasor_to_series[AxisT: "AnyAxis"](
+    wf: ProjectedWaveform[TimePhasor[AxisT]],
+    /,
+) -> ProjectedWaveform[TimeSeries[AxisT]]: ...
+@overload
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HomogeneousHarmonicProjectedWaveform[MT, FrequencyPhasor[AxisT]],
+    /,
+) -> HomogeneousHarmonicProjectedWaveform[MT, FrequencySeries[AxisT]]: ...
+@overload
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[MT, FrequencyPhasor[AxisT]],
+    /,
+) -> HarmonicProjectedWaveform[MT, FrequencySeries[AxisT]]: ...
+@overload
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HomogeneousHarmonicProjectedWaveform[MT, TimePhasor[AxisT]],
+    /,
+) -> HomogeneousHarmonicProjectedWaveform[MT, TimeSeries[AxisT]]: ...
+@overload
+def phasor_to_series[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[MT, TimePhasor[AxisT]],
+    /,
+) -> HarmonicProjectedWaveform[MT, TimeSeries[AxisT]]: ...
 
 
-def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
-    wf: _HPWLike[MT, reps.Phasor[AxisT]],
+def phasor_to_series(
+    wf: _PhasorWaveTypes,
+    /,
 ):
-    """Convert :class:`~types.Phasor`-valued :class:`~types.HarmonicProjectedWaveform` to :class:`~types.FrequencySeries`-valued :class:`~types.HarmonicProjectedWaveform`."""  # noqa: E501
-    _mapping = {mode: phasor_to_fs_pw(wf[mode]) for mode in wf}
+    """Convert phasor-valued waveform to series-valued waveform."""
+    if isinstance(wf, HarmonicWaveform):
+        _mapping = {mode: wf[mode].to_series() for mode in wf}
+        if isinstance(wf, HomogeneousHarmonicWaveform):
+            return homogeneous_harmonic_waveform(_mapping)
+        return harmonic_waveform(_mapping)
 
+    if isinstance(wf, ProjectedWaveform):
+        return projected_waveform(
+            {chnname: wf[chnname].to_series() for chnname in wf.channel_names},
+        )
+
+    _mapping = {
+        mode: projected_waveform(
+            {
+                chnname: wf[mode][chnname].to_series()
+                for chnname in wf[mode].channel_names
+            },
+        )
+        for mode in wf
+    }
     if isinstance(wf, HomogeneousHarmonicProjectedWaveform):
         return homogeneous_harmonic_projected_waveform(_mapping)
     return harmonic_projected_waveform(_mapping)
 
 
-# To deprecate
+@overload
+def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
+    wf: HomogeneousHarmonicWaveform[MT, FrequencyPhasor[AxisT]],
+) -> HomogeneousHarmonicWaveform[MT, FrequencySeries[AxisT]]: ...
+
+
+@overload
+def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[MT, FrequencyPhasor[AxisT]],
+) -> HarmonicWaveform[MT, FrequencySeries[AxisT]]: ...
+
+
+@utils.deprecated(
+    "phasor_to_fs_hw", "function", "0.8.0", alternative="phasor_to_series"
+)
+def phasor_to_fs_hw[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicWaveform[MT, FrequencyPhasor[AxisT]],
+):
+    """Convert :class:`~types.FrequencyPhasor`-valued :class:`~types.HarmonicWaveform` to :class:`~types.FrequencySeries` (*Deprecated*).
+
+    .. deprecated:: 0.6.6
+        Will be removed in 0.8.0. Use :func:`phasor_to_series` instead.
+    """  # noqa: E501
+    return phasor_to_series(wf)
+
+
+@utils.deprecated(
+    "phasor_to_fs_pw", "function", "0.8.0", alternative="phasor_to_series"
+)
+def phasor_to_fs_pw[AxisT: "AnyAxis"](
+    wf: ProjectedWaveform[FrequencyPhasor[AxisT]],
+):
+    """Convert :class:`~types.FrequencyPhasor`-valued :class:`~types.ProjectedWaveform` to :class:`~types.FrequencySeries` (*Deprecated*).
+
+    .. deprecated:: 0.6.6
+        Will be removed in 0.8.0. Use :func:`phasor_to_series` instead.
+    """  # noqa: E501
+    return phasor_to_series(wf)
+
+
+@overload
+def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
+    wf: HomogeneousHarmonicProjectedWaveform[MT, FrequencyPhasor[AxisT]],
+) -> HomogeneousHarmonicProjectedWaveform[MT, FrequencySeries[AxisT]]: ...
+
+
+@overload
+def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[MT, FrequencyPhasor[AxisT]],
+) -> HomogeneousHarmonicProjectedWaveform[MT, FrequencySeries[AxisT]]: ...
+
+
+@utils.deprecated(
+    "phasor_to_fs_hpw", "function", "0.8.0", alternative="phasor_to_series"
+)
+def phasor_to_fs_hpw[MT: Mode, AxisT: "AnyAxis"](
+    wf: HarmonicProjectedWaveform[MT, FrequencyPhasor[AxisT]],
+):
+    """Convert :class:`~types.FrequencyPhasor`-valued :class:`~types.HarmonicProjectedWaveform` to :class:`~types.FrequencySeries` (*Deprecated*).
+
+    .. deprecated:: 0.6.6
+        Will be removed in 0.8.0. Use :func:`phasor_to_series` instead.
+    """  # noqa: E501
+    return phasor_to_series(wf)
+
+
+@utils.deprecated("get_dense_maker", "function", "0.8.0")
 def get_dense_maker(
     interpolator: Interpolator,
 ):
@@ -561,11 +887,11 @@ def get_dense_maker(
     frequencies truncated to the lowest and highest frequencies of the
     input waveform.
 
-    .. warning::
 
-        This function is deprecated in v0.6.0 and will be removed in v0.8.0.
-        Use :func:`~densify_phasor`, :func:`~densify_phasor_hw`, :func:`~densify_phasor_pw`,
-        or :func:`~densify_phasor_hpw` instead.
+    .. deprecated:: 0.6.0
+        Will be removed in 0.8.0. Use :func:`densify_phasor`,
+        :func:`densify_phasor_hw`, :func:`densify_phasor_pw`,
+        or :func:`densify_phasor_hpw` instead.
     """  # noqa: E501
 
     def make[MT: Mode, AxisT: "AnyAxis"](
@@ -573,11 +899,11 @@ def get_dense_maker(
         *,
         embed: bool = False,
     ) -> Callable[
-        [HarmonicProjectedWaveform[MT, reps.Phasor[AnyAxis]]],
-        HarmonicProjectedWaveform[MT, reps.Phasor[AxisT]],
+        [HarmonicProjectedWaveform[MT, FrequencyPhasor[AnyAxis]]],
+        HarmonicProjectedWaveform[MT, FrequencyPhasor[AxisT]],
     ]:
 
-        def do_phasor(wf: reps.Phasor[AnyAxis]):
+        def do_phasor(wf: FrequencyPhasor[AnyAxis]):
             _frequencies = frequencies.asarray(xpc.get_namespace(wf.entries))
 
             _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
@@ -589,13 +915,15 @@ def get_dense_maker(
                 return nwf
             return nwf.get_embedded((frequencies,), known_slices=(_slice,))
 
-        def do_response(resp: ProjectedWaveform[reps.Phasor[AnyAxis]]):
-            return ProjectedWaveform[reps.Phasor[AxisT]].from_dict(
+        def do_response(resp: ProjectedWaveform[FrequencyPhasor[AnyAxis]]):
+            return ProjectedWaveform[FrequencyPhasor[AxisT]].from_dict(
                 {chnname: do_phasor(resp[chnname]) for chnname in resp.channel_names},
             )
 
-        def do[ModeT: Mode](wf: HarmonicProjectedWaveform[ModeT, reps.Phasor[AnyAxis]]):
-            return HarmonicProjectedWaveform[ModeT, reps.Phasor[AxisT]](
+        def do[ModeT: Mode](
+            wf: HarmonicProjectedWaveform[ModeT, FrequencyPhasor[AnyAxis]],
+        ):
+            return HarmonicProjectedWaveform[ModeT, FrequencyPhasor[AxisT]](
                 {mode: do_response(wf[mode]) for mode in wf.harmonics},
             )
 

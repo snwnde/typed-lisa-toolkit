@@ -65,9 +65,11 @@ semantic subsetting and embedding.
 
    frequency_series
    time_series
-   phasor
+   frequency_phasor
+   time_phasor
    stft
    wdm
+   phasor
 
 The following functions construct new representations
 by processing existing representations:
@@ -148,6 +150,7 @@ The following functions construct new waveforms by processing existing waveforms
    densify_phasor_hw
    densify_phasor_pw
    densify_phasor_hpw
+   phasor_to_series
    phasor_to_fs_hw
    phasor_to_fs_pw
    phasor_to_fs_hpw
@@ -201,6 +204,7 @@ from ._constructors import (
     densify_phasor_hpw,
     densify_phasor_hw,
     densify_phasor_pw,
+    frequency_phasor,
     frequency_series,
     fsdata,
     get_dense_maker,
@@ -222,12 +226,14 @@ from ._constructors import (
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
     phasor_to_fs_pw,
+    phasor_to_series,
     plus_cross_waveform,
     projected_waveform,
     pw,
     stft,
     stftdata,
     sum_harmonics,
+    time_phasor,
     time_series,
     timed_fsdata,
     tsdata,
@@ -251,6 +257,7 @@ __all__ = [
     "densify_phasor_hpw",
     "densify_phasor_hw",
     "densify_phasor_pw",
+    "frequency_phasor",
     "frequency_series",
     "fsdata",
     "get_dense_maker",
@@ -276,6 +283,7 @@ __all__ = [
     "phasor_to_fs_hpw",
     "phasor_to_fs_hw",
     "phasor_to_fs_pw",
+    "phasor_to_series",
     "plot",
     "plot_compare",
     "plus_cross_waveform",
@@ -285,6 +293,7 @@ __all__ = [
     "stft",
     "stftdata",
     "sum_harmonics",
+    "time_phasor",
     "time_series",
     "timed_fsdata",
     "tsdata",

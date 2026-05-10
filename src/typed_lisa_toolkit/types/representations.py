@@ -575,33 +575,36 @@ def time_series[AxisT: "AnyAxis"](
 
 
 @overload
-def phasor[AT: AxLike](
+def frequency_phasor[AT: AxLike](
     frequencies: AT,
     amplitudes: Array,
     phases: Array,
-) -> Phasor[Axis[AT]]: ...
+) -> FrequencyPhasor[Axis[AT]]: ...
 
 
 @overload
-def phasor[AxisT: "AnyAxis"](
+def frequency_phasor[AxisT: "AnyAxis"](
     frequencies: AxisT,
     amplitudes: Array,
     phases: Array,
-) -> Phasor[AxisT]: ...
+) -> FrequencyPhasor[AxisT]: ...
 
 
-def phasor(
+def frequency_phasor(
     frequencies: AnyAxis | AxLike,
     amplitudes: Array,
     phases: Array,
 ):
-    """Build a :class:`~types.Phasor`.
+    """Build a :class:`~types.FrequencyPhasor`.
 
     Parameters
     ----------
-    frequencies: AxisT
-        Either a :class:`~typed_lisa_toolkit.types.Linspace` or a 1D
+    frequencies:
+        Either an :class:`~typed_lisa_toolkit.types.Axis`,
+        a :class:`~typed_lisa_toolkit.types.Linspace`, or a 1D
         :class:`array <typed_lisa_toolkit.types.misc.Array>` of positive frequencies.
+        In the last two cases, the axis will be automatically created with the
+        frequencies as values.
 
     amplitudes: :class:`~typed_lisa_toolkit.types.misc.Array`
         Either an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nf)``
@@ -647,8 +650,126 @@ def phasor(
         _axis = frequencies
     else:
         _axis = axis(frequencies)
-    return Phasor[Any].make(
-        frequencies=_axis,
+    return FrequencyPhasor[Any].make(
+        axis=_axis,
+        amplitudes=amplitudes,
+        phases=phases,
+    )
+
+
+@overload
+def time_phasor[AT: AxLike](
+    times: AT,
+    amplitudes: Array,
+    phases: Array,
+) -> TimePhasor[Axis[AT]]: ...
+
+
+@overload
+def time_phasor[AxisT: "AnyAxis"](
+    times: AxisT,
+    amplitudes: Array,
+    phases: Array,
+) -> TimePhasor[AxisT]: ...
+
+
+def time_phasor(
+    times: AnyAxis | AxLike,
+    amplitudes: Array,
+    phases: Array,
+):
+    """Build a :class:`~types.TimePhasor`.
+
+    Parameters
+    ----------
+    times:
+        Either an :class:`~typed_lisa_toolkit.types.Axis`,
+        a :class:`~typed_lisa_toolkit.types.Linspace`, or a 1D
+        :class:`array <typed_lisa_toolkit.types.misc.Array>` of time points.
+        In the last two cases, the axis will be automatically created with the
+        time points as values.
+
+    amplitudes: :class:`~typed_lisa_toolkit.types.misc.Array`
+        Either an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nt)``
+        where ``Nt`` is the size of ``times``,
+        or a 1D array of shape ``(Nt,)`` that will be broadcasted to
+        the shape ``(1, 1, 1, 1, Nt)``.
+        Must be of the same shape as ``phases``.
+
+    phases: :class:`~typed_lisa_toolkit.types.misc.Array`
+        Either an array of shape ``(n_batch, n_channels, n_harmonics, 1, Nt)``
+        where ``Nt`` is the size of ``times``,
+        or a 1D array of shape ``(Nt,)`` that will be broadcasted to
+        the shape ``(1, 1, 1, 1, Nt)``
+        Must be of the same shape as ``amplitudes``.
+
+    Note
+    ----
+    See the :external+l2d-interface:ref:`general description  <shape_convention>`
+    of the shape convention.
+    """
+    if amplitudes.shape != phases.shape:
+        msg = (
+            "Amplitudes and phases must have the same shape. "
+            f"Got {amplitudes.shape} and {phases.shape}."
+        )
+        raise ValueError(msg)
+    if amplitudes.ndim == 1:
+        pass
+    else:
+        _validate_shape(
+            amplitudes,
+            (
+                amplitudes.shape[0],
+                amplitudes.shape[1],
+                amplitudes.shape[2],
+                1,
+                len(times),
+            ),
+        )
+    if isinstance(times, Linspace):
+        _axis = axis(times)
+    elif isinstance(times, Axis):
+        _axis = times
+    else:
+        _axis = axis(times)
+    return TimePhasor[Any].make(
+        axis=_axis,
+        amplitudes=amplitudes,
+        phases=phases,
+    )
+
+
+@overload
+def phasor[AT: AxLike](
+    frequencies: AT,
+    amplitudes: Array,
+    phases: Array,
+) -> Phasor[Axis[AT]]: ...
+
+
+@overload
+def phasor[AxisT: "AnyAxis"](
+    frequencies: AxisT,
+    amplitudes: Array,
+    phases: Array,
+) -> Phasor[AxisT]: ...
+
+
+@deprecated("phasor", "function", "0.8.0", alternative="frequency_phasor")
+def phasor(
+    frequencies: AnyAxis | AxLike,
+    amplitudes: Array,
+    phases: Array,
+):
+    """Alias for :func:`frequency_phasor` (*Deprecated*).
+
+    .. warning::
+        This function is deprecated and will be removed in 0.8.0; use
+        :func:`frequency_phasor` instead.
+    """
+    return frequency_phasor(
+        frequencies=frequencies,
         amplitudes=amplitudes,
         phases=phases,
     )
@@ -1119,14 +1240,141 @@ class UniformTimeSeries(TimeSeries[Axis[Linspace]], _Uniform1DMixin):
         return transforms.time2freq(self * tapering_window)
 
 
-class Phasor[AxisT: "AnyAxis"](
+class _BasePhasor[AxisT: "AnyAxis"](
     _Subset1DMixin["Grid1D[AxisT]"],
+    abc.ABC,
 ):
-    """Phasor representation.
+    KIND: Final = "phasor"
+
+    @property
+    def kind(self) -> Literal["phasor"]:
+        """The semantic kind of the representation."""
+        return self.KIND
+
+    @property
+    @abc.abstractmethod
+    def domain(self) -> Domain:
+        """Physical domain of the representation."""
+
+    @property
+    def phases(self) -> Array:
+        """The phases of the phasors."""
+        return self.entries[..., slice(1, 2), :].real
+
+    @property
+    def amplitudes(self) -> Array:
+        """The amplitudes of the phasors."""
+        return self.entries[..., slice(0, 1), :]
+
+    @property
+    def axis(self) -> AxisT:
+        return self.grid[0]
+
+    @property
+    def axis_onset(self) -> float:
+        return _get_axis_onset(self.axis)
+
+    @property
+    def axis_end(self) -> float:
+        return _get_axis_end(self.axis)
+
+    @classmethod
+    def make(
+        cls,
+        *,
+        axis: AnyAxis,
+        amplitudes: Array,
+        phases: Array,
+    ):
+        """Create a phasor from amplitudes and phases."""
+        xp = xpc.get_namespace(amplitudes, phases)
+        # If amplitudes and phases are 1D
+        if amplitudes.ndim == 1 and phases.ndim == 1:
+            return cls(
+                grid=(axis,),
+                entries=xp.stack((amplitudes, phases), axis=0)[None, None, None, ...],
+            )
+        # If amplitudes and phases are already in the shape of entries
+        full_shape_size = 5
+        if (
+            amplitudes.shape == phases.shape
+            and len(amplitudes.shape) == full_shape_size
+            and amplitudes.shape[4] == len(axis)
+            and amplitudes.shape[3] == 1
+        ):
+            return cls(
+                grid=(axis,),
+                entries=xp.stack((amplitudes[:, :, 0], phases[:, :, 0]), axis=3),
+            )
+        _msg = (
+            "Amplitudes and phases must be either 1D arrays of shape (n_axis,) "
+            "or 5D arrays of shape "
+            "(n_batches, n_channels, n_harmonics, 1, n_axis), "
+            f"but got shapes {amplitudes.shape} and {phases.shape}."
+        )
+        raise ValueError(_msg)
+
+    def __setitem__(self, slice: _slice, value: Any) -> None:
+        """Set the entries and phases of a subset of the phasor."""
+        _set_value(self.entries, _get_full_slice((slice,)), value)
+
+    def create_like(self, entries: Array):
+        """Create a new instance with the same grid as the current one."""
+        return type(self)(grid=self.grid, entries=entries)
+
+    def get_embedded[AT: "AnyAxis"](
+        self,
+        embedding_grid: Grid1D[AT],
+        *,
+        known_slices: tuple[slice, ...] | None = None,
+    ) -> Self:
+        """Return the phasor embedded in a new 1D grid."""
+        grid, entries = _mixins.embed_entries_to_grid(
+            self.grid,
+            self.entries,
+            embedding_grid,
+            known_slices=known_slices,
+        )
+        return type(self)(grid=grid, entries=entries)
+
+    def _get_interpolated_impl(
+        self,
+        axis_: AnyAxis | Array,
+        interpolator: Interpolator,
+    ):
+        """Implement get_interpolated for subclasses."""
+        xp = xpc.get_namespace(self.amplitudes, self.phases)
+        _axis_array = axis_.asarray(xp) if isinstance(axis_, Axis) else axis_
+        _axis_obj = axis_ if isinstance(axis_, Axis) else axis(axis_)
+        self_axis = to_array(self.axis, xp=xp)
+        if self.entries.shape != (1, 1, 1, 2, len(self_axis)):
+            _msg = (
+                f"Only 1D phasors with shape (1, 1, 1, 2, {len(self_axis)}) "
+                "are supported "
+                f"for interpolation, but got shape {self.entries.shape}."
+            )
+            raise ValueError(_msg)
+        amp_real = self.amplitudes.real.squeeze()
+        amp_imag = self.amplitudes.imag.squeeze()
+        amplitudes_real = interpolator(self_axis, amp_real)(_axis_array)
+        amplitudes_imag = interpolator(self_axis, amp_imag)(_axis_array)
+        amplitudes = amplitudes_real + 1j * amplitudes_imag
+        phases = interpolator(self_axis, self.phases.squeeze())(_axis_array)
+        return type(self).make(
+            axis=_axis_obj,
+            amplitudes=amplitudes,
+            phases=phases,
+        )
+
+
+class FrequencyPhasor[AxisT: "AnyAxis"](
+    _BasePhasor[AxisT],
+):
+    """Frequency-domain phasor representation.
 
     .. note::
-        To construct a :class:`.Phasor`, use the factory function
-        :func:`~typed_lisa_toolkit.phasor`.
+        To construct a :class:`.FrequencyPhasor`, use the factory function
+        :func:`~typed_lisa_toolkit.frequency_phasor`.
 
     A phasor is a couple of amplitude and phase that represent a complex number.
     This class encapsulates a sequence of phasors at different frequencies, which
@@ -1142,7 +1390,6 @@ class Phasor[AxisT: "AnyAxis"](
     """
 
     DOMAIN: Final = "frequency"
-    KIND: Final = "phasor"
 
     @property
     def domain(self) -> Literal["frequency"]:
@@ -1150,24 +1397,9 @@ class Phasor[AxisT: "AnyAxis"](
         return self.DOMAIN
 
     @property
-    def kind(self) -> Literal["phasor"]:
-        """The semantic kind of the representation."""
-        return self.KIND
-
-    @property
-    def phases(self) -> Array:
-        """The phases of the phasors."""
-        return self.entries[..., slice(1, 2), :].real
-
-    @property
-    def amplitudes(self) -> Array:
-        """The amplitudes of the phasors."""
-        return self.entries[..., slice(0, 1), :]
-
-    @property
     def frequencies(self) -> AxisT:
         """The frequencies of the phasors."""
-        return self.grid[0]
+        return self.axis
 
     @property
     def f_min(self) -> float:
@@ -1179,120 +1411,37 @@ class Phasor[AxisT: "AnyAxis"](
         """The maximum frequency of the series."""
         return _get_axis_end(self.frequencies)
 
-    @classmethod
-    def make(
-        cls,
-        *,
-        frequencies: AnyAxis,
-        amplitudes: Array,
-        phases: Array,
-    ):
-        """Create a phasor from amplitudes and phases."""
-        xp = xpc.get_namespace(amplitudes, phases)
-        # If amplitudes and phases are 1D
-        if amplitudes.ndim == 1 and phases.ndim == 1:
-            return cls(
-                grid=(frequencies,),
-                entries=xp.stack((amplitudes, phases), axis=0)[None, None, None, ...],
-            )
-        # If amplitudes and phases are already in the shape of entries
-        full_shape_size = 5
-        if (
-            amplitudes.shape == phases.shape
-            and len(amplitudes.shape) == full_shape_size
-            and amplitudes.shape[4] == len(frequencies)
-            and amplitudes.shape[3] == 1
-        ):
-            return cls(
-                grid=(frequencies,),
-                entries=xp.stack((amplitudes[:, :, 0], phases[:, :, 0]), axis=3),
-            )
-        _msg = (
-            "Amplitudes and phases must be either 1D arrays of shape (n_freqs,) "
-            "or 5D arrays of shape "
-            "(n_batches, n_channels, n_harmonics, 1, n_freqs), "
-            f"but got shapes {amplitudes.shape} and {phases.shape}."
-        )
-        raise ValueError(_msg)
-
-    def __setitem__(self, slice: _slice, value: Any) -> None:
-        """Set the entries and phases of a subset of the phasor."""
-        _set_value(self.entries, _get_full_slice((slice,)), value)
-
-    def create_like(self, entries: Array):
-        """Create a new series with the same grid as the current one."""
-        return type(self)(grid=self.grid, entries=entries)
-
-    def get_embedded[AT: "AnyAxis"](
-        self,
-        embedding_grid: Grid1D[AT],
-        *,
-        known_slices: tuple[slice, ...] | None = None,
-    ) -> Phasor[AT]:
-        """Return the phasor embedded in a new 1D grid."""
-        grid, entries = _mixins.embed_entries_to_grid(
-            self.grid,
-            self.entries,
-            embedding_grid,
-            known_slices=known_slices,
-        )
-        return Phasor[AT](grid=grid, entries=entries)
-
     @overload
     def get_interpolated[AT: "AnyAxis"](
         self,
-        frequencies: AT,
+        axis_: AT,
         interpolator: Interpolator,
-    ) -> Phasor[AT]: ...
+    ) -> FrequencyPhasor[AT]: ...
 
     @overload
     def get_interpolated(
         self,
-        frequencies: Array,
+        axis_: Array,
         interpolator: Interpolator,
-    ) -> Phasor[Axis[Array]]: ...
+    ) -> FrequencyPhasor[Axis[Array]]: ...
 
     def get_interpolated(
         self,
-        frequencies: AnyAxis | Array,
+        axis_: AnyAxis | Array,
         interpolator: Interpolator,
-    ):
+    ) -> FrequencyPhasor[AnyAxis]:
         """Get the phasors interpolated to the given frequencies."""
-        xp = xpc.get_namespace(self.amplitudes, self.phases)
-        _frequencies = (
-            frequencies.asarray(xp) if isinstance(frequencies, Axis) else frequencies
-        )
-        _axis = frequencies if isinstance(frequencies, Axis) else axis(frequencies)
-        self_freq = to_array(self.frequencies, xp=xp)
-        if self.entries.shape != (1, 1, 1, 2, len(self_freq)):
-            _msg = (
-                f"Only 1D phasors with shape (1, 1, 1, 2, {len(self_freq)}) "
-                "are supported"
-                f"for interpolation, but got shape {self.entries.shape}."
-            )
-            raise ValueError(_msg)
-        amp_real = self.amplitudes.real.squeeze()
-        amp_imag = self.amplitudes.imag.squeeze()
-        amplitudes_real = interpolator(self_freq, amp_real)(_frequencies)
-        amplitudes_imag = interpolator(self_freq, amp_imag)(_frequencies)
-        amplitudes = amplitudes_real + 1j * amplitudes_imag
-        phases = interpolator(self_freq, self.phases.squeeze())(_frequencies)
-        return Phasor[Any].make(
-            frequencies=_axis,
-            amplitudes=amplitudes,
-            phases=phases,
-        )
+        return self._get_interpolated_impl(axis_, interpolator)
 
     def to_frequency_series(self):
-        """Convert to a :class:`.FrequencySeries` or :class:`.UniformFrequencySeries`.
+        r"""Convert to a :class:`.FrequencySeries` or :class:`.UniformFrequencySeries`.
 
-        This method converts the phasor representation to a frequency series
+        This method returns a :class:`.FrequencySeries`
+        or :class:`.UniformFrequencySeries`
         by applying the formula:
-        ``X(f) = A(f) * exp(1j * phi(f))`` where ``A(f)`` is the amplitude
-        and ``phi(f)`` is the phase.
-        If the grid of the phasor is uniform,
-        a :class:`.UniformFrequencySeries` is returned;
-        otherwise, a :class:`.FrequencySeries` is returned.
+
+        .. math::
+            X(f) = A(f) \cdot \exp(1j \cdot \phi(f))
         """
         xp = xpc.get_namespace(self.amplitudes, self.phases)
         return frequency_series(
@@ -1300,57 +1449,100 @@ class Phasor[AxisT: "AnyAxis"](
             self.amplitudes * xp.exp(1j * self.phases),
         )
 
+    def to_series(self):
+        """Alias for :meth:`.to_frequency_series`."""
+        return self.to_frequency_series()
 
-def densify_phasor[AT: "AnyAxis"](
-    wf: Phasor[AnyAxis],
-    interpolator: Interpolator,
-    frequencies: AT,
-    *,
-    embed: bool = False,
-) -> Phasor[AT]:
-    """Densify a sparse :class:`~types.Phasor` representation by interpolation.
 
-    Parameters
-    ----------
-    wf :
-        The phasor representation to densify.
-    interpolator :
-        The interpolator to use for densification.
-    frequencies :
-        The frequencies at which to evaluate the densified phasor.
-    embed :
-        Whether to embed the densified phasor on the original frequency grid.
+class TimePhasor[AxisT: "AnyAxis"](
+    _BasePhasor[AxisT],
+):
+    """Time-domain phasor representation.
 
-    Attention
-    ---------
-    The branch with `embed=False` does not support JIT compilation.
+    .. note::
+        To construct a :class:`.TimePhasor`, use the factory function
+        :func:`~typed_lisa_toolkit.time_phasor`.
+
+    A phasor is a couple of amplitude and phase that represent a complex number.
+    This class encapsulates a sequence of phasors at different times, which
+    can be used to represent a waveform. This representation is useful for
+    interpolating waveforms generated on a sparse grid of times to a dense
+    grid of times.
+
+    The input phases are expected to be smooth, without zigzags, so as the real
+    and imaginary parts of the amplitudes. This is crucial for the interpolation
+    to work properly.
+
+    .. note:: The so-called amplitude is itself complex number in general.
     """
-    xp = xpc.get_namespace(wf.entries)
-    _frequencies = to_array(frequencies, xp=xp)
-    if not embed:
-        _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
-        freqs = frequencies[_slice]
-        return wf.get_interpolated(freqs, interpolator)
-    mask = utils.get_subset_mask(_frequencies, wf.f_min, wf.f_max)
-    nwf = wf.get_interpolated(frequencies, interpolator)
-    _amp = xp.where(mask, nwf.amplitudes, 0)
-    _phase = xp.where(mask, nwf.phases, 0)
-    return phasor(frequencies, _amp, _phase)
 
-    # if embed:
-    #     freqs = xp.where(mask, _frequencies, 0)
-    #     nwf = wf.get_interpolated(freqs, interpolator)
-    #     return nwf
-    # freqs = _frequencies[mask]
-    # nwf = wf.get_interpolated(freqs, interpolator)
-    # return nwf
+    DOMAIN: Final = "time"
 
-    # _slice = utils.get_subset_slice(_frequencies, wf.f_min, wf.f_max)
-    # freqs = frequencies[_slice]
-    # nwf = wf.get_interpolated(freqs, interpolator)
-    # if not embed:
-    #     return nwf
-    # return nwf.get_embedded((frequencies,), known_slices=(_slice,))
+    @property
+    def domain(self) -> Literal["time"]:
+        """The physical domain of the representation."""
+        return self.DOMAIN
+
+    @property
+    def times(self) -> AxisT:
+        """The times of the phasors."""
+        return self.axis
+
+    @property
+    def t_start(self) -> float:
+        """The onset time of the series."""
+        return _get_axis_onset(self.times)
+
+    @property
+    def t_end(self) -> float:
+        """The end time of the series."""
+        return _get_axis_end(self.times)
+
+    @overload
+    def get_interpolated[AT: "AnyAxis"](
+        self,
+        axis_: AT,
+        interpolator: Interpolator,
+    ) -> TimePhasor[AT]: ...
+
+    @overload
+    def get_interpolated(
+        self,
+        axis_: Array,
+        interpolator: Interpolator,
+    ) -> TimePhasor[Axis[Array]]: ...
+
+    def get_interpolated(
+        self,
+        axis_: AnyAxis | Array,
+        interpolator: Interpolator,
+    ) -> TimePhasor[AnyAxis]:
+        """Get the phasors interpolated to the given times."""
+        return self._get_interpolated_impl(axis_, interpolator)
+
+    def to_time_series(self):
+        r"""Convert to a :class:`.TimeSeries` or :class:`.UniformTimeSeries`.
+
+        This method returns a :class:`.TimeSeries` or :class:`.UniformTimeSeries`
+        by applying the formula:
+
+        .. math::
+            X(t) = A(t) \cdot \exp(1j \cdot \phi(t))
+        """
+        xp = xpc.get_namespace(self.amplitudes, self.phases)
+        return time_series(
+            self.times,
+            self.amplitudes * xp.exp(1j * self.phases),
+        )
+
+    def to_series(self):
+        """Alias for :meth:`.to_time_series`."""
+        return self.to_time_series()
+
+
+# Backward compatibility alias
+Phasor = FrequencyPhasor
+"""Alias for :class:`.FrequencyPhasor` (*Deprecated*)."""
 
 
 class _FreqProperty2D:

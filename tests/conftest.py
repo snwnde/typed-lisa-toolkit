@@ -10,6 +10,7 @@ from typed_lisa_toolkit import (
     axis,
     build_grid2d,
     cast_mode,
+    frequency_phasor,
     frequency_series,
     fsdata,
     harmonic_projected_waveform,
@@ -17,10 +18,10 @@ from typed_lisa_toolkit import (
     homogeneous_harmonic_projected_waveform,
     linspace_from_array,
     make_sdm,
-    phasor,
     projected_waveform,
     stft,
     stftdata,
+    time_phasor,
     time_series,
     tsdata,
     wdm,
@@ -398,14 +399,27 @@ def ary_time_series_fixture(
     return time_series(ary_time_axis, entries[None, None, None, None, :])
 
 
-@pytest.fixture(scope="session", name="lin_phasor")
-def lin_phasor_fixture(xp: ModuleType, lin_freq_axis: Axis[Linspace]):
+@pytest.fixture(scope="session", name="lin_freq_phasor")
+def lin_freq_phasor_fixture(xp: ModuleType, lin_freq_axis: Axis[Linspace]):
     amplitudes = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j)
     phases = xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * np.pi
-    return phasor(
-        lin_freq_axis,
-        amplitudes[None, None, None, None, :],
-        phases[None, None, None, None, :],
+    return frequency_phasor(
+        frequencies=lin_freq_axis,
+        amplitudes=amplitudes[None, None, None, None, :],
+        phases=phases[None, None, None, None, :],
+    )
+
+
+@pytest.fixture(scope="session", name="lin_time_phasor")
+def lin_time_phasor_fixture(xp: ModuleType, lin_time_axis: Axis[Linspace]):
+    amplitudes = xp.asarray([1.0, 0.5, 0.25, -0.25, -0.5, -0.75], dtype=xp.float64) * (
+        1 + 1j
+    )
+    phases = xp.asarray([0.0, 0.5, 1.0, 1.5, 2.0, 2.5], dtype=xp.float64) * np.pi
+    return time_phasor(
+        times=lin_time_axis,
+        amplitudes=amplitudes[None, None, None, None, :],
+        phases=phases[None, None, None, None, :],
     )
 
 
@@ -413,10 +427,10 @@ def lin_phasor_fixture(xp: ModuleType, lin_freq_axis: Axis[Linspace]):
 def uni_ary_phasor_fixture(xp: ModuleType, uni_ary_freq_axis: Axis[Array]):
     amplitudes = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j)
     phases = xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * np.pi
-    return phasor(
-        uni_ary_freq_axis,
-        amplitudes[None, None, None, None, :],
-        phases[None, None, None, None, :],
+    return frequency_phasor(
+        frequencies=uni_ary_freq_axis,
+        amplitudes=amplitudes[None, None, None, None, :],
+        phases=phases[None, None, None, None, :],
     )
 
 
@@ -424,10 +438,10 @@ def uni_ary_phasor_fixture(xp: ModuleType, uni_ary_freq_axis: Axis[Array]):
 def ary_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
     amplitudes = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j)
     phases = xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * np.pi
-    return phasor(
-        ary_freq_axis,
-        amplitudes[None, None, None, None, :],
-        phases[None, None, None, None, :],
+    return frequency_phasor(
+        frequencies=ary_freq_axis,
+        amplitudes=amplitudes[None, None, None, None, :],
+        phases=phases[None, None, None, None, :],
     )
 
 
@@ -969,30 +983,30 @@ def hw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
     mode_22 = cast_mode((2, 2))
     mode_33 = cast_mode((3, 3))
 
-    wf_22 = phasor(
-        ary_freq_axis,
-        cast(
+    wf_22 = frequency_phasor(
+        frequencies=ary_freq_axis,
+        amplitudes=cast(
             "Array",
             (xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j))[
                 None, None, None, None, :
             ],
         ),
-        cast(
+        phases=cast(
             "Array",
             (xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * xp.pi)[
                 None, None, None, None, :
             ],
         ),
     )
-    wf_33 = phasor(
-        ary_freq_axis,
-        cast(
+    wf_33 = frequency_phasor(
+        frequencies=ary_freq_axis,
+        amplitudes=cast(
             "Array",
             (xp.asarray([0.5, 0.25, 0.75], dtype=xp.float64) * (1 + 1j))[
                 None, None, None, None, :
             ],
         ),
-        cast(
+        phases=cast(
             "Array",
             (xp.asarray([0.25, 0.75, 0.5], dtype=xp.float64) * xp.pi)[
                 None, None, None, None, :
@@ -1080,52 +1094,52 @@ def harmonic_projected_waveform_fixture(xp: ModuleType, lin_freq_axis: Axis[Lins
     return harmonic_projected_waveform({mode_22: resp_22, mode_33: resp_33})
 
 
-@pytest.fixture(scope="session", name="hpw_phasor")
-def hpw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
+@pytest.fixture(scope="session", name="hpw_freq_phasor")
+def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
     mode_22 = cast_mode((2, 2))
     mode_33 = cast_mode((3, 3))
 
     resp_22 = projected_waveform(
         {
-            "X": phasor(
-                ary_freq_axis,
-                cast(
+            "X": frequency_phasor(
+                frequencies=ary_freq_axis,
+                amplitudes=cast(
                     "Array",
                     (xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
-                cast(
+                phases=cast(
                     "Array",
                     (xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
                 ),
             ),
-            "Y": phasor(
-                ary_freq_axis,
-                cast(
+            "Y": frequency_phasor(
+                frequencies=ary_freq_axis,
+                amplitudes=cast(
                     "Array",
                     (xp.asarray([0.5, 0.25, 0.75], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
-                cast(
+                phases=cast(
                     "Array",
                     (xp.asarray([0.25, 0.75, 0.5], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
                 ),
             ),
-            "Z": phasor(
-                ary_freq_axis,
-                cast(
+            "Z": frequency_phasor(
+                frequencies=ary_freq_axis,
+                amplitudes=cast(
                     "Array",
                     (xp.asarray([0.3, 0.8, -0.2], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
-                cast(
+                phases=cast(
                     "Array",
                     (xp.asarray([-0.1, 0.4, -0.9], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
@@ -1136,45 +1150,45 @@ def hpw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
     )
     resp_33 = projected_waveform(
         {
-            "X": phasor(
-                ary_freq_axis,
-                cast(
+            "X": frequency_phasor(
+                frequencies=ary_freq_axis,
+                amplitudes=cast(
                     "Array",
                     (xp.asarray([0.2, -0.5, 0.1], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
-                cast(
+                phases=cast(
                     "Array",
                     (xp.asarray([0.0, 1.0, -0.2], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
                 ),
             ),
-            "Y": phasor(
-                ary_freq_axis,
-                cast(
+            "Y": frequency_phasor(
+                frequencies=ary_freq_axis,
+                amplitudes=cast(
                     "Array",
                     (xp.asarray([1.0, 1.5, 2.0], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
-                cast(
+                phases=cast(
                     "Array",
                     (xp.asarray([0.0, 0.0, 0.0], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
                 ),
             ),
-            "Z": phasor(
-                ary_freq_axis,
-                cast(
+            "Z": frequency_phasor(
+                frequencies=ary_freq_axis,
+                amplitudes=cast(
                     "Array",
                     (xp.asarray([0.4, -0.7, 1.1], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
-                cast(
+                phases=cast(
                     "Array",
                     (xp.asarray([0.2, -0.1, -0.3], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
@@ -1200,11 +1214,11 @@ def homogeneous_harmonic_projected_waveform_fixture(
     )
 
 
-@pytest.fixture(scope="session", name="pw_phasor")
-def pw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
+@pytest.fixture(scope="session", name="pw_freq_phasor")
+def pw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
     resp = projected_waveform(
         {
-            "X": phasor(
+            "X": frequency_phasor(
                 ary_freq_axis,
                 cast(
                     "Array",
@@ -1219,7 +1233,7 @@ def pw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
                     ],
                 ),
             ),
-            "Y": phasor(
+            "Y": frequency_phasor(
                 ary_freq_axis,
                 cast(
                     "Array",
@@ -1234,7 +1248,7 @@ def pw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
                     ],
                 ),
             ),
-            "Z": phasor(
+            "Z": frequency_phasor(
                 ary_freq_axis,
                 cast(
                     "Array",
@@ -1254,14 +1268,14 @@ def pw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
     return projected_waveform({"X": resp["X"], "Y": resp["Y"], "Z": resp["Z"]})
 
 
-@pytest.fixture(scope="session", name="hhpw_phasor")
-def hhpw_phasor_fixture(
-    hpw_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
+@pytest.fixture(scope="session", name="hhpw_freq_phasor")
+def hhpw_freq_phasor_fixture(
+    hpw_freq_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
 ):
     return homogeneous_harmonic_projected_waveform(
         {
             mode: projected_waveform_obj
-            for mode, projected_waveform_obj in hpw_phasor.items()
+            for mode, projected_waveform_obj in hpw_freq_phasor.items()
         },
     )
 
