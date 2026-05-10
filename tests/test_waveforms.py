@@ -1,6 +1,7 @@
 import pytest
 
 from typed_lisa_toolkit import (
+    densify_phasor,
     densify_phasor_hpw,
     densify_phasor_hw,
     densify_phasor_pw,
@@ -10,6 +11,7 @@ from typed_lisa_toolkit import (
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
     phasor_to_fs_pw,
+    phasor_to_series,
     plus_cross_waveform,
     projected_waveform,
 )
@@ -34,45 +36,67 @@ def test_densify_phasor_hw(
     linear_interpolator: Interpolator,
     dense_ary_freq_axis: Axis[Array],
 ):
-    hhw = densify_phasor_hw(hw_phasor, linear_interpolator, dense_ary_freq_axis)
+    with pytest.warns(DeprecationWarning, match="densify_phasor_hw"):
+        _hhw = densify_phasor_hw(hw_phasor, linear_interpolator, dense_ary_freq_axis)
+    assert isinstance(_hhw, HomogeneousHarmonicWaveform)
+    hhw = densify_phasor(hw_phasor, linear_interpolator, dense_ary_freq_axis)
     assert isinstance(hhw, HomogeneousHarmonicWaveform)
 
 
 def test_densify_phasor_pw(
-    pw_phasor: ProjectedWaveform[Phasor[Axis[Array]]],
+    pw_freq_phasor: ProjectedWaveform[Phasor[Axis[Array]]],
     linear_interpolator: Interpolator,
     dense_ary_freq_axis: Axis[Array],
 ):
-    pw = densify_phasor_pw(pw_phasor, linear_interpolator, dense_ary_freq_axis)
+    with pytest.warns(DeprecationWarning, match="densify_phasor_pw"):
+        _pw = densify_phasor_pw(
+            pw_freq_phasor, linear_interpolator, dense_ary_freq_axis
+        )
+    assert isinstance(_pw, ProjectedWaveform)
+    pw = densify_phasor(pw_freq_phasor, linear_interpolator, dense_ary_freq_axis)
     assert isinstance(pw, ProjectedWaveform)
 
 
 def test_densify_phasor_hpw(
-    hpw_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
+    hpw_freq_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
     linear_interpolator: Interpolator,
     dense_ary_freq_axis: Axis[Array],
 ):
-    hpw = densify_phasor_hpw(hpw_phasor, linear_interpolator, dense_ary_freq_axis)
+    with pytest.warns(DeprecationWarning, match="densify_phasor_hpw"):
+        _hpw = densify_phasor_hpw(
+            hpw_freq_phasor, linear_interpolator, dense_ary_freq_axis
+        )
+    assert isinstance(_hpw, HarmonicProjectedWaveform)
+    hpw = densify_phasor(hpw_freq_phasor, linear_interpolator, dense_ary_freq_axis)
     assert isinstance(hpw, HomogeneousHarmonicProjectedWaveform)
 
 
 def test_phasor_to_fs_hw(hw_phasor: HarmonicWaveform[Harmonic, Phasor[Axis[Array]]]):
-    fs_hw = phasor_to_fs_hw(hw_phasor)
+    with pytest.warns(DeprecationWarning, match="phasor_to_series"):
+        _fs_hw = phasor_to_fs_hw(hw_phasor)
+    assert isinstance(_fs_hw, HarmonicWaveform)
+    fs_hw = phasor_to_series(hw_phasor)
     assert isinstance(fs_hw, HarmonicWaveform)
 
 
 def test_phasor_to_fs_pw(
-    pw_phasor: ProjectedWaveform[Phasor[Axis[Array]]],
+    pw_freq_phasor: ProjectedWaveform[Phasor[Axis[Array]]],
 ):
-    fs_pw = phasor_to_fs_pw(pw_phasor)
+    with pytest.warns(DeprecationWarning, match="phasor_to_series"):
+        _fs_pw = phasor_to_fs_pw(pw_freq_phasor)
+    assert isinstance(_fs_pw, ProjectedWaveform)
+    fs_pw = phasor_to_series(pw_freq_phasor)
     assert isinstance(fs_pw, ProjectedWaveform)
 
 
 def test_phasor_to_fs_hpw(
-    hpw_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
+    hpw_freq_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
 ):
-    fs_hw = phasor_to_fs_hpw(hpw_phasor)
-    assert isinstance(fs_hw, HarmonicProjectedWaveform)
+    with pytest.warns(DeprecationWarning, match="phasor_to_series"):
+        _fs_hpw = phasor_to_fs_hpw(hpw_freq_phasor)
+    assert isinstance(_fs_hpw, HarmonicProjectedWaveform)
+    fs_hpw = phasor_to_series(hpw_freq_phasor)
+    assert isinstance(fs_hpw, HarmonicProjectedWaveform)
 
 
 def test_plus_cross_waveform_accessors_and_kind(
@@ -122,30 +146,37 @@ def test_phasor_to_fs_hw_homogeneous_branch(
     hw_phasor: HarmonicWaveform[Harmonic, Phasor[Axis[Array]]],
 ):
     hhw = homogeneous_harmonic_waveform({mode: rep for mode, rep in hw_phasor.items()})
-    fs_hhw = phasor_to_fs_hw(hhw)
+    with pytest.warns(DeprecationWarning, match="phasor_to_series"):
+        _fs_hhw = phasor_to_fs_hw(hhw)
+    assert isinstance(_fs_hhw, type(hhw))
+    fs_hhw = phasor_to_series(hhw)
     assert isinstance(fs_hhw, type(hhw))
 
 
 def test_phasor_to_fs_hpw_homogeneous_branch(
-    hhpw_phasor: HomogeneousHarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
+    hhpw_freq_phasor: HomogeneousHarmonicProjectedWaveform[
+        Harmonic, Phasor[Axis[Array]]
+    ],
 ):
-    fs_hhpw = phasor_to_fs_hpw(hhpw_phasor)
-    assert isinstance(fs_hhpw, type(hhpw_phasor))
+    with pytest.warns(DeprecationWarning, match="phasor_to_series"):
+        fs_hhpw = phasor_to_fs_hpw(hhpw_freq_phasor)
+    assert isinstance(fs_hhpw, type(hhpw_freq_phasor))
 
 
 def test_get_dense_maker(
-    hpw_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
+    hpw_freq_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
     linear_interpolator: Interpolator,
     dense_ary_freq_axis: Axis[Array],
 ):
-    make = get_dense_maker(linear_interpolator)
+    with pytest.warns(DeprecationWarning, match="get_dense_maker"):
+        make = get_dense_maker(linear_interpolator)
 
     densifier = make(dense_ary_freq_axis, embed=False)
-    dense_hpw = densifier(hpw_phasor)
+    dense_hpw = densifier(hpw_freq_phasor)
     assert isinstance(dense_hpw, HarmonicProjectedWaveform)
 
     densifier_embed = make(dense_ary_freq_axis, embed=True)
-    dense_hhpw = densifier_embed(hpw_phasor)
+    dense_hhpw = densifier_embed(hpw_freq_phasor)
     homogeneous = homogeneous_harmonic_projected_waveform(
         {mode: dense_hhpw[mode] for mode in dense_hhpw}
     )

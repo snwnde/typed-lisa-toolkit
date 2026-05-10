@@ -26,13 +26,14 @@ from ..types import (
     AnyAxis,
     Array,
     Axis,
+    FrequencyPhasor,
     FrequencySeries,
     Grid2D,
     Grid2DSparse,
     HarmonicProjectedWaveform,
     HarmonicWaveform,
     Linspace,
-    Phasor,
+    TimePhasor,
     TimeSeries,
     _mixins,
 )
@@ -49,7 +50,12 @@ from .options import (
     sieve_kwargs,
 )
 
-LineRep = FrequencySeries[AnyAxis] | TimeSeries[AnyAxis] | Phasor[AnyAxis]
+LineRep = (
+    FrequencySeries[AnyAxis]
+    | TimeSeries[AnyAxis]
+    | TimePhasor[AnyAxis]
+    | FrequencyPhasor[AnyAxis]
+)
 ImRep = STFT[Grid2D[AnyAxis, AnyAxis]] | WDM[Grid2D[Axis[Linspace], Axis[Linspace]]]
 HMRep = HarmonicWaveform[_mixins.Mode, LineRep] | HarmonicWaveform[_mixins.Mode, ImRep]
 ChanRep = _mixins.ChannelMapping[LineRep] | _mixins.ChannelMapping[ImRep]
@@ -126,6 +132,15 @@ class XYLabel(abc.ABC):
 
 
 def _guard_shape(obj: LineRep | ImRep) -> None:
+    if isinstance(obj, (TimePhasor, FrequencyPhasor)):
+        if obj.entries.shape[1:4] != (1, 1, 2):
+            msg = (
+                f"{type(obj).__name__} only supports n_channels=1, "
+                "n_harmonics=1, n_features=2. "
+                f"Got {obj.entries.shape[1:4]}."
+            )
+            raise ValueError(msg)
+        return
     if obj.entries.shape[1:4] != (1, 1, 1):
         msg = (
             f"{type(obj).__name__} only supports n_channels=1, "
@@ -407,14 +422,15 @@ class PlotNode:
 def classify(
     obj: AxPlottable | MultChan, /, label_ctx: LabelContext = trivial_ctx
 ) -> PlotNode:
-    if isinstance(obj, (TimeSeries)):
+    if isinstance(obj, (TimeSeries, TimePhasor)):
         _guard_shape(obj)
         xaxis, xunit = _get_times_axis(obj.times)
+        _ary = obj.entries if isinstance(obj, TimeSeries) else obj.phases
         children = [
             PlotNode(
                 payload=SingleLine(
                     xaxis=xaxis,
-                    line=obj.entries[i].squeeze(),
+                    line=_ary[i].squeeze(),
                     xunit=xunit,
                     xname="Time",
                     yname=False,
@@ -428,11 +444,11 @@ def classify(
             children=children,
             label_ctx=label_ctx,
         ).normalize()
-    if isinstance(obj, (FrequencySeries, Phasor)):
+    if isinstance(obj, (FrequencySeries, FrequencyPhasor)):
         _guard_shape(obj)
         xaxis, xunit = _get_freqs_axis(obj.frequencies)
         _ary = obj.abs().entries if isinstance(obj, FrequencySeries) else obj.phases
-        _plt_mode = "semilogx" if isinstance(obj, Phasor) else "loglog"
+        _plt_mode = "semilogx" if isinstance(obj, FrequencyPhasor) else "loglog"
         children = [
             PlotNode(
                 payload=SingleLine(
@@ -585,8 +601,13 @@ def _dispatch_compare[T: AxPlottable | MultChan](
     for idx, row_label in enumerate(multirow):
         _axs[0][idx].set_ylabel(row_label)
     if showdiff:
-        if isinstance(obj1, Phasor) or isinstance(obj2, Phasor):
-            msg = "Showing the difference is not supported for Phasor objects."
+        if isinstance(obj1, (TimePhasor, FrequencyPhasor)) or isinstance(
+            obj2, (TimePhasor, FrequencyPhasor)
+        ):
+            msg = (
+                "Showing the difference is not "
+                f"supported for {type(obj1).__name__} objects."
+            )
             raise ValueError(msg)
         node_diff = classify(obj1 - obj2)
         node_diff(_axs[1], plot_mode=plot_mode, **kwargs)

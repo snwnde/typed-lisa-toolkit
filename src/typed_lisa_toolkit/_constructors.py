@@ -21,14 +21,16 @@ from .types.misc import (
 from .types.modes import cast_mode
 from .types.noisemodel import make_sdm, noise_model
 from .types.representations import (
-    densify_phasor,
+    frequency_phasor,
     frequency_series,
     phasor,
     stft,
+    time_phasor,
     time_series,
     wdm,
 )
 from .types.waveforms import (
+    densify_phasor,
     densify_phasor_hpw,
     densify_phasor_hw,
     densify_phasor_pw,
@@ -45,6 +47,7 @@ from .types.waveforms import (
     phasor_to_fs_hpw,
     phasor_to_fs_hw,
     phasor_to_fs_pw,
+    phasor_to_series,
     plus_cross_waveform,
     projected_waveform,
     pw,
@@ -64,6 +67,7 @@ __all__ = [
     "densify_phasor_hpw",
     "densify_phasor_hw",
     "densify_phasor_pw",
+    "frequency_phasor",
     "frequency_series",
     "fsdata",
     "get_dense_maker",
@@ -85,12 +89,14 @@ __all__ = [
     "phasor_to_fs_hpw",
     "phasor_to_fs_hw",
     "phasor_to_fs_pw",
+    "phasor_to_series",
     "plus_cross_waveform",
     "projected_waveform",
     "pw",
     "stft",
     "stftdata",
     "sum_harmonics",
+    "time_phasor",
     "time_series",
     "timed_fsdata",
     "tsdata",

@@ -5,6 +5,7 @@ import pytest
 
 from typed_lisa_toolkit import (
     densify_phasor,
+    frequency_phasor,
     frequency_series,
     phasor,
     stft,
@@ -16,12 +17,13 @@ from typed_lisa_toolkit.types import (
     WDM,
     Array,
     Axis,
+    FrequencyPhasor,
     FrequencySeries,
     Grid2DCartesian,
     Grid2DSparse,
     Interpolator,
     Linspace,
-    Phasor,
+    TimePhasor,
     TimeSeries,
     UniformFrequencySeries,
     UniformTimeSeries,
@@ -160,31 +162,74 @@ def test_ary_time_series(
     assert embed.grid == ary_time_series.grid
 
 
-def test_lin_phasor(lin_phasor: Phasor[Axis[Linspace]]):
+def test_lin_freq_phasor(lin_freq_phasor: FrequencyPhasor[Axis[Linspace]]):
     from scipy.interpolate import interp1d
 
     with pytest.raises(ValueError, match="num must be"):
-        _ = lin_phasor.get_subset(interval=(0.1, 0.5))
-    subset = lin_phasor.get_subset(interval=(1.0, 2.5))
+        _ = lin_freq_phasor.get_subset(interval=(0.1, 0.5))
+    subset = lin_freq_phasor.get_subset(interval=(1.0, 2.5))
     assert len(subset.grid[0]) == 2
     assert subset.entries.shape == (1, 1, 1, 2, 2)
-    subset = lin_phasor.get_subset(slice=slice(0, 2))
+    subset = lin_freq_phasor.get_subset(slice=slice(0, 2))
     assert len(subset.grid[0]) == 2
     assert subset.entries.shape == (1, 1, 1, 2, 2)
-    embed = lin_phasor.get_embedded(embedding_grid=lin_phasor.grid)
-    assert embed.grid == lin_phasor.grid
-    embed = lin_phasor.get_embedded(
-        embedding_grid=lin_phasor.grid, known_slices=(slice(0, 3),)
+    embed = lin_freq_phasor.get_embedded(embedding_grid=lin_freq_phasor.grid)
+    assert embed.grid == lin_freq_phasor.grid
+    embed = lin_freq_phasor.get_embedded(
+        embedding_grid=lin_freq_phasor.grid, known_slices=(slice(0, 3),)
     )
-    assert embed.grid == lin_phasor.grid
-    new_freqs = lin_phasor.xp.linspace(
-        lin_phasor.frequencies[2], lin_phasor.frequencies[-3], 8
+    assert embed.grid == lin_freq_phasor.grid
+    new_freqs = lin_freq_phasor.xp.linspace(
+        lin_freq_phasor.frequencies[2], lin_freq_phasor.frequencies[-3], 8
     )
-    interpolated = lin_phasor.get_interpolated(new_freqs, interp1d)
-    assert isinstance(interpolated, Phasor)
+    interpolated = lin_freq_phasor.get_interpolated(new_freqs, interp1d)
+    assert isinstance(interpolated, FrequencyPhasor)
     assert len(interpolated.frequencies) == 8
-    fs = lin_phasor.to_frequency_series()
+    fs = lin_freq_phasor.to_frequency_series()
     assert isinstance(fs, FrequencySeries)
+
+
+def test_lin_time_phasor(lin_time_phasor: TimePhasor[Axis[Linspace]]):
+    from scipy.interpolate import interp1d
+
+    with pytest.raises(ValueError, match="num must be"):
+        _ = lin_time_phasor.get_subset(interval=(0.1, 0.5))
+    subset = lin_time_phasor.get_subset(interval=(1.0, 2.5))
+    assert len(subset.grid[0]) == 2
+    assert subset.entries.shape == (1, 1, 1, 2, 2)
+    subset = lin_time_phasor.get_subset(slice=slice(0, 2))
+    assert len(subset.grid[0]) == 2
+    assert subset.entries.shape == (1, 1, 1, 2, 2)
+    embed = lin_time_phasor.get_embedded(embedding_grid=lin_time_phasor.grid)
+    assert embed.grid == lin_time_phasor.grid
+    embed = lin_time_phasor.get_embedded(
+        embedding_grid=lin_time_phasor.grid, known_slices=(slice(0, 6),)
+    )
+    assert embed.grid == lin_time_phasor.grid
+    new_times = lin_time_phasor.xp.linspace(
+        lin_time_phasor.times[2], lin_time_phasor.times[-3], 8
+    )
+    interpolated = lin_time_phasor.get_interpolated(new_times, interp1d)
+    assert isinstance(interpolated, TimePhasor)
+    assert len(interpolated.times) == 8
+    ts = lin_time_phasor.to_time_series()
+    assert isinstance(ts, TimeSeries)
+
+
+def test_deprecated_phasor_function(lin_freq_axis: Axis[Linspace], xp: ModuleType):
+    n_freqs = len(lin_freq_axis)
+    amplitudes = xp.asarray([1.0] * n_freqs, dtype=xp.float64) * (1 + 1j)
+    phases = xp.asarray([0.0] * n_freqs, dtype=xp.float64)
+
+    with pytest.warns(DeprecationWarning, match="phasor.*frequency_phasor"):
+        phasor_obj = phasor(
+            frequencies=lin_freq_axis,
+            amplitudes=amplitudes[None, None, None, None, :],
+            phases=phases[None, None, None, None, :],
+        )
+
+    assert isinstance(phasor_obj, FrequencyPhasor)
+    assert phasor_obj.domain == "frequency"
 
 
 def test_frequency_series_factory_validation(
@@ -205,11 +250,17 @@ def test_phasor_factory_validation(lin_freq_axis: Axis[Linspace], xp: ModuleType
     amplitudes = xp.ones((1, 1, 1, 1, len(lin_freq_axis)), dtype=xp.float64)
     phases = xp.ones((1, 1, 1, 1, len(lin_freq_axis) - 1), dtype=xp.float64)
     with pytest.raises(ValueError, match="must have the same shape"):
-        phasor(lin_freq_axis, amplitudes, phases)
+        frequency_phasor(
+            frequencies=lin_freq_axis, amplitudes=amplitudes, phases=phases
+        )
 
     bad_feature_shape = xp.ones((1, 1, 1, 2, len(lin_freq_axis)), dtype=xp.float64)
     with pytest.raises(ValueError, match="Invalid shape"):
-        phasor(lin_freq_axis, bad_feature_shape, bad_feature_shape)
+        frequency_phasor(
+            frequencies=lin_freq_axis,
+            amplitudes=bad_feature_shape,
+            phases=bad_feature_shape,
+        )
 
 
 def test_stft_factory_validation(
@@ -269,7 +320,7 @@ def test_irfft_and_rfft_argument_validation(
 
 
 def test_phasor_interpolation_rejects_noncanonical_shape(
-    ary_phasor: Phasor[Axis[Array]],
+    ary_phasor: FrequencyPhasor[Axis[Array]],
 ):
     from scipy.interpolate import interp1d
 
@@ -287,14 +338,14 @@ def test_phasor_interpolation_rejects_noncanonical_shape(
 
 
 def test_densify_phasor_embed_true(
-    ary_phasor: Phasor[Axis[Array]],
+    ary_phasor: FrequencyPhasor[Axis[Array]],
     linear_interpolator: Interpolator,
     dense_ary_freq_axis: Axis[Array],
 ):
     dense = densify_phasor(
         ary_phasor, linear_interpolator, dense_ary_freq_axis, embed=True
     )
-    assert isinstance(dense, Phasor)
+    assert isinstance(dense, FrequencyPhasor)
     assert len(dense.frequencies) == len(dense_ary_freq_axis)
 
 
@@ -313,13 +364,14 @@ def test_array_input_factory_branches(xp: ModuleType):
 def test_phasor_1d_and_make_error_branch(lin_freq_axis: Axis[Linspace], xp: ModuleType):
     amps = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64)
     phases = xp.asarray([0.0, 0.25, 0.5], dtype=xp.float64)
-    ph = phasor(lin_freq_axis, amps, phases)
-    assert isinstance(ph, Phasor)
+    with pytest.warns(DeprecationWarning, match="phasor.*frequency_phasor"):
+        ph = phasor(frequencies=lin_freq_axis, amplitudes=amps, phases=phases)
+    assert isinstance(ph, FrequencyPhasor)
     assert ph.entries.shape[3] == 2
 
     with pytest.raises(ValueError, match="either 1D arrays"):
-        Phasor.make(
-            frequencies=lin_freq_axis,
+        FrequencyPhasor.make(
+            axis=lin_freq_axis,
             amplitudes=xp.ones((2, 2), dtype=xp.float64),
             phases=xp.ones((2, 2), dtype=xp.float64),
         )
@@ -377,7 +429,7 @@ def test_irfft_rfft_positional_deprecation_paths(
         _ = lin_time_series.rfft(lambda x: lin_time_series.xp.ones_like(x))  # pyright: ignore[reportUnknownLambdaType]
 
 
-def test_uni_ary_phasor(uni_ary_phasor: Phasor[Axis[Array]]):
+def test_uni_ary_phasor(uni_ary_phasor: FrequencyPhasor[Axis[Array]]):
     from scipy.interpolate import interp1d
 
     subset = uni_ary_phasor.get_subset(interval=(0.1, 0.5))
@@ -398,11 +450,11 @@ def test_uni_ary_phasor(uni_ary_phasor: Phasor[Axis[Array]]):
         uni_ary_phasor.frequencies[2], uni_ary_phasor.frequencies[-3], 8
     )
     interpolated = uni_ary_phasor.get_interpolated(new_freqs, interp1d)
-    assert isinstance(interpolated, Phasor)
+    assert isinstance(interpolated, FrequencyPhasor)
     assert len(interpolated.frequencies) == 8
 
 
-def test_ary_phasor(ary_phasor: Phasor[Axis[Array]]):
+def test_ary_phasor(ary_phasor: FrequencyPhasor[Axis[Array]]):
     from scipy.interpolate import interp1d
 
     subset = ary_phasor.get_subset(interval=(0.1, 0.5))
@@ -423,7 +475,7 @@ def test_ary_phasor(ary_phasor: Phasor[Axis[Array]]):
         ary_phasor.frequencies[2], ary_phasor.frequencies[-3], 8
     )
     interpolated = ary_phasor.get_interpolated(new_freqs, interp1d)
-    assert isinstance(interpolated, Phasor)
+    assert isinstance(interpolated, FrequencyPhasor)
     assert len(interpolated.frequencies) == 8
 
 
@@ -989,7 +1041,7 @@ def test_lin_lin_sparse_wdm(
 
 
 def test_densify_phasor(
-    uni_ary_phasor: Phasor[Axis[Array]],
+    uni_ary_phasor: FrequencyPhasor[Axis[Array]],
     linear_interpolator: Interpolator,
     dense_ary_freq_axis: Axis[Array],
 ):

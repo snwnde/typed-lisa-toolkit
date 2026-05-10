@@ -19,7 +19,7 @@ else:
 import numpy as np
 import numpy.testing as npt
 
-from typed_lisa_toolkit import densify_phasor_hw, shop
+from typed_lisa_toolkit import densify_phasor, shop
 from typed_lisa_toolkit.types import (
     WDM,
     Array,
@@ -98,11 +98,11 @@ def test_densify_phasor_hw_jit(
     linear_interpolator: Interpolator,
     dense_ary_freq_axis: Axis[Array],
 ):
-    expected = densify_phasor_hw(
+    expected = densify_phasor(
         hw_phasor, linear_interpolator, dense_ary_freq_axis, embed=True
     )
     densify_phasor_hw_jit = jax.jit(  # pyright: ignore[reportUnknownMemberType]
-        densify_phasor_hw, static_argnums=(1,), static_argnames=("embed",)
+        densify_phasor, static_argnums=(1,), static_argnames=("embed",)
     )
     # Verify results match
     hhw_jit = cast(

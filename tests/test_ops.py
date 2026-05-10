@@ -127,10 +127,10 @@ def test_ary_time_series(
     assert (ary_time_series.entries == expected).all()
 
 
-def test_lin_phasor(lin_phasor: Phasor[Axis[Linspace]]):
+def test_lin_phasor(lin_freq_phasor: Phasor[Axis[Linspace]]):
     # Catch error
     with pytest.raises(TypeError):
-        _ = lin_phasor + 1  # pyright: ignore[reportOperatorIssue, reportUnknownVariableType]
+        _ = lin_freq_phasor + 1  # pyright: ignore[reportOperatorIssue, reportUnknownVariableType]
 
 
 def test_uni_ary_phasor(uni_ary_phasor: Phasor[Axis[Array]]):

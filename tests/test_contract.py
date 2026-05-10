@@ -320,19 +320,19 @@ def test_ary_time_series(
     )
 
 
-def test_lin_phasor(lin_phasor: Phasor[Axis[Linspace]]):
-    assert lin_phasor.domain == "frequency"
-    assert lin_phasor.kind == "phasor"
-    assert isinstance(lin_phasor.entries, lin_phasor.xp.ndarray)
-    assert not np.isreal(lin_phasor.amplitudes).any()
-    assert np.isreal(lin_phasor.phases).all()
-    assert isinstance(lin_phasor.grid, tuple)
-    assert lin_phasor.entries.shape == (
+def test_lin_phasor(lin_freq_phasor: Phasor[Axis[Linspace]]):
+    assert lin_freq_phasor.domain == "frequency"
+    assert lin_freq_phasor.kind == "phasor"
+    assert isinstance(lin_freq_phasor.entries, lin_freq_phasor.xp.ndarray)
+    assert not np.isreal(lin_freq_phasor.amplitudes).any()
+    assert np.isreal(lin_freq_phasor.phases).all()
+    assert isinstance(lin_freq_phasor.grid, tuple)
+    assert lin_freq_phasor.entries.shape == (
         1,
         1,
         1,
         2,
-        len(lin_phasor.grid[0].ax),
+        len(lin_freq_phasor.grid[0].ax),
     )
 
 

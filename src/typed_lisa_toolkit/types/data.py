@@ -730,11 +730,6 @@ class _Grid2DData[  # pyright: ignore[reportUnsafeMultipleInheritance]
         grid2d = build_grid2d(frequencies, times, sparse_indices=sparse_indices)
         return cls(grid2d, entries, channels=channels, name=name)
 
-    # def _get_plotter(self):
-    #     from ..viz import plotters
-
-    #     return plotters.TFDataPlotter
-
 
 class STFTData[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     _Grid2DData[reps.STFT[GridT]]
