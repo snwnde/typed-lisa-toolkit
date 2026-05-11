@@ -57,7 +57,7 @@ def xp_fixture(request) -> ModuleType:  # pyright: ignore[reportUnknownParameter
     """Fixture to parametrize tests over different array libraries."""
     xp_name = request.param  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     if xp_name == "numpy":
-        import numpy as np
+        import array_api_compat.numpy as np
 
         return np
     if xp_name == "jax":
@@ -68,10 +68,11 @@ def xp_fixture(request) -> ModuleType:  # pyright: ignore[reportUnknownParameter
 
         return jnp
     if xp_name == "pytorch":
+        import array_api_compat.torch
         import torch
 
-        torch.set_default_dtype(torch.float64)  # pyright: ignore[reportPrivateImportUsage]
-        return torch
+        torch.set_default_dtype(torch.float64)
+        return array_api_compat.torch
     msg = f"Unsupported array library: {xp_name}"
     raise ValueError(msg)
 
@@ -124,7 +125,7 @@ def uni_ary_freq_axis_fixture(xp: ModuleType) -> Axis[Array]:
 
 @pytest.fixture(scope="session", name="dense_ary_freq_axis")
 def dense_ary_freq_axis_fixture(xp: ModuleType) -> Axis[Array]:
-    return axis(xp.linspace(1.0, 3.0, num=10))
+    return axis(xp.linspace(1.0, 3.0, 10))
 
 
 @pytest.fixture(scope="session", name="ary_freq_axis")
@@ -1296,7 +1297,15 @@ def linear_interpolator_fixture(xp: ModuleType):  # pyright: ignore[reportUnknow
         y_arr = xp.asarray(y)
 
         def _interp(x_new):  # pyright: ignore[reportUnknownParameterType, reportMissingParameterType]
-            return xp.interp(xp.asarray(x_new, dtype=xp.float64), x_arr, y_arr)
+            try:
+                return xp.interp(xp.asarray(x_new, dtype=xp.float64), x_arr, y_arr)
+            except AttributeError:
+                res = np.interp(
+                    np.asarray(x_new, dtype=np.float64),
+                    np.asarray(x_arr),
+                    np.asarray(y_arr),
+                )
+                return xp.asarray(res)
 
         return _interp  # pyright: ignore[reportUnknownVariableType]
 

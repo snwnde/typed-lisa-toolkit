@@ -244,7 +244,11 @@ class NDArrayMixin(abc.ABC):  # noqa: PLW1641
         return self._unary_op(self.xp.angle, **kwargs)
 
     def unwrap(self, **kwargs: Any) -> Self:
-        return self._unary_op(self.xp.unwrap, **kwargs)
+        try:
+            return self._unary_op(self.xp.unwrap, **kwargs)
+        except AttributeError:
+            # Fallback to numpy's unwrap
+            return self._unary_op(np.unwrap, **kwargs)
 
 
 @runtime_checkable
@@ -539,8 +543,8 @@ def embed_entries_to_grid[GT: "AnyGrid"](
     known_slices: tuple[slice, ...] | None = None,
 ) -> tuple[GT, "Array"]:
     """Embed entries from source grid into a target grid."""
-    _embedding_grid = tuple(to_array(eg) for eg in embedding_grid)
-    _source_grid = tuple(to_array(sg) for sg in source_grid)
+    _embedding_grid = tuple(eg for eg in embedding_grid)
+    _source_grid = tuple(sg for sg in source_grid)
     entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
         _source_grid, source_entries
     )

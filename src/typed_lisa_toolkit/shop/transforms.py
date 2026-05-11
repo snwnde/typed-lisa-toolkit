@@ -5,7 +5,10 @@ import warnings
 from types import ModuleType
 from typing import Literal, overload
 
-from .. import _constructors  # pyright: ignore[reportPrivateUsage]
+from .. import (
+    _constructors,  # pyright: ignore[reportPrivateUsage]
+    utils,
+)
 from ..types import AnyAxis, Array, Axis, AxLike, Grid2DCartesian, Linspace, data
 from ..types import representations as reps
 
@@ -142,7 +145,9 @@ def freq2time(
         else fd.frequencies.stop + fd.frequencies.ax.step / 2
     )
     nyquist_dt = 1.0 / (2 * nyquist_freq)
-    if _times.step < nyquist_dt and not xp.isclose(_times.step, nyquist_dt):
+    if _times.step < nyquist_dt and not xp.isclose(
+        xp.asarray(_times.step), xp.asarray(nyquist_dt)
+    ):
         warnings.warn("The time grid is denser than the Nyquist limit.", stacklevel=2)
 
     signal = fft.irfft(fd.get_kernel() / _times.step, n=len(_times), axis=-1)
@@ -156,20 +161,21 @@ def freq2time(
     )
 
 
-def _set_wdm_backend(xp: "ModuleType") -> None:
-    if xp.__name__ == "numpy":
+def _wdm_backend_env(xp: "ModuleType") -> dict[str, str]:
+    if xp.__name__ in ("numpy", "array_api_compat.numpy"):
         pass
-    elif xp.__name__.startswith("jax"):
+    elif "jax" in xp.__name__:
         _backend = os.environ.get("WDM_BACKEND")
         if _backend is None:
-            os.environ["WDM_BACKEND"] = "jax"
-        elif _backend != "jax":
+            return {"WDM_BACKEND": "jax"}
+        if _backend != "jax":
             msg = (
                 f"WDM_BACKEND is set to {_backend!r}, "
                 "but the input data uses JAX arrays. "
                 "Please set WDM_BACKEND to 'jax' or unset it to use the JAX backend."
             )
             raise ValueError(msg)
+    return {}
 
 
 @overload
@@ -230,8 +236,6 @@ def time2wdm(
         forward_wdm as _forward_wdm,
     )
 
-    _set_wdm_backend(tthing.xp)
-
     if isinstance(tthing, data.TSData):
         return _constructors.wdmdata(
             {key: time2wdm(val, Nt=Nt, Nf=Nf) for (key, val) in tthing.items()},
@@ -250,14 +254,15 @@ def time2wdm(
         msg = "Currently only single-channel time series are supported by time2wdm."
         raise ValueError(msg)
     _entries = tseries.entries[:, 0, 0, 0]
-    coeffs = _forward_wdm(
-        _entries,
-        nt=Nt,
-        nf=Nf,
-        a=DEFAULT_WINDOW_A,
-        d=DEFAULT_WINDOW_D,
-        dt=tseries.times.ax.step,
-    ).swapaxes(-2, -1)
+    with utils.set_env(**_wdm_backend_env(tseries.xp)):
+        coeffs = _forward_wdm(
+            _entries,
+            nt=Nt,
+            nf=Nf,
+            a=DEFAULT_WINDOW_A,
+            d=DEFAULT_WINDOW_D,
+            dt=tseries.times.ax.step,
+        ).swapaxes(-2, -1)
     expected_shape = (n_batches, Nf + 1, Nt)
     if coeffs.shape != expected_shape:
         msg = (
@@ -383,8 +388,6 @@ def freq2wdm(
         get_backend as _get_backend,
     )
 
-    _set_wdm_backend(fthing.xp)
-
     if isinstance(fthing, data.FSData):
         return _constructors.wdmdata(
             {key: freq2wdm(val, Nt=Nt, Nf=Nf, t0=t0) for (key, val) in fthing.items()},
@@ -394,7 +397,8 @@ def freq2wdm(
         f"Expected a FrequencySeries input, got {type(fthing)}"
     )
     fseries = fthing
-    backend = _get_backend()
+    with utils.set_env(**_wdm_backend_env(fseries.xp)):
+        backend = _get_backend()
     tseries_entries = backend.fft.irfft(fseries.entries, n=Nf * Nt)
     duration = 1 / fseries.frequencies.ax.step
     dt = duration / (Nf * Nt)
@@ -433,8 +437,6 @@ def wdm2freq(
         frequency_wdm as _frequency_wdm,
     )
 
-    _set_wdm_backend(wdmthing.xp)
-
     if isinstance(wdmthing, data.WDMData):
         return _constructors.fsdata(
             {key: wdm2freq(val) for (key, val) in wdmthing.items()},
@@ -446,7 +448,10 @@ def wdm2freq(
         msg = "Currently only single-channel WDMs are supported by wdm2freq."
         raise ValueError(msg)
     _coeffs = wdm.entries[:, 0, 0, 0].swapaxes(-2, -1)
-    wtfs = _frequency_wdm(_coeffs, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D)
+    with utils.set_env(**_wdm_backend_env(wdm.xp)):
+        wtfs = _frequency_wdm(
+            _coeffs, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D
+        )
     # wtfs is on a grid from fftfreq but we want rfftfreq
     _n = wtfs.shape[1]
     _num = _n // 2 + 1 if _n % 2 == 0 else (_n + 1) // 2

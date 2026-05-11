@@ -223,8 +223,7 @@ class Axis[T: Array | Linspace]:  # noqa: PLW1641
                 return False
             if not isinstance(self.ax, Linspace) and isinstance(other.ax, Linspace):
                 return False
-            xp = xpc.get_namespace(self.ax)
-            return xp.array_equal(self.ax, other.ax)
+            return bool((self.asarray() == other.asarray()).all())
         return False
 
     def __array__(
@@ -394,8 +393,7 @@ class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:  # noqa: PLW1641
             return False
         if self.axis1 != other.axis1:
             return False
-        xp = xpc.get_namespace(self.indices)
-        return xp.array_equal(self.indices, other.indices)
+        return bool((self.indices == other.indices).all())
 
 
 type Grid1D[AxisT: "AnyAxis"] = tuple[AxisT]

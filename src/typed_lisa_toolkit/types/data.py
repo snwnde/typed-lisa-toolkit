@@ -13,7 +13,7 @@ import h5py
 import numpy as np
 import numpy.typing as npt
 
-from ..utils import deprecated, warn_external
+from ..utils import deprecated, extend_to, warn_external
 from . import _mixins, tapering
 from . import representations as reps
 from .misc import (
@@ -30,6 +30,7 @@ from .misc import (
     Linspace,
     axis,
     build_grid2d,
+    linspace_from_step,
 )
 
 if TYPE_CHECKING:
@@ -478,37 +479,27 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
     ) -> TSData:
         """Return the zero-padded data."""
         xp = xpc.get_namespace(self.get_kernel())
-        _times = xp.asarray(self.times)
-        pad_width = tuple(int(xp.rint(time / self.dt)) for time in pad_time)
-        time_end_values = (
-            -self.dt * pad_width[0] + self.times.start,
-            self.dt * pad_width[1] + self.times.stop,
+        pad_width = tuple(
+            int(xp.round(xp.asarray(time / self.dt))) for time in pad_time
         )
-        padded_time = xp.pad(
-            _times,
-            pad_width,
-            mode="linear_ramp",
-            end_values=time_end_values,
+        known_slices = (slice(pad_width[0], pad_width[0] + len(self.times)),)
+        target = axis(
+            linspace_from_step(
+                self.times.start - pad_width[0] * self.dt,
+                self.dt,
+                len(self.times) + sum(pad_width),
+            )
         )
-
-        tapering_window = tapering(_times) if tapering is not None else 1
-        signal = self.get_kernel() * tapering_window
-        padded_signal = xp.pad(
-            signal,
-            ((0, 0), (0, 0), (0, 0), (0, 0), pad_width),
-            mode="constant",
+        taper = tapering(xp.asarray(self.times)) if tapering is not None else 1
+        padded_entries = extend_to(target, known_slices=known_slices)(
+            self.times, self.get_kernel() * taper
         )
         return tsdata(
-            times=padded_time,
-            entries=padded_signal,
+            times=target,
+            entries=padded_entries,
             channels=self.channel_names,
             name=self.name,
         )
-
-    # def _get_plotter(self):
-    #     from ..viz import plotters
-
-    #     return plotters.TSDataPlotter
 
 
 class FSData(_SeriesData[reps.UniformFrequencySeries]):

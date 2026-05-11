@@ -18,7 +18,7 @@ from .. import utils
 from . import _mixins, waveforms
 from . import data as dm
 from . import representations as reps
-from .misc import AnyAxis, Array, Axis, Domain, Grid2D, Linspace
+from .misc import AnyAxis, Array, Axis, Domain, Grid2D, Linspace, axis
 
 
 def _import_quadax() -> ModuleType:
@@ -91,8 +91,8 @@ class IntegrationPolicy(Protocol):
         ...
 
 
-class _NumpyIntegrationPolicy(IntegrationPolicy):
-    """Numpy-backed integration policy with selectable quadrature method."""
+class _IntegrationPolicy(IntegrationPolicy):
+    """Multi-backed integration policy with selectable quadrature method."""
 
     def __init__(
         self,
@@ -108,7 +108,9 @@ class _NumpyIntegrationPolicy(IntegrationPolicy):
         **kwargs: Any,
     ) -> Any:
         scipy_integrate = _import_scipy_integrate()
-        return getattr(scipy_integrate, self.method)(__y, x=x, **kwargs)
+        xp = xpc.array_namespace(__y)
+        res = getattr(scipy_integrate, self.method)(__y, x=x, **kwargs)
+        return xp.asarray(res)
 
     def cumulative(
         self,
@@ -118,7 +120,9 @@ class _NumpyIntegrationPolicy(IntegrationPolicy):
         **kwargs: Any,
     ) -> Any:
         scipy_integrate = _import_scipy_integrate()
-        return getattr(scipy_integrate, "cumulative_" + self.method)(__y, x=x, **kwargs)
+        xp = xpc.array_namespace(__y)
+        res = getattr(scipy_integrate, "cumulative_" + self.method)(__y, x=x, **kwargs)
+        return xp.asarray(res)
 
 
 class _JaxIntegrationPolicy(IntegrationPolicy):
@@ -157,10 +161,12 @@ def _make_integration_policy(
 ) -> IntegrationPolicy:
     """Build an integration policy from a method name."""
     module_name = xp.__name__
-    if module_name == "numpy":
-        return _NumpyIntegrationPolicy(method=method)
-    if module_name == "jax.numpy":
+    if module_name in ("numpy", "array_api_compat.numpy"):
+        return _IntegrationPolicy(method=method)
+    if module_name in ("jax.numpy", "array_api_compat.jax.numpy"):
         return _JaxIntegrationPolicy(method=method)
+    if module_name in ("torch", "array_api_compat.torch"):
+        return _IntegrationPolicy(method=method)
     msg = f"Unsupported array module {module_name}. Cannot create integration policy."
     raise NotImplementedError(msg)
 
@@ -242,7 +248,7 @@ class SpectralDensity:
                 "Only 'cholesky' is supported currently."
             )
             raise NotImplementedError(msg)
-        xp = self._inverse_sdm.__array_namespace__()
+        xp = xpc.array_namespace(self._inverse_sdm)
         return xp.linalg.cholesky(self._inverse_sdm, upper=True)
 
 
@@ -276,7 +282,7 @@ class DiagonalSpectralDensity(SpectralDensity):
             chnname: 1 / fd_noise.psd(frequencies, option=chnname)
             for chnname in channel_names
         }
-        xp = next(iter(_dict.values())).__array_namespace__()
+        xp = xpc.array_namespace(next(iter(_dict.values())))
         diag = xp.stack(
             [xp.squeeze(_dict[c]) for c in channel_names],
             axis=-1,
@@ -298,9 +304,9 @@ class DiagonalSpectralDensity(SpectralDensity):
         """  # noqa: E501
         if kind is not None:
             return super().get_whitening_matrix(kind=kind)
-        xp = self._inverse_sdm.__array_namespace__()
+        xp = xpc.array_namespace(self._inverse_sdm)
         # S_n^{-1} is diagonal => W = sqrt(S_n^{-1})
-        diag = xp.diagonal(self._inverse_sdm, axis1=-2, axis2=-1)
+        diag = xp.linalg.diagonal(self._inverse_sdm)
         return xp.sqrt(diag)[:, :, None] * xp.eye(
             len(self.channel_order),
             dtype=diag.dtype,
@@ -365,7 +371,7 @@ class FDNoiseModel(
         # Keep the original PSD object for potential future use
         # (e.g., subband restriction)
         self.sdm: SpectralDensity = sdm
-        xp = sdm.get_kernel().__array_namespace__()
+        xp = xpc.array_namespace(sdm.get_kernel())
         self._ip: IntegrationPolicy = _make_integration_policy(xp, integration_method)
 
     def reset(self) -> Self:
@@ -381,7 +387,7 @@ class FDNoiseModel(
     def _get_whitened_entries(self, _data: FDEntry) -> "Array":
         """Return the whitened kernel entries of the given dm."""
         kernel = _data.get_kernel()  # (n_batches, n_ch, 1, 1, n_freqs)
-        xp = kernel.__array_namespace__()
+        xp = xpc.array_namespace(kernel)
         W = self.sdm.get_whitening_matrix()  # (n_freqs, n_ch, n_ch)  # noqa: N806
         whitened_e = xp.einsum("fij,...fj->...fi", W, xp.moveaxis(kernel, 1, -1))
         return xp.moveaxis(whitened_e, -1, 1)
@@ -398,15 +404,13 @@ class FDNoiseModel(
         """
         _left = left.get_kernel()  # shape (n_batches, n_channels, 1, 1, n_freqs)
         _right = right.get_kernel()  # same shape as _left
-        xp = _left.__array_namespace__()
+        xp = xpc.array_namespace(_left)
         try:
             if self.sdm.is_diagonal:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
                 # If the spectral density matrix is diagonal,
                 # we can simply divide by the diagonal elements.
-                diag = xp.diagonal(
+                diag = xp.linalg.diagonal(
                     self.sdm.get_kernel(),
-                    axis1=-1,
-                    axis2=-2,
                 )  # shape (n_freqs, n_channels)
                 return (4 * _left.conj() * _right) * diag.T[None, :, None, None, :]
         except AttributeError:
@@ -414,7 +418,7 @@ class FDNoiseModel(
         return 4 * xp.einsum(
             "...fi,fij,...fj->...f",
             xp.moveaxis(_left.conj(), 1, -1),
-            self.sdm.get_kernel(),
+            xp.astype(self.sdm.get_kernel(), _left.dtype),
             xp.moveaxis(_right, 1, -1),
         )
 
@@ -435,7 +439,7 @@ class FDNoiseModel(
             \frac{d^*(f) h(f)}{S_n(f)} \, \mathrm{d} f.
         """
         frequencies = _first_frequencies(left)
-        xp = _first_entries(left).__array_namespace__()
+        xp = xpc.array_namespace(_first_entries(left))
         return self._ip.integrate(
             self.get_integrand(left, right),
             x=_mixins.to_array(frequencies, xp=xp),
@@ -460,7 +464,7 @@ class FDNoiseModel(
             h(f)}{S_n(f)} \, \mathrm{d} f.
         """
         frequencies = _first_frequencies(left)
-        xp = _first_entries(left).__array_namespace__()
+        xp = xpc.array_namespace(_first_entries(left))
         return self._ip.cumulative(
             self.get_integrand(left, right),
             x=_mixins.to_array(frequencies, xp=xp),
@@ -543,14 +547,14 @@ class FDNoiseModel(
         and the negative frequencies are
         populated by **zero** before the inverse Fourier transform.
         """
-        xp = _first_entries(left).__array_namespace__()
+        xp = xpc.array_namespace(_first_entries(left))
         two_sided_freq = xp.fft.fftshift(
             xp.fft.fftfreq(len(left.times), left.times.ax.step),
         )
         _first = next(iter(left.values()))
         frequencies, df = _mixins.to_array(_first.frequencies, xp), _first.df
-        two_sided_integrand_entries = utils.extend_to(two_sided_freq)(
-            frequencies,
+        two_sided_integrand_entries = utils.extend_to(axis(two_sided_freq))(
+            axis(frequencies),
             self.get_integrand(left, right),
         )
         cross_correlation = xp.fft.ifft(
@@ -571,10 +575,12 @@ class FDNoiseModel(
         Applies the whitening matrix, so whitened noise has unit covariance.
         """
         d_k = _data.get_kernel()  # (n_batches, n_ch, 1, 1, n_freqs)
-        xp = d_k.__array_namespace__()
+        xp = xpc.array_namespace(d_k)
         W = self.sdm.get_whitening_matrix()  # (n_freqs, n_ch, n_ch)  # noqa: N806
         d_e = xp.moveaxis(d_k[:, :, 0, 0, :], 1, -1)  # (n_batches, n_freqs, n_ch)
-        whitened_e = xp.einsum("fij,...fj->...fi", W, d_e)  # (n_batches, n_freqs, n_ch)
+        whitened_e = xp.einsum(
+            "fij,...fj->...fi", xp.astype(W, d_e.dtype), d_e
+        )  # (n_batches, n_freqs, n_ch)
         whitened_k = xp.moveaxis(whitened_e, -1, 1)[:, :, None, None, :]
         return _data.create_like(whitened_k)
 
@@ -590,7 +596,7 @@ class FDNoiseModel(
             \frac{\langle d, h \rangle}
             {\sqrt{\langle d, d \rangle \langle h, h \rangle}}.
         """
-        xp = _first_entries(left).__array_namespace__()
+        xp = xpc.array_namespace(_first_entries(left))
         return self.get_scalar_product(left, right) / xp.sqrt(
             self.get_scalar_product(left, left) * self.get_scalar_product(right, right),
         )
@@ -688,7 +694,7 @@ class EvolutionarySpectralDensity:
                 "Only 'cholesky' is supported currently."
             )
             raise NotImplementedError(msg)  # pyright: ignore[reportUnreachable]
-        xp = self._inverse_esdm.__array_namespace__()
+        xp = xpc.array_namespace(self._inverse_esdm)
         return xp.linalg.cholesky(self._inverse_esdm, upper=True)
 
 
@@ -721,7 +727,7 @@ class TFNoiseModel:
     def _get_whitened_entries(self, _data: TFEntry) -> "Array":
         """Return the whitened kernel entries of the given dm."""
         kernel = _data.get_kernel()  # (n_batches, n_ch, 1, 1, n_freqs, n_times)
-        xp = kernel.__array_namespace__()
+        xp = xpc.array_namespace(kernel)
         W = (  # noqa: N806
             self.esd.get_whitening_matrix()
         )  # (n_freqs, n_times, n_ch, n_ch)
@@ -736,7 +742,7 @@ class TFNoiseModel:
         """Return the scalar product."""
         _left = left.get_kernel()  # shape (n_batches, n_channels, 1, 1, n_freq, n_time)
         _right = right.get_kernel()  # same shape as _left
-        xp = _left.__array_namespace__()
+        xp = xpc.array_namespace(_left)
         return (
             xp.einsum(
                 "...fti,ftij,...ftj->...ft",
@@ -842,7 +848,7 @@ def make_sdm(
                 ),
             )
             return SpectralDensity(_freqs, inverse_sdm, channel_names)
-        xp = xpc.get_namespace(inverse_sdm)
+        xp = xpc.array_namespace(inverse_sdm)
         _inverse_sdm = inverse_sdm[:, :, None] * xp.eye(
             len(channel_names),
             dtype=inverse_sdm.dtype,
