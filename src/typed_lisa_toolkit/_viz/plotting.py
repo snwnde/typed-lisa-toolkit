@@ -282,6 +282,7 @@ class SingleImage(XYLabel):
         image_kwargs = sieve_kwargs(IMSHOW_KWARGS, kwargs)
         image_kwargs["origin"] = image_kwargs.get("origin", "lower")
         image_kwargs["aspect"] = image_kwargs.get("aspect", "auto")
+        image_kwargs["extent"] = image_kwargs.get("extent", self.extent)
         ax.imshow(
             self.toshow,
             **image_kwargs,
@@ -474,20 +475,12 @@ def classify(
             raise NotImplementedError(msg)
         xaxis, xunit = _get_times_axis(obj.times)
         yaxis, yunit = _get_freqs_axis(obj.frequencies)
-        if isinstance(obj, STFT):
-            extent = (
-                cast("float", xaxis[0]),
-                cast("float", xaxis[-1]),
-                cast("float", yaxis[0]),
-                cast("float", yaxis[-1]),
-            )
-        else:
-            extent = (
-                cast("float", xaxis[0]),
-                cast("float", xaxis[-1] + obj.dT),
-                cast("float", yaxis[0]),
-                cast("float", yaxis[-1] + obj.dF),
-            )
+        extent = (
+            cast("float", xaxis[0]),
+            cast("float", xaxis[-1]),
+            cast("float", yaxis[0]),
+            cast("float", yaxis[-1]),
+        )
 
         if obj.entries.shape[0] != 1:
             msg = "STFT and WDM with n_channels > 1 are not supported yet."
