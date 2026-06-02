@@ -168,7 +168,7 @@ def _make_integration_policy(
 class _StationaryFDNoise(Protocol):
     """Protocol for frequency domain stationary noise PSD models."""
 
-    def psd(self, frequencies: "Array", option: ChnName) -> "Array":
+    def psd(self, _frequencies: "Array", _chname: ChnName) -> "Array":
         """Return the power spectral density (PSD) values on the given frequency grid for the specified channel."""  # noqa: E501
         ...
 
@@ -273,8 +273,7 @@ class DiagonalSpectralDensity(SpectralDensity):
     ):
         """Create a SpectralDensity instance from a frequency domain noise model and a frequency grid."""  # noqa: E501
         _dict = {
-            chnname: 1 / fd_noise.psd(frequencies, option=chnname)
-            for chnname in channel_names
+            chnname: 1 / fd_noise.psd(frequencies, chnname) for chnname in channel_names
         }
         xp = next(iter(_dict.values())).__array_namespace__()
         diag = xp.stack(
