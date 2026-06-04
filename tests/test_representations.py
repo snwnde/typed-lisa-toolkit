@@ -15,7 +15,7 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import (
     STFT,
     WDM,
-    Array,
+    AnyArray,
     Axis,
     FrequencyPhasor,
     FrequencySeries,
@@ -33,7 +33,7 @@ from typed_lisa_toolkit.types import (
 
 
 def test_uni_freq_series(
-    lin_freq_series: UniformFrequencySeries, long_freq_grid1d: tuple[Axis[Array]]
+    lin_freq_series: UniformFrequencySeries, long_freq_grid1d: tuple[Axis[AnyArray]]
 ):
     with pytest.raises(ValueError, match="num must be"):
         lin_freq_series.get_subset(interval=(0.1, 0.5))
@@ -64,7 +64,7 @@ def test_uni_freq_series(
 
 
 def test_uni_ary_freq_series(
-    uni_ary_freq_series: FrequencySeries[Axis[Array]],
+    uni_ary_freq_series: FrequencySeries[Axis[AnyArray]],
 ):
     subset = uni_ary_freq_series.get_subset(interval=(0.1, 0.5))
     assert len(subset.grid[0]) == 0
@@ -85,7 +85,7 @@ def test_uni_ary_freq_series(
 
 
 def test_ary_freq_series(
-    ary_freq_series: FrequencySeries[Axis[Array]],
+    ary_freq_series: FrequencySeries[Axis[AnyArray]],
 ):
     subset = ary_freq_series.get_subset(interval=(0.1, 0.5))
     assert len(subset.grid[0]) == 0
@@ -104,7 +104,7 @@ def test_ary_freq_series(
 
 
 def test_uni_time_series(
-    lin_time_series: UniformTimeSeries, long_time_grid1d: tuple[Axis[Array]]
+    lin_time_series: UniformTimeSeries, long_time_grid1d: tuple[Axis[AnyArray]]
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = lin_time_series.get_subset(interval=(0.1, 0.5))
@@ -125,7 +125,7 @@ def test_uni_time_series(
 
 
 def test_uni_ary_time_series(
-    uni_ary_time_series: TimeSeries[Axis[Array]],
+    uni_ary_time_series: TimeSeries[Axis[AnyArray]],
 ):
     subset = uni_ary_time_series.get_subset(interval=(0.1, 0.5))
     assert len(subset.grid[0]) == 0
@@ -144,7 +144,7 @@ def test_uni_ary_time_series(
 
 
 def test_ary_time_series(
-    ary_time_series: TimeSeries[Axis[Array]],
+    ary_time_series: TimeSeries[Axis[AnyArray]],
 ):
     subset = ary_time_series.get_subset(interval=(0.1, 0.5))
     assert len(subset.grid[0]) == 0
@@ -275,7 +275,7 @@ def test_stft_factory_validation(
 
 
 def test_wdm_factory_validation(
-    ary_freq_axis: Axis[Array], lin_time_axis: Axis[Linspace], xp: ModuleType
+    ary_freq_axis: Axis[AnyArray], lin_time_axis: Axis[Linspace], xp: ModuleType
 ):
     entries = xp.ones(
         (1, 1, 1, 1, len(ary_freq_axis), len(lin_time_axis)), dtype=xp.float64
@@ -320,7 +320,7 @@ def test_irfft_and_rfft_argument_validation(
 
 
 def test_phasor_interpolation_rejects_noncanonical_shape(
-    ary_phasor: FrequencyPhasor[Axis[Array]],
+    ary_phasor: FrequencyPhasor[Axis[AnyArray]],
 ):
     from scipy.interpolate import interp1d
 
@@ -338,9 +338,9 @@ def test_phasor_interpolation_rejects_noncanonical_shape(
 
 
 def test_densify_phasor_embed_true(
-    ary_phasor: FrequencyPhasor[Axis[Array]],
+    ary_phasor: FrequencyPhasor[Axis[AnyArray]],
     linear_interpolator: Interpolator,
-    dense_ary_freq_axis: Axis[Array],
+    dense_ary_freq_axis: Axis[AnyArray],
 ):
     dense = densify_phasor(
         ary_phasor, linear_interpolator, dense_ary_freq_axis, embed=True
@@ -350,10 +350,10 @@ def test_densify_phasor_embed_true(
 
 
 def test_array_input_factory_branches(xp: ModuleType):
-    freqs = cast("Array", xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64))
-    times = cast("Array", xp.asarray([0.0, 1.0, 2.0], dtype=xp.float64))
-    fs_entries = cast("Array", xp.ones((1, 1, 1, 1, len(freqs)), dtype=xp.float64))
-    ts_entries = cast("Array", xp.ones((1, 1, 1, 1, len(times)), dtype=xp.float64))
+    freqs = cast("AnyArray", xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64))
+    times = cast("AnyArray", xp.asarray([0.0, 1.0, 2.0], dtype=xp.float64))
+    fs_entries = cast("AnyArray", xp.ones((1, 1, 1, 1, len(freqs)), dtype=xp.float64))
+    ts_entries = cast("AnyArray", xp.ones((1, 1, 1, 1, len(times)), dtype=xp.float64))
 
     fs = frequency_series(freqs, fs_entries)
     ts = time_series(times, ts_entries)
@@ -429,7 +429,7 @@ def test_irfft_rfft_positional_deprecation_paths(
         _ = lin_time_series.rfft(lambda x: lin_time_series.xp.ones_like(x))  # pyright: ignore[reportUnknownLambdaType]
 
 
-def test_uni_ary_phasor(uni_ary_phasor: FrequencyPhasor[Axis[Array]]):
+def test_uni_ary_phasor(uni_ary_phasor: FrequencyPhasor[Axis[AnyArray]]):
     from scipy.interpolate import interp1d
 
     subset = uni_ary_phasor.get_subset(interval=(0.1, 0.5))
@@ -454,7 +454,7 @@ def test_uni_ary_phasor(uni_ary_phasor: FrequencyPhasor[Axis[Array]]):
     assert len(interpolated.frequencies) == 8
 
 
-def test_ary_phasor(ary_phasor: FrequencyPhasor[Axis[Array]]):
+def test_ary_phasor(ary_phasor: FrequencyPhasor[Axis[AnyArray]]):
     from scipy.interpolate import interp1d
 
     subset = ary_phasor.get_subset(interval=(0.1, 0.5))
@@ -508,7 +508,7 @@ def test_lin_lin_cartesian_stft(
 
 
 def test_lin_uni_cartesian_stft(
-    lin_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[Array]]],
+    lin_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[AnyArray]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = lin_uni_cartesian_stft.get_subset(
@@ -536,7 +536,7 @@ def test_lin_uni_cartesian_stft(
 
 
 def test_lin_ary_cartesian_stft(
-    lin_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[Array]]],
+    lin_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[AnyArray]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = lin_ary_cartesian_stft.get_subset(
@@ -564,7 +564,7 @@ def test_lin_ary_cartesian_stft(
 
 
 def test_ary_lin_cartesian_stft(
-    ary_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Linspace]]],
+    ary_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[Linspace]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = ary_lin_cartesian_stft.get_subset(
@@ -592,7 +592,7 @@ def test_ary_lin_cartesian_stft(
 
 
 def test_ary_uni_cartesian_stft(
-    ary_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    ary_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = ary_uni_cartesian_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -621,7 +621,7 @@ def test_ary_uni_cartesian_stft(
 
 
 def test_uni_lin_cartesian_stft(
-    uni_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Linspace]]],
+    uni_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[Linspace]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = uni_lin_cartesian_stft.get_subset(
@@ -649,7 +649,7 @@ def test_uni_lin_cartesian_stft(
 
 
 def test_uni_uni_cartesian_stft(
-    uni_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    uni_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = uni_uni_cartesian_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -678,7 +678,7 @@ def test_uni_uni_cartesian_stft(
 
 
 def test_uni_ary_cartesian_stft(
-    uni_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    uni_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = uni_ary_cartesian_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -707,7 +707,7 @@ def test_uni_ary_cartesian_stft(
 
 
 def test_ary_ary_cartesian_stft(
-    ary_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    ary_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = ary_ary_cartesian_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -763,7 +763,7 @@ def test_lin_lin_sparse_stft(
 
 
 def test_lin_uni_sparse_stft(
-    lin_uni_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[Array]]],
+    lin_uni_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[AnyArray]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = lin_uni_sparse_stft.get_subset(
@@ -790,7 +790,7 @@ def test_lin_uni_sparse_stft(
 
 
 def test_lin_ary_sparse_stft(
-    lin_ary_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[Array]]],
+    lin_ary_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[AnyArray]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = lin_ary_sparse_stft.get_subset(
@@ -817,7 +817,7 @@ def test_lin_ary_sparse_stft(
 
 
 def test_uni_lin_sparse_stft(
-    uni_lin_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Linspace]]],
+    uni_lin_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[Linspace]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = uni_lin_sparse_stft.get_subset(
@@ -844,7 +844,7 @@ def test_uni_lin_sparse_stft(
 
 
 def test_uni_uni_sparse_stft(
-    uni_uni_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    uni_uni_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = uni_uni_sparse_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -872,7 +872,7 @@ def test_uni_uni_sparse_stft(
 
 
 def test_uni_ary_sparse_stft(
-    uni_ary_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    uni_ary_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = uni_ary_sparse_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -900,7 +900,7 @@ def test_uni_ary_sparse_stft(
 
 
 def test_ary_lin_sparse_stft(
-    ary_lin_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Linspace]]],
+    ary_lin_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[Linspace]]],
 ):
     with pytest.raises(ValueError, match="num must be"):
         _ = ary_lin_sparse_stft.get_subset(
@@ -927,7 +927,7 @@ def test_ary_lin_sparse_stft(
 
 
 def test_ary_uni_sparse_stft(
-    ary_uni_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    ary_uni_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = ary_uni_sparse_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -955,7 +955,7 @@ def test_ary_uni_sparse_stft(
 
 
 def test_ary_ary_sparse_stft(
-    ary_ary_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    ary_ary_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     subset = ary_ary_sparse_stft.get_subset(
         time_interval=(0.1, 0.5), freq_interval=(0.1, 0.5)
@@ -1041,9 +1041,9 @@ def test_lin_lin_sparse_wdm(
 
 
 def test_densify_phasor(
-    uni_ary_phasor: FrequencyPhasor[Axis[Array]],
+    uni_ary_phasor: FrequencyPhasor[Axis[AnyArray]],
     linear_interpolator: Interpolator,
-    dense_ary_freq_axis: Axis[Array],
+    dense_ary_freq_axis: Axis[AnyArray],
 ):
     densify_phasor(
         uni_ary_phasor,

@@ -3,7 +3,7 @@ from types import ModuleType
 from typed_lisa_toolkit.types import (
     STFT,
     WDM,
-    Array,
+    AnyArray,
     Axis,
     FrequencySeries,
     FSData,
@@ -37,22 +37,22 @@ def test_lin_freq_axis(lin_freq_axis: Axis[Linspace]):
     assert lin_freq_axis.stop == lin_freq_axis.ax.stop
 
 
-def test_uni_ary_time_axis(uni_ary_time_axis: Axis[Array]):
+def test_uni_ary_time_axis(uni_ary_time_axis: Axis[AnyArray]):
     assert uni_ary_time_axis.start == uni_ary_time_axis.ax[0]
     assert uni_ary_time_axis.stop == uni_ary_time_axis.ax[-1]
 
 
-def test_uni_ary_freq_axis(uni_ary_freq_axis: Axis[Array]):
+def test_uni_ary_freq_axis(uni_ary_freq_axis: Axis[AnyArray]):
     assert uni_ary_freq_axis.start == uni_ary_freq_axis.ax[0]
     assert uni_ary_freq_axis.stop == uni_ary_freq_axis.ax[-1]
 
 
-def test_ary_time_axis(ary_time_axis: Axis[Array]):
+def test_ary_time_axis(ary_time_axis: Axis[AnyArray]):
     assert ary_time_axis.start == ary_time_axis.ax[0]
     assert ary_time_axis.stop == ary_time_axis.ax[-1]
 
 
-def test_ary_freq_axis(ary_freq_axis: Axis[Array]):
+def test_ary_freq_axis(ary_freq_axis: Axis[AnyArray]):
     assert ary_freq_axis.start == ary_freq_axis.ax[0]
     assert ary_freq_axis.stop == ary_freq_axis.ax[-1]
 
@@ -70,22 +70,22 @@ def test_lin_freq_grid1d(lin_freq_grid1d: tuple[Axis[Linspace]]):
     assert isinstance(lin_freq_grid1d[0], Axis)
 
 
-def test_uni_ary_time_grid1d(uni_ary_time_grid1d: tuple[Axis[Array]]):
+def test_uni_ary_time_grid1d(uni_ary_time_grid1d: tuple[Axis[AnyArray]]):
     assert len(uni_ary_time_grid1d) == 1
     assert isinstance(uni_ary_time_grid1d[0], Axis)
 
 
-def test_uni_ary_freq_grid1d(uni_ary_freq_grid1d: tuple[Axis[Array]]):
+def test_uni_ary_freq_grid1d(uni_ary_freq_grid1d: tuple[Axis[AnyArray]]):
     assert len(uni_ary_freq_grid1d) == 1
     assert isinstance(uni_ary_freq_grid1d[0], Axis)
 
 
-def test_ary_time_grid1d(ary_time_grid1d: tuple[Axis[Array]]):
+def test_ary_time_grid1d(ary_time_grid1d: tuple[Axis[AnyArray]]):
     assert len(ary_time_grid1d) == 1
     assert isinstance(ary_time_grid1d[0], Axis)
 
 
-def test_ary_freq_grid1d(ary_freq_grid1d: tuple[Axis[Array]]):
+def test_ary_freq_grid1d(ary_freq_grid1d: tuple[Axis[AnyArray]]):
     assert len(ary_freq_grid1d) == 1
     assert isinstance(ary_freq_grid1d[0], Axis)
 
@@ -96,132 +96,150 @@ def test_lin_lin_cartesian(lin_lin_cartesian: tuple[Axis[Linspace], Axis[Linspac
     assert isinstance(lin_lin_cartesian[1], Axis)
 
 
-def test_lin_ary_cartesian(lin_ary_cartesian: tuple[Axis[Linspace], Axis[Array]]):
+def test_lin_ary_cartesian(lin_ary_cartesian: tuple[Axis[Linspace], Axis[AnyArray]]):
     assert len(lin_ary_cartesian) == 2
     assert isinstance(lin_ary_cartesian[0], Axis)
     assert isinstance(lin_ary_cartesian[1], Axis)
 
 
-def test_ary_lin_cartesian(ary_lin_cartesian: tuple[Axis[Array], Axis[Linspace]]):
+def test_ary_lin_cartesian(ary_lin_cartesian: tuple[Axis[AnyArray], Axis[Linspace]]):
     assert len(ary_lin_cartesian) == 2
     assert isinstance(ary_lin_cartesian[0], Axis)
     assert isinstance(ary_lin_cartesian[1], Axis)
 
 
-def test_ary_ary_cartesian(ary_ary_cartesian: tuple[Axis[Array], Axis[Array]]):
+def test_ary_ary_cartesian(ary_ary_cartesian: tuple[Axis[AnyArray], Axis[AnyArray]]):
     assert len(ary_ary_cartesian) == 2
     assert isinstance(ary_ary_cartesian[0], Axis)
     assert isinstance(ary_ary_cartesian[1], Axis)
 
 
-def test_lin_uni_cartesian(lin_uni_cartesian: tuple[Axis[Linspace], Axis[Array]]):
+def test_lin_uni_cartesian(lin_uni_cartesian: tuple[Axis[Linspace], Axis[AnyArray]]):
     assert len(lin_uni_cartesian) == 2
     assert isinstance(lin_uni_cartesian[0], Axis)
     assert isinstance(lin_uni_cartesian[1], Axis)
 
 
-def test_uni_lin_cartesian(uni_lin_cartesian: tuple[Axis[Array], Axis[Linspace]]):
+def test_uni_lin_cartesian(uni_lin_cartesian: tuple[Axis[AnyArray], Axis[Linspace]]):
     assert len(uni_lin_cartesian) == 2
     assert isinstance(uni_lin_cartesian[0], Axis)
     assert isinstance(uni_lin_cartesian[1], Axis)
 
 
-def test_uni_uni_cartesian(uni_uni_cartesian: tuple[Axis[Array], Axis[Array]]):
+def test_uni_uni_cartesian(uni_uni_cartesian: tuple[Axis[AnyArray], Axis[AnyArray]]):
     assert len(uni_uni_cartesian) == 2
     assert isinstance(uni_uni_cartesian[0], Axis)
     assert isinstance(uni_uni_cartesian[1], Axis)
 
 
-def test_ary_uni_cartesian(ary_uni_cartesian: tuple[Axis[Array], Axis[Array]]):
+def test_ary_uni_cartesian(ary_uni_cartesian: tuple[Axis[AnyArray], Axis[AnyArray]]):
     assert len(ary_uni_cartesian) == 2
     assert isinstance(ary_uni_cartesian[0], Axis)
     assert isinstance(ary_uni_cartesian[1], Axis)
 
 
-def test_uni_ary_cartesian(uni_ary_cartesian: tuple[Axis[Array], Axis[Array]]):
+def test_uni_ary_cartesian(uni_ary_cartesian: tuple[Axis[AnyArray], Axis[AnyArray]]):
     assert len(uni_ary_cartesian) == 2
     assert isinstance(uni_ary_cartesian[0], Axis)
     assert isinstance(uni_ary_cartesian[1], Axis)
 
 
-def test_lin_lin_sparse(lin_lin_sparse: Grid2DSparse[Axis[Linspace], Axis[Linspace]]):
+def test_lin_lin_sparse(
+    xp: ModuleType, lin_lin_sparse: Grid2DSparse[Axis[Linspace], Axis[Linspace]]
+):
     assert len(lin_lin_sparse) == 2
     assert isinstance(lin_lin_sparse[0], Axis)
     assert isinstance(lin_lin_sparse[1], Axis)
-    assert max(lin_lin_sparse.indices[:, 0] <= len(lin_lin_sparse[0].ax))
-    assert max(lin_lin_sparse.indices[:, 1] <= len(lin_lin_sparse[1].ax))
+    assert xp.all(lin_lin_sparse.indices[:, 0] < len(lin_lin_sparse[0].ax))
+    assert xp.all(lin_lin_sparse.indices[:, 1] < len(lin_lin_sparse[1].ax))
     assert lin_lin_sparse.indices.shape[1] == 2
 
 
-def test_lin_uni_sparse(lin_uni_sparse: Grid2DSparse[Axis[Linspace], Axis[Array]]):
+def test_lin_uni_sparse(
+    xp: ModuleType, lin_uni_sparse: Grid2DSparse[Axis[Linspace], Axis[AnyArray]]
+):
     assert len(lin_uni_sparse) == 2
     assert isinstance(lin_uni_sparse[0], Axis)
     assert isinstance(lin_uni_sparse[1], Axis)
-    assert max(lin_uni_sparse.indices[:, 0] <= len(lin_uni_sparse[0].ax))
-    assert max(lin_uni_sparse.indices[:, 1] <= len(lin_uni_sparse[1].ax))
+    assert xp.all(lin_uni_sparse.indices[:, 0] < len(lin_uni_sparse[0].ax))
+    assert xp.all(lin_uni_sparse.indices[:, 1] < len(lin_uni_sparse[1].ax))
     assert lin_uni_sparse.indices.shape[1] == 2
 
 
-def test_lin_ary_sparse(lin_ary_sparse: Grid2DSparse[Axis[Linspace], Axis[Array]]):
+def test_lin_ary_sparse(
+    xp: ModuleType, lin_ary_sparse: Grid2DSparse[Axis[Linspace], Axis[AnyArray]]
+):
     assert len(lin_ary_sparse) == 2
     assert isinstance(lin_ary_sparse[0], Axis)
     assert isinstance(lin_ary_sparse[1], Axis)
-    assert max(lin_ary_sparse.indices[:, 0] <= len(lin_ary_sparse[0].ax))
-    assert max(lin_ary_sparse.indices[:, 1] <= len(lin_ary_sparse[1].ax))
+    assert xp.all(lin_ary_sparse.indices[:, 0] < len(lin_ary_sparse[0].ax))
+    assert xp.all(lin_ary_sparse.indices[:, 1] < len(lin_ary_sparse[1].ax))
     assert lin_ary_sparse.indices.shape[1] == 2
 
 
-def test_uni_lin_sparse(uni_lin_sparse: Grid2DSparse[Axis[Array], Axis[Linspace]]):
+def test_uni_lin_sparse(
+    xp: ModuleType, uni_lin_sparse: Grid2DSparse[Axis[AnyArray], Axis[Linspace]]
+):
     assert len(uni_lin_sparse) == 2
     assert isinstance(uni_lin_sparse[0], Axis)
     assert isinstance(uni_lin_sparse[1], Axis)
-    assert max(uni_lin_sparse.indices[:, 0] <= len(uni_lin_sparse[0].ax))
-    assert max(uni_lin_sparse.indices[:, 1] <= len(uni_lin_sparse[1].ax))
+    assert xp.all(uni_lin_sparse.indices[:, 0] < len(uni_lin_sparse[0].ax))
+    assert xp.all(uni_lin_sparse.indices[:, 1] < len(uni_lin_sparse[1].ax))
     assert uni_lin_sparse.indices.shape[1] == 2
 
 
-def test_uni_uni_sparse(uni_uni_sparse: Grid2DSparse[Axis[Array], Axis[Array]]):
+def test_uni_uni_sparse(
+    xp: ModuleType, uni_uni_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]
+):
     assert len(uni_uni_sparse) == 2
     assert isinstance(uni_uni_sparse[0], Axis)
     assert isinstance(uni_uni_sparse[1], Axis)
-    assert max(uni_uni_sparse.indices[:, 0] <= len(uni_uni_sparse[0].ax))
-    assert max(uni_uni_sparse.indices[:, 1] <= len(uni_uni_sparse[1].ax))
+    assert xp.all(uni_uni_sparse.indices[:, 0] < len(uni_uni_sparse[0].ax))
+    assert xp.all(uni_uni_sparse.indices[:, 1] < len(uni_uni_sparse[1].ax))
     assert uni_uni_sparse.indices.shape[1] == 2
 
 
-def test_uni_ary_sparse(uni_ary_sparse: Grid2DSparse[Axis[Array], Axis[Array]]):
+def test_uni_ary_sparse(
+    xp: ModuleType, uni_ary_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]
+):
     assert len(uni_ary_sparse) == 2
     assert isinstance(uni_ary_sparse[0], Axis)
     assert isinstance(uni_ary_sparse[1], Axis)
-    assert max(uni_ary_sparse.indices[:, 0] <= len(uni_ary_sparse[0].ax))
-    assert max(uni_ary_sparse.indices[:, 1] <= len(uni_ary_sparse[1].ax))
+    assert xp.all(uni_ary_sparse.indices[:, 0] < len(uni_ary_sparse[0].ax))
+    assert xp.all(uni_ary_sparse.indices[:, 1] < len(uni_ary_sparse[1].ax))
     assert uni_ary_sparse.indices.shape[1] == 2
 
 
-def test_ary_lin_sparse(ary_lin_sparse: Grid2DSparse[Axis[Array], Axis[Linspace]]):
+def test_ary_lin_sparse(
+    xp: ModuleType, ary_lin_sparse: Grid2DSparse[Axis[AnyArray], Axis[Linspace]]
+):
     assert len(ary_lin_sparse) == 2
     assert isinstance(ary_lin_sparse[0], Axis)
     assert isinstance(ary_lin_sparse[1], Axis)
-    assert max(ary_lin_sparse.indices[:, 0] <= len(ary_lin_sparse[0].ax))
-    assert max(ary_lin_sparse.indices[:, 1] <= len(ary_lin_sparse[1].ax))
+    assert xp.all(ary_lin_sparse.indices[:, 0] < len(ary_lin_sparse[0].ax))
+    assert xp.all(ary_lin_sparse.indices[:, 1] < len(ary_lin_sparse[1].ax))
     assert ary_lin_sparse.indices.shape[1] == 2
 
 
-def test_ary_uni_sparse(ary_uni_sparse: Grid2DSparse[Axis[Array], Axis[Array]]):
+def test_ary_uni_sparse(
+    xp: ModuleType, ary_uni_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]
+):
     assert len(ary_uni_sparse) == 2
     assert isinstance(ary_uni_sparse[0], Axis)
     assert isinstance(ary_uni_sparse[1], Axis)
-    assert max(ary_uni_sparse.indices[:, 0] <= len(ary_uni_sparse[0].ax))
-    assert max(ary_uni_sparse.indices[:, 1] <= len(ary_uni_sparse[1].ax))
+    assert xp.all(ary_uni_sparse.indices[:, 0] < len(ary_uni_sparse[0].ax))
+    assert xp.all(ary_uni_sparse.indices[:, 1] < len(ary_uni_sparse[1].ax))
     assert ary_uni_sparse.indices.shape[1] == 2
 
 
-def test_ary_ary_sparse(ary_ary_sparse: Grid2DSparse[Axis[Array], Axis[Array]]):
+def test_ary_ary_sparse(
+    xp: ModuleType, ary_ary_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]
+):
     assert len(ary_ary_sparse) == 2
     assert isinstance(ary_ary_sparse[0], Axis)
     assert isinstance(ary_ary_sparse[1], Axis)
-    assert max(ary_ary_sparse.indices[:, 0] <= len(ary_ary_sparse[0].ax))
-    assert max(ary_ary_sparse.indices[:, 1] <= len(ary_ary_sparse[1].ax))
+    assert xp.all(ary_ary_sparse.indices[:, 0] < len(ary_ary_sparse[0].ax))
+    assert xp.all(ary_ary_sparse.indices[:, 1] < len(ary_ary_sparse[1].ax))
     assert ary_ary_sparse.indices.shape[1] == 2
 
 
@@ -242,7 +260,7 @@ def test_lin_freq_series(lin_freq_series: UniformFrequencySeries):
 
 
 def test_uni_ary_freq_series(
-    uni_ary_freq_series: FrequencySeries[Axis[Array]],
+    uni_ary_freq_series: FrequencySeries[Axis[AnyArray]],
 ):
     assert uni_ary_freq_series.domain == "frequency"
     assert uni_ary_freq_series.kind is None
@@ -257,7 +275,7 @@ def test_uni_ary_freq_series(
 
 
 def test_ary_freq_series(
-    ary_freq_series: FrequencySeries[Axis[Array]],
+    ary_freq_series: FrequencySeries[Axis[AnyArray]],
 ):
     assert ary_freq_series.domain == "frequency"
     assert ary_freq_series.kind is None
@@ -285,7 +303,7 @@ def test_lin_time_series(lin_time_series: UniformTimeSeries):
 
 
 def test_uni_ary_time_series(
-    uni_ary_time_series: TimeSeries[Axis[Array]],
+    uni_ary_time_series: TimeSeries[Axis[AnyArray]],
 ):
     assert uni_ary_time_series.domain == "time"
     assert uni_ary_time_series.kind is None
@@ -300,7 +318,7 @@ def test_uni_ary_time_series(
 
 
 def test_ary_time_series(
-    ary_time_series: TimeSeries[Axis[Array]],
+    ary_time_series: TimeSeries[Axis[AnyArray]],
 ):
     assert ary_time_series.domain == "time"
     assert ary_time_series.kind is None
@@ -329,7 +347,7 @@ def test_lin_phasor(xp: ModuleType, lin_freq_phasor: Phasor[Axis[Linspace]]):
     )
 
 
-def test_uni_ary_phasor(xp: ModuleType, uni_ary_phasor: Phasor[Axis[Array]]):
+def test_uni_ary_phasor(xp: ModuleType, uni_ary_phasor: Phasor[Axis[AnyArray]]):
     assert uni_ary_phasor.domain == "frequency"
     assert uni_ary_phasor.kind == "phasor"
     assert not xp.isreal(uni_ary_phasor.amplitudes).any()
@@ -344,7 +362,7 @@ def test_uni_ary_phasor(xp: ModuleType, uni_ary_phasor: Phasor[Axis[Array]]):
     )
 
 
-def test_ary_phasor(xp: ModuleType, ary_phasor: Phasor[Axis[Array]]):
+def test_ary_phasor(xp: ModuleType, ary_phasor: Phasor[Axis[AnyArray]]):
     assert ary_phasor.domain == "frequency"
     assert ary_phasor.kind == "phasor"
     assert not xp.isreal(ary_phasor.amplitudes).any()
@@ -376,7 +394,7 @@ def test_lin_lin_cartesian_stft(
 
 
 def test_lin_uni_cartesian_stft(
-    lin_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[Array]]],
+    lin_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[AnyArray]]],
 ):
     assert lin_uni_cartesian_stft.domain == "time-frequency"
     assert lin_uni_cartesian_stft.kind == "stft"
@@ -392,7 +410,7 @@ def test_lin_uni_cartesian_stft(
 
 
 def test_lin_ary_cartesian_stft(
-    lin_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[Array]]],
+    lin_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Linspace], Axis[AnyArray]]],
 ):
     assert lin_ary_cartesian_stft.domain == "time-frequency"
     assert lin_ary_cartesian_stft.kind == "stft"
@@ -408,7 +426,7 @@ def test_lin_ary_cartesian_stft(
 
 
 def test_ary_lin_cartesian_stft(
-    ary_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Linspace]]],
+    ary_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[Linspace]]],
 ):
     assert ary_lin_cartesian_stft.domain == "time-frequency"
     assert ary_lin_cartesian_stft.kind == "stft"
@@ -424,7 +442,7 @@ def test_ary_lin_cartesian_stft(
 
 
 def test_ary_uni_cartesian_stft(
-    ary_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    ary_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert ary_uni_cartesian_stft.domain == "time-frequency"
     assert ary_uni_cartesian_stft.kind == "stft"
@@ -440,7 +458,7 @@ def test_ary_uni_cartesian_stft(
 
 
 def test_uni_lin_cartesian_stft(
-    uni_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Linspace]]],
+    uni_lin_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[Linspace]]],
 ):
     assert uni_lin_cartesian_stft.domain == "time-frequency"
     assert uni_lin_cartesian_stft.kind == "stft"
@@ -456,7 +474,7 @@ def test_uni_lin_cartesian_stft(
 
 
 def test_uni_uni_cartesian_stft(
-    uni_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    uni_uni_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert uni_uni_cartesian_stft.domain == "time-frequency"
     assert uni_uni_cartesian_stft.kind == "stft"
@@ -472,7 +490,7 @@ def test_uni_uni_cartesian_stft(
 
 
 def test_uni_ary_cartesian_stft(
-    uni_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    uni_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert uni_ary_cartesian_stft.domain == "time-frequency"
     assert uni_ary_cartesian_stft.kind == "stft"
@@ -488,7 +506,7 @@ def test_uni_ary_cartesian_stft(
 
 
 def test_ary_ary_cartesian_stft(
-    ary_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[Array], Axis[Array]]],
+    ary_ary_cartesian_stft: STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert ary_ary_cartesian_stft.domain == "time-frequency"
     assert ary_ary_cartesian_stft.kind == "stft"
@@ -519,7 +537,7 @@ def test_lin_lin_sparse_stft(
 
 
 def test_lin_uni_sparse_stft(
-    lin_uni_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[Array]]],
+    lin_uni_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[AnyArray]]],
 ):
     assert lin_uni_sparse_stft.domain == "time-frequency"
     assert lin_uni_sparse_stft.kind == "stft"
@@ -534,7 +552,7 @@ def test_lin_uni_sparse_stft(
 
 
 def test_lin_ary_sparse_stft(
-    lin_ary_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[Array]]],
+    lin_ary_sparse_stft: STFT[Grid2DSparse[Axis[Linspace], Axis[AnyArray]]],
 ):
     assert lin_ary_sparse_stft.domain == "time-frequency"
     assert lin_ary_sparse_stft.kind == "stft"
@@ -549,7 +567,7 @@ def test_lin_ary_sparse_stft(
 
 
 def test_uni_lin_sparse_stft(
-    uni_lin_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Linspace]]],
+    uni_lin_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[Linspace]]],
 ):
     assert uni_lin_sparse_stft.domain == "time-frequency"
     assert uni_lin_sparse_stft.kind == "stft"
@@ -564,7 +582,7 @@ def test_uni_lin_sparse_stft(
 
 
 def test_uni_uni_sparse_stft(
-    uni_uni_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    uni_uni_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert uni_uni_sparse_stft.domain == "time-frequency"
     assert uni_uni_sparse_stft.kind == "stft"
@@ -579,7 +597,7 @@ def test_uni_uni_sparse_stft(
 
 
 def test_uni_ary_sparse_stft(
-    uni_ary_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    uni_ary_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert uni_ary_sparse_stft.domain == "time-frequency"
     assert uni_ary_sparse_stft.kind == "stft"
@@ -594,7 +612,7 @@ def test_uni_ary_sparse_stft(
 
 
 def test_ary_lin_sparse_stft(
-    ary_lin_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Linspace]]],
+    ary_lin_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[Linspace]]],
 ):
     assert ary_lin_sparse_stft.domain == "time-frequency"
     assert ary_lin_sparse_stft.kind == "stft"
@@ -609,7 +627,7 @@ def test_ary_lin_sparse_stft(
 
 
 def test_ary_uni_sparse_stft(
-    ary_uni_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    ary_uni_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert ary_uni_sparse_stft.domain == "time-frequency"
     assert ary_uni_sparse_stft.kind == "stft"
@@ -624,7 +642,7 @@ def test_ary_uni_sparse_stft(
 
 
 def test_ary_ary_sparse_stft(
-    ary_ary_sparse_stft: STFT[Grid2DSparse[Axis[Array], Axis[Array]]],
+    ary_ary_sparse_stft: STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]],
 ):
     assert ary_ary_sparse_stft.domain == "time-frequency"
     assert ary_ary_sparse_stft.kind == "stft"

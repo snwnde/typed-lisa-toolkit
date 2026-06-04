@@ -22,7 +22,7 @@ import numpy as np
 
 from .. import utils
 from . import modes
-from .misc import AnyAxis, AnyGrid, Array, Domain, Linspace
+from .misc import AnyArray, AnyAxis, AnyGrid, Domain, Linspace
 
 _ModeHM = tuple[int, int]
 _ModeQNM = tuple[int, int, int]
@@ -256,11 +256,11 @@ class HasUnaryOp(Protocol):
     def _unary_op(self, op: Callable[..., Any], /, **kwargs: Any) -> Self: ...
 
 
-class BinaryUnaryOpMixin(NDArrayMixin, abc.ABC):
-    entries: "Array"
+class BinaryUnaryOpMixin[AryT: AnyArray = AnyArray](NDArrayMixin, abc.ABC):
+    entries: "AryT"
 
     @abc.abstractmethod
-    def create_like(self, entries: "Array") -> Self: ...
+    def create_like(self, entries: "AryT") -> Self: ...
 
     @abc.abstractmethod
     def _unwrap(self, other: object) -> object: ...
@@ -331,7 +331,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
     def __init__(
         self,
         grid: "AnyGrid|None" = None,
-        entries: "Array|None" = None,
+        entries: "AnyArray|None" = None,
         channels: tuple[str, ...] | None = None,
         *,
         name: str | None = None,
@@ -346,7 +346,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
             if grid is None or entries is None or channels is None:
                 raise ValueError(msg)
             self._grid: AnyGrid = grid
-            self.entries: Array = entries
+            self.entries: AnyArray = entries
             self._channel_names: tuple[str, ...] = tuple[str, ...](channels)
             try:
                 self._rep_type: type[RepT] = self._REP_TYPE
@@ -392,7 +392,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
             chn: self.__get_repr_by_channel(chn) for chn in self._channel_names
         }
 
-    def create_like(self, entries: "Array") -> Self:
+    def create_like(self, entries: "AnyArray") -> Self:
         return type(self)(
             self.grid,
             entries,
@@ -515,7 +515,7 @@ class ChannelMapping[RepT: "AnyReps"](Mapping[str, RepT], BinaryUnaryOpMixin, ab
     def kind(self) -> str | None:
         """Semantic kind."""
 
-    def get_kernel(self) -> Array:
+    def get_kernel(self) -> AnyArray:
         """Return kernel entries in conventional shape."""
         return self.entries
 
@@ -530,25 +530,25 @@ def validate_maps_to_reps(mapping: Mapping[Any, "AnyReps"], /):
             raise ValueError(msg) from error
 
 
-def to_array(ary: "AnyAxis", xp: ModuleType = np) -> "Array":
+def to_array(ary: "AnyAxis", xp: ModuleType = np) -> "AnyArray":
     """Convert an axis to an array if it is a Linspace, otherwise return it as is."""
     return ary.asarray(xp)
 
 
-def embed_entries_to_grid[GT: "AnyGrid"](
+def embed_entries_to_grid[GT: "AnyGrid", AryT: "AnyArray"](
     source_grid: "AnyGrid",
-    source_entries: "Array",
+    source_entries: AryT,
     embedding_grid: GT,
     *,
     known_slices: tuple[slice, ...] | None = None,
-) -> tuple[GT, "Array"]:
+) -> tuple[GT, AryT]:
     """Embed entries from source grid into a target grid."""
     _embedding_grid = tuple(eg for eg in embedding_grid)
     _source_grid = tuple(sg for sg in source_grid)
     entries = utils.extend_to(_embedding_grid, known_slices=known_slices)(
         _source_grid, source_entries
     )
-    return embedding_grid, entries
+    return embedding_grid, cast("AryT", entries)
 
 
 class HasDomain(Protocol):
@@ -636,7 +636,7 @@ class ModeMapping[ModeT: Mode, VT: _HasXPAndDomain](Mapping[ModeT, VT], NDArrayM
         return self[next(iter(self))].domain
 
     def __xp__(self, api_version: str | None = None) -> ModuleType:
-        """Array namespace from the first harmonic."""
+        """AnyArray namespace from the first harmonic."""
         return self[next(iter(self))].__xp__(api_version=api_version)
 
     def _binary_op(

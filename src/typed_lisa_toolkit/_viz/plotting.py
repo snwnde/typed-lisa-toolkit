@@ -23,8 +23,8 @@ from matplotlib.figure import Figure
 from ..types import (
     STFT,
     WDM,
+    AnyArray,
     AnyAxis,
-    Array,
     Axis,
     FrequencyPhasor,
     FrequencySeries,
@@ -150,7 +150,7 @@ def _guard_shape(obj: LineRep | ImRep) -> None:
         raise ValueError(msg)
 
 
-def _get_times_axis(times: AnyAxis) -> tuple[Array, Unit]:
+def _get_times_axis(times: AnyAxis) -> tuple[AnyArray, Unit]:
     # Default unit is seconds
     duration = times.stop - times.start
     # If the duration is more than a week, use days as the time unit
@@ -171,7 +171,7 @@ def _get_times_axis(times: AnyAxis) -> tuple[Array, Unit]:
     return xaxis, time_unit
 
 
-def _get_freqs_axis(freqs: AnyAxis) -> tuple[Array, Unit]:
+def _get_freqs_axis(freqs: AnyAxis) -> tuple[AnyArray, Unit]:
     # Default unit is Hz
     max_freq = freqs.stop
     # If the maximum frequency is more than 1 kHz, use kHz as the frequency unit
@@ -200,8 +200,8 @@ def _get_freqs_axis(freqs: AnyAxis) -> tuple[Array, Unit]:
 class SingleLine(XYLabel):
     def __init__(
         self,
-        xaxis: Array,
-        line: Array,
+        xaxis: AnyArray,
+        line: AnyArray,
         *,
         xunit: Unit | None = None,
         yunit: Unit | None = None,
@@ -240,7 +240,7 @@ class SingleLine(XYLabel):
 class SingleImage(XYLabel):
     def __init__(
         self,
-        toshow: Array,
+        toshow: AnyArray,
         *,
         extent: tuple[float, float, float, float],
         xunit: Unit | None = None,
@@ -284,7 +284,7 @@ class SingleImage(XYLabel):
         image_kwargs["aspect"] = image_kwargs.get("aspect", "auto")
         image_kwargs["extent"] = image_kwargs.get("extent", self.extent)
         ax.imshow(
-            self.toshow,
+            np.asarray(self.toshow),
             **image_kwargs,
         )
         return ax
@@ -431,7 +431,7 @@ def classify(
             PlotNode(
                 payload=SingleLine(
                     xaxis=xaxis,
-                    line=_ary[i].squeeze(),
+                    line=np.asarray(_ary[i]).squeeze(),
                     xunit=xunit,
                     xname="Time",
                     yname=False,
@@ -439,7 +439,7 @@ def classify(
                 label_ctx=label_ctx,
                 plot_mode="plot",
             )
-            for i in range(obj.entries.shape[0])
+            for i in range(np.asarray(obj.entries).shape[0])
         ]
         return PlotNode(
             children=children,
@@ -454,7 +454,7 @@ def classify(
             PlotNode(
                 payload=SingleLine(
                     xaxis=xaxis,
-                    line=_ary[i].squeeze(),
+                    line=np.asarray(_ary[i]).squeeze(),
                     xunit=xunit,
                     xname="Frequency",
                     yname=False,
@@ -462,7 +462,7 @@ def classify(
                 label_ctx=label_ctx,
                 plot_mode=_plt_mode,
             )
-            for i in range(obj.entries.shape[0])
+            for i in range(np.asarray(obj.entries).shape[0])
         ]
         return PlotNode(
             children=children,
@@ -489,7 +489,7 @@ def classify(
         children = [
             PlotNode(
                 payload=SingleImage(
-                    toshow=obj.abs().entries[i].squeeze(),
+                    toshow=np.asarray(obj.abs().entries[i]).squeeze(),
                     extent=extent,
                     xunit=xunit,
                     yunit=yunit,
@@ -499,7 +499,7 @@ def classify(
                 label_ctx=label_ctx,
                 plot_mode="imshow",
             )
-            for i in range(obj.entries.shape[0])
+            for i in range(np.asarray(obj.entries).shape[0])
         ]
         return PlotNode(
             children=children,

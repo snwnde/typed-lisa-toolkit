@@ -43,6 +43,6 @@ def test_extend_to_1d(xp: ModuleType):
     extended = utils.extend_to(target_grid)(grid, entries)
     # Only indices 3-7 should be filled
     assert extended.shape == (1, 1, 1, 1, 10)
-    assert (extended[..., 3:8] == entries).all()
-    assert (extended[..., :3] == 0).all()
-    assert (extended[..., 8:] == 0).all()
+    assert xp.all(extended[..., 3:8] == entries)
+    assert xp.all(extended[..., :3] == 0)
+    assert xp.all(extended[..., 8:] == 0)

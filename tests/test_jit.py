@@ -22,7 +22,7 @@ import numpy.testing as npt
 from typed_lisa_toolkit import densify_phasor, shop
 from typed_lisa_toolkit.types import (
     WDM,
-    Array,
+    AnyArray,
     Axis,
     EvolutionarySpectralDensity,
     FSData,
@@ -94,9 +94,9 @@ def test_xyz2aet_esdm_jit(esdm: EvolutionarySpectralDensity):
 
 @pytest.mark.parametrize("xp", ["jax"], indirect=True)
 def test_densify_phasor_hw_jit(
-    hw_phasor: HarmonicWaveform[Harmonic, Phasor[Axis[Array]]],
+    hw_phasor: HarmonicWaveform[Harmonic, Phasor[Axis[AnyArray]]],
     linear_interpolator: Interpolator,
-    dense_ary_freq_axis: Axis[Array],
+    dense_ary_freq_axis: Axis[AnyArray],
 ):
     expected = densify_phasor(
         hw_phasor, linear_interpolator, dense_ary_freq_axis, embed=True
@@ -106,15 +106,15 @@ def test_densify_phasor_hw_jit(
     )
     # Verify results match
     hhw_jit = cast(
-        "HarmonicWaveform[Harmonic, Phasor[Axis[Array]]]",
+        "HarmonicWaveform[Harmonic, Phasor[Axis[AnyArray]]]",
         densify_phasor_hw_jit(
             hw_phasor, linear_interpolator, dense_ary_freq_axis, embed=True
         ),
     )
     assert isinstance(hhw_jit, type(expected))
-    assert (
+    assert np.all(
         next(iter(hhw_jit.values())).entries == next(iter(expected.values())).entries
-    ).all()
+    )
 
 
 @pytest.mark.parametrize("xp", ["jax"], indirect=True)
@@ -125,7 +125,7 @@ def test_time2freq_timeseries_jit(
     time2freq_jit = jax.jit(shop.time2freq)  # pyright: ignore[reportUnknownMemberType]
     fs_jit = cast("UniformFrequencySeries", time2freq_jit(lin_time_series))
     assert isinstance(fs_jit, UniformFrequencySeries)
-    assert (fs_jit.entries == expected.entries).all()
+    assert np.all(fs_jit.entries == expected.entries)
 
 
 @pytest.mark.parametrize("xp", ["jax"], indirect=True)
@@ -138,7 +138,7 @@ def test_time2freq_tsdata_jit(
     assert isinstance(fs_jit, TimedFSData)
     assert fs_jit.times == expected.times
     assert fs_jit.frequencies == expected.frequencies
-    assert (fs_jit.entries == expected.entries).all()
+    assert np.all(fs_jit.entries == expected.entries)
 
 
 @pytest.mark.parametrize("xp", ["jax"], indirect=True)
@@ -189,4 +189,4 @@ def test_time2wdm_timeseries_jit(
         time2wdm_jit(long_time_series, Nt=4, Nf=2),
     )
     assert isinstance(wdm_jit, WDM)
-    assert (wdm_jit.entries == expected.entries).all()
+    assert np.all(wdm_jit.entries == expected.entries)

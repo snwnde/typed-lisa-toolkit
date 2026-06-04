@@ -4,12 +4,15 @@ import abc
 import logging
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
+import array_api_compat as xpc
+import numpy as np
+
 from . import data as dm
 from . import modes
 from . import noisemodel as nm
 from . import representations as reps
 from . import waveforms as wf
-from .misc import AnyGrid, Array, Axis, Linspace
+from .misc import AnyArray, AnyGrid, Axis, Linspace
 
 if TYPE_CHECKING:
     AnyReps = reps.Representation[AnyGrid]
@@ -37,14 +40,14 @@ class Likelihood[TemplateT: Any](Protocol):
     def get_log_likelihood(
         self,
         template: TemplateT,
-    ) -> "Array":
+    ) -> "AnyArray":
         """Get the log likelihood."""
         ...
 
     def get_log_likelihood_ratio(
         self,
         template: TemplateT,
-    ) -> "Array":
+    ) -> "AnyArray":
         """Get the log likelihood ratio."""
         ...
 
@@ -65,7 +68,7 @@ class WhittleLikelihood[
     def __init__(self, data: "AnyData", noisemodel: nm.NoiseModelLike[Any, Any]):
         self._data: AnyData = data
         self._noisemodel: nm.NoiseModelLike[Any, Any] = noisemodel
-        self.data_square: Array = self.noisemodel.get_scalar_product(data, data)
+        self.data_square: AnyArray = self.noisemodel.get_scalar_product(data, data)
 
     @property
     def data(self):  # pyright: ignore[reportRedeclaration]
@@ -80,14 +83,26 @@ class WhittleLikelihood[
         return cast("NoiseModelT", self._noisemodel)
 
     @classmethod
-    def log_likelihood_ratio(cls, cross_product: "Array", template_square: "Array"):
+    def log_likelihood_ratio(
+        cls, cross_product: AnyArray | complex, template_square: AnyArray | complex
+    ) -> AnyArray:
         """Compute the log likelihood ratio."""
-        return cross_product - 0.5 * template_square
+        try:
+            xp = xpc.array_namespace(cross_product, template_square)
+        except TypeError:
+            xp = np
+        return xp.asarray(cross_product) - 0.5 * xp.asarray(template_square)
 
     @classmethod
-    def log_likelihood(cls, log_likelihood_ratio: "Array", data_square: "Array"):
+    def log_likelihood(
+        cls, log_likelihood_ratio: AnyArray | complex, data_square: AnyArray | complex
+    ) -> AnyArray:
         """Compute the log likelihood."""
-        return log_likelihood_ratio - 0.5 * data_square
+        try:
+            xp = xpc.array_namespace(log_likelihood_ratio, data_square)
+        except TypeError:
+            xp = np
+        return xp.asarray(log_likelihood_ratio) - 0.5 * xp.asarray(data_square)
 
 
 class FDWhittleLikelihood(WhittleLikelihood[nm.FDNoiseModel]):

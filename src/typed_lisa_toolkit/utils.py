@@ -32,7 +32,7 @@ from typing import Any
 
 import array_api_compat as xpc
 
-from .types.misc import AnyAxis, Array
+from .types.misc import AnyArray, AnyAxis
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ def deprecated(
     return _deprecated(message, package_prefix=package_prefix)
 
 
-def get_subset_slice(increasing_array: Array, /, min: float, max: float):
+def get_subset_slice(increasing_array: AnyArray, /, min: float, max: float):
     """Return the index slice for the subset [min, max] of the increasing array.
 
     Examples
@@ -114,7 +114,9 @@ def get_subset_slice(increasing_array: Array, /, min: float, max: float):
     return slice(start_idx, end_idx)
 
 
-def get_subset_mask[ArrayT: Array](array: ArrayT, /, min: float, max: float) -> ArrayT:
+def get_subset_mask[ArrayT: AnyArray](
+    array: ArrayT, /, min: float, max: float
+) -> ArrayT:
     """Return a boolean mask for the subset [min, max] of the array.
 
     Examples
@@ -126,7 +128,7 @@ def get_subset_mask[ArrayT: Array](array: ArrayT, /, min: float, max: float) -> 
     return xp.logical_and(array >= min, array <= max)
 
 
-def get_support_slice(array: Array):
+def get_support_slice(array: AnyArray):
     """Return the index slice for the support of the array.
 
     If the array is all zeros, the slice returned is empty.
@@ -161,7 +163,7 @@ def extend_to[AT: AnyAxis](
 
     .. code-block:: python
 
-            def get_extension(grid: tuple[AnyAxis, ...], entries: Array) -> Array:
+            def get_extension(grid: tuple[AnyAxis, ...], entries: AnyArray) -> AnyArray:
                 ...
 
     The function extends the entries to the target grid by setting the entries
@@ -201,8 +203,8 @@ def extend_to[AT: AnyAxis](
 
     def get_extension(
         grid: tuple[AnyAxis, ...] | AnyAxis,
-        entries: Array,
-    ) -> Array:
+        entries: AnyArray,
+    ) -> AnyArray:
         _grid = grid if isinstance(grid, tuple) else (grid,)
         xp = xpc.get_namespace(entries)
         # Handle canonical shape:
@@ -262,8 +264,8 @@ def set_env(**environ: Any):
 
 #     @functools.wraps(interpolator)
 #     def _interpolator(
-#         grid: Array,
-#         entries: Array,
+#         grid: AnyArray,
+#         entries: AnyArray,
 #     ) -> ArrayFunc:
 #         support_slice = get_support_slice(entries)
 #         xp = xpc.get_namespace(entries)
@@ -274,7 +276,7 @@ def set_env(**environ: Any):
 #         min = float(trimmed_grid[0])
 #         max = float(trimmed_grid[-1])
 
-#         def _interpolated(target_grid: Array) -> Array:
+#         def _interpolated(target_grid: AnyArray) -> AnyArray:
 #             """Return the interpolated entries at the target grid, zero outside support."""  # noqa: E501
 #             target_support_slice = get_subset_slice(target_grid, min, max)
 #             interp_grid = target_grid[target_support_slice]

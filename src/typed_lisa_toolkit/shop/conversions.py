@@ -7,8 +7,8 @@ from typing import Any, Literal, cast, overload
 import array_api_compat as xpc
 
 from ..types import (
+    AnyArray,
     AnyAxis,
-    Array,
     Axis,
     EvolutionarySpectralDensity,
     Grid2D,
@@ -43,7 +43,7 @@ def get_aet2xyz_matrix(xp: ModuleType):
     return get_xyz2aet_matrix(xp).T
 
 
-def _matrix_mult[VT: Array | ConvertibleReps](matrix: Any, *vectors: VT) -> list[VT]:
+def _matrix_mult[VT: AnyArray | ConvertibleReps](matrix: Any, *vectors: VT) -> list[VT]:
     """Perform matrix multiplication between a 3x3 matrix and three vectors."""
     # We do manually because not all waveforms have an underlying array that we can
     # use for matrix multiplication.
@@ -55,7 +55,7 @@ def _matrix_mult[VT: Array | ConvertibleReps](matrix: Any, *vectors: VT) -> list
     ]
 
 
-def _get_xp(*args: ConvertibleReps | Array):
+def _get_xp(*args: ConvertibleReps | AnyArray):
     try:
         return xpc.get_namespace(*args)
     except TypeError:
@@ -64,14 +64,14 @@ def _get_xp(*args: ConvertibleReps | Array):
         )
 
 
-def _xyz2aet[VT: Array | ConvertibleReps](X: VT, Y: VT, Z: VT) -> tuple[VT, VT, VT]:  # noqa: N803
+def _xyz2aet[VT: AnyArray | ConvertibleReps](X: VT, Y: VT, Z: VT) -> tuple[VT, VT, VT]:  # noqa: N803
     xp = _get_xp(X, Y, Z)
     xyz2aet_matrix = get_xyz2aet_matrix(xp)
     A, E, T = _matrix_mult(xyz2aet_matrix, X, Y, Z)  # noqa: N806
     return A, E, T
 
 
-def _aet2xyz[VT: Array | ConvertibleReps](A: VT, E: VT, T: VT) -> tuple[VT, VT, VT]:  # noqa: N803
+def _aet2xyz[VT: AnyArray | ConvertibleReps](A: VT, E: VT, T: VT) -> tuple[VT, VT, VT]:  # noqa: N803
     xp = _get_xp(A, E, T)
     aet2xyz_matrix = get_aet2xyz_matrix(xp)
     X, Y, Z = _matrix_mult(aet2xyz_matrix, A, E, T)  # noqa: N806
@@ -172,7 +172,9 @@ def _convert_spectral_density[SDT: SpectralDensity | EvolutionarySpectralDensity
     )
 
 
-def _convert_array(xyz: Array, /, *, direction: Literal["xyz2aet", "aet2xyz"]) -> Array:
+def _convert_array(
+    xyz: AnyArray, /, *, direction: Literal["xyz2aet", "aet2xyz"]
+) -> AnyArray:
     xp = xpc.get_namespace(xyz)
     num_channels = 3
     if direction == "xyz2aet":
@@ -196,7 +198,7 @@ def _convert_array(xyz: Array, /, *, direction: Literal["xyz2aet", "aet2xyz"]) -
 
 _ConvertibleTypes = (
     Mapping[str, ConvertibleReps]
-    | Array
+    | AnyArray
     | SpectralDensity
     | EvolutionarySpectralDensity
 )
@@ -207,7 +209,7 @@ def xyz2aet[MapT: Mapping[str, ConvertibleReps]](xyz: MapT, /) -> MapT: ...
 
 
 @overload
-def xyz2aet(xyz: Array, /) -> Array: ...
+def xyz2aet(xyz: AnyArray, /) -> AnyArray: ...
 
 
 @overload
@@ -221,19 +223,19 @@ def xyz2aet(xyz: EvolutionarySpectralDensity, /) -> EvolutionarySpectralDensity:
 @overload
 def xyz2aet(
     *,
-    X: Array,  # noqa: N803
-    Y: Array,  # noqa: N803
-    Z: Array,  # noqa: N803
-) -> tuple[Array, Array, Array]: ...
+    X: AnyArray,  # noqa: N803
+    Y: AnyArray,  # noqa: N803
+    Z: AnyArray,  # noqa: N803
+) -> tuple[AnyArray, AnyArray, AnyArray]: ...
 
 
 def xyz2aet(
     xyz: _ConvertibleTypes | None = None,
     /,
     *,
-    X: Array | None = None,  # noqa: N803
-    Y: Array | None = None,  # noqa: N803
-    Z: Array | None = None,  # noqa: N803
+    X: AnyArray | None = None,  # noqa: N803
+    Y: AnyArray | None = None,  # noqa: N803
+    Z: AnyArray | None = None,  # noqa: N803
 ):
     """Convert :ref:`data <data_types>`, :ref:`waveforms <waveform_types>` or :ref:`spectral density matrices <spectral_density_matrices>` in XYZ channels to AET channels.
 
@@ -260,7 +262,7 @@ def aet2xyz[MapT: Mapping[str, ConvertibleReps]](aet: MapT, /) -> MapT: ...
 
 
 @overload
-def aet2xyz(aet: Array, /) -> Array: ...
+def aet2xyz(aet: AnyArray, /) -> AnyArray: ...
 
 
 @overload
@@ -274,19 +276,19 @@ def aet2xyz(aet: EvolutionarySpectralDensity, /) -> EvolutionarySpectralDensity:
 @overload
 def aet2xyz(
     *,
-    A: Array,  # noqa: N803
-    E: Array,  # noqa: N803
-    T: Array,  # noqa: N803
-) -> tuple[Array, Array, Array]: ...
+    A: AnyArray,  # noqa: N803
+    E: AnyArray,  # noqa: N803
+    T: AnyArray,  # noqa: N803
+) -> tuple[AnyArray, AnyArray, AnyArray]: ...
 
 
 def aet2xyz(
     aet: _ConvertibleTypes | None = None,
     /,
     *,
-    A: Array | None = None,  # noqa: N803
-    E: Array | None = None,  # noqa: N803
-    T: Array | None = None,  # noqa: N803
+    A: AnyArray | None = None,  # noqa: N803
+    E: AnyArray | None = None,  # noqa: N803
+    T: AnyArray | None = None,  # noqa: N803
 ):
     """Convert :ref:`data <data_types>`, :ref:`waveforms <waveform_types>` or :ref:`spectral density matrices <spectral_density_matrices>` in AET channels to XYZ channels.
 

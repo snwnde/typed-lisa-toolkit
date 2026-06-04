@@ -5,7 +5,6 @@ import logging
 from collections.abc import Callable
 from types import ModuleType
 from typing import (
-    TYPE_CHECKING,
     Any,
     Literal,
     Self,
@@ -15,32 +14,23 @@ from typing import (
 )
 
 import array_api_compat as xpc
+import l2d_interface.array
 import numpy as np
 import numpy.typing as npt
 
-if TYPE_CHECKING:
-    import jax
-    import jax.typing as jpt
-
-    type JaxArrayLike = jpt.ArrayLike
-    type JaxArray = jax.Array
-else:
-    type JaxArrayLike = npt.ArrayLike
-    type JaxArray = npt.NDArray[np.number]
-
-type ArrayLike = JaxArrayLike | npt.ArrayLike
-type Array = JaxArray | npt.NDArray[np.number]
+ArrayLike = Any
+Array = l2d_interface.array.Array
 """An array from any array library supporting the Python Array API standard.
 
 Currently only NumPy and JAX arrays have been tested, but in principle any array
 library that implements the Python Array API standard should be compatible.
 """
+AnyArray = Array[Any] | npt.NDArray[Any]
 
-
-ArrayFunc = Callable[[Array], Array]
+ArrayFunc = Callable[[AnyArray], AnyArray]
 """A callable that takes an :class:`array <.Array>` as input and returns an :class:`array <.Array>` as output."""  # noqa: E501
 
-Interpolator = Callable[[Array, Array], ArrayFunc]
+Interpolator = Callable[[AnyArray, AnyArray], ArrayFunc]
 """A callable providing interpolation functionality.
 
 
@@ -134,21 +124,34 @@ class Linspace:
         """Return the string representation of the array."""
         return f"Linspace(start={self.start}, step={self.step}, num={self.num})"
 
-    def __array__(
+    @overload
+    def __array__[DT: np.floating](
         self,
-        dtype: "npt.DTypeLike | None" = None,
+        dtype: DT,
         *,
         copy: bool | None = None,
-    ) -> "npt.NDArray[np.floating]":
+    ) -> "npt.NDArray[DT]": ...
+    @overload
+    def __array__(
+        self,
+        dtype: None = None,
+        *,
+        copy: bool | None = None,
+    ) -> "npt.NDArray[np.float64]": ...
+    def __array__(
+        self,
+        dtype: "np.floating | None" = None,
+        *,
+        copy: bool | None = None,
+    ):
         """Return the grid as a numpy array."""
         grid = self.start + self.step * np.arange(self.num, dtype=dtype)
         if copy is False:
             return grid
-        return np.array(grid, copy=True)
+        return np.array(grid, copy=True, dtype=dtype)
 
     @overload
     def __getitem__(self, slice: _slice, /) -> Self: ...
-
     @overload
     def __getitem__(self, idx: int, /) -> float: ...
 
@@ -189,26 +192,40 @@ class Linspace:
             return grid.step
         return linspace_from_array(grid).step
 
+    @overload
+    def asarray[DT: Any, MT: ModuleType](
+        self,
+        xp: MT,
+        *,
+        dtype: DT,
+    ) -> Array[DT, MT]: ...
+    @overload
+    def asarray[MT: Any](
+        self,
+        xp: MT,
+        *,
+        dtype: None = None,
+    ) -> Array[Any, MT]: ...
     def asarray(
         self,
         xp: ModuleType,
         *,
-        dtype: "npt.DTypeLike | jax.typing.DTypeLike | None" = None,
-    ) -> "Array":
+        dtype: Any | None = None,
+    ):
         """Return the linspace as an array in the specified array library."""
         return xp.asarray(self, dtype=dtype)
 
 
 @final
-class Axis[T: Array | Linspace]:  # noqa: PLW1641
+class Axis[T: AnyArray | Linspace, MT: ModuleType = ModuleType]:  # noqa: PLW1641
     """An axis of a grid."""
 
-    def __init__(self, ax: ArrayLike | Linspace, *, xp: ModuleType):
+    def __init__(self, ax: ArrayLike | Linspace, *, xp: MT):
         if isinstance(ax, Linspace):
             self._ax = ax
         else:
             self._ax = xp.asarray(ax)
-        self.xp: ModuleType = xp
+        self.xp = xp
 
     def __repr__(self) -> str:
         """Return the string representation of the axis."""
@@ -223,19 +240,19 @@ class Axis[T: Array | Linspace]:  # noqa: PLW1641
                 return False
             if not isinstance(self.ax, Linspace) and isinstance(other.ax, Linspace):
                 return False
-            return bool((self.asarray() == other.asarray()).all())
+            return bool(self.xp.all(self.asarray() == other.asarray()))
         return False
 
     def __array__(
         self,
-        dtype: "npt.DTypeLike | jax.typing.DTypeLike | None" = None,
+        dtype: Any | None = None,
         *,
         copy: bool | None = None,
-    ) -> "Array":
+    ) -> Array[Any, MT]:
         """Return the axis as an array."""
         if isinstance(self.ax, Linspace):
-            return self.ax.__array__(dtype=dtype, copy=copy)
-        return np.asarray(self.ax, dtype=dtype, copy=copy)
+            return cast("Array[Any, MT]", self.ax.__array__(dtype=dtype, copy=copy))
+        return cast("Array[Any, MT]", np.asarray(self.ax, dtype=dtype, copy=copy))
 
     def __deepcopy__(self, memo: dict[int, Any]):
         """Return a deepcopy of the axis without copying the array namespace."""
@@ -263,6 +280,8 @@ class Axis[T: Array | Linspace]:  # noqa: PLW1641
         if isinstance(sli, _slice):
             return type(self)(self.ax[sli], xp=self.xp)
         if isinstance(sli, int):
+            if isinstance(self.ax, Linspace):
+                return self.ax[sli]
             return float(self.ax[sli])
         msg = f"Invalid index {sli} for AnyAxis. Must be an integer or a slice."
         raise TypeError(msg)
@@ -277,22 +296,47 @@ class Axis[T: Array | Linspace]:  # noqa: PLW1641
         """The last point of the axis."""
         return cast("float", self.ax[-1])
 
+    @overload
+    def asarray[DT: Any, MT2: ModuleType](
+        self,
+        xp: MT2,
+        *,
+        dtype: DT,
+    ) -> Array[DT, MT2]: ...
+    @overload
+    def asarray[MT2: ModuleType](
+        self,
+        xp: MT2,
+        *,
+        dtype: None = None,
+    ) -> Array[Any, MT2]: ...
+    @overload
+    def asarray[DT: Any](
+        self,
+        xp: None = None,
+        *,
+        dtype: DT,
+    ) -> Array[DT, MT]: ...
+    @overload
+    def asarray(
+        self,
+        xp: None = None,
+        *,
+        dtype: None = None,
+    ) -> Array[Any, MT]: ...
     def asarray(
         self,
         xp: ModuleType | None = None,
         *,
-        dtype: "npt.DTypeLike | jax.typing.DTypeLike | None" = None,
-    ) -> "Array":
+        dtype: Any | None = None,
+    ):
         """Return the axis as an array in the specified array library."""
         xp = self.xp if xp is None else xp
         return xp.asarray(self.ax, dtype=dtype)
 
 
-AxLike = Array | Linspace
+AxLike = AnyArray | Linspace
 AnyAxis = Axis[AxLike]
-
-# AnyAxis = _ArrayAxis | Linspace
-# """An axis of a grid, which can be either an :class:`array <.Array>` or a :class:`Linspace`."""  # noqa: E501
 
 
 def linspace_from_step(start: float, step: float, num: int) -> Linspace:
@@ -321,7 +365,7 @@ def linspace_from_array(array: ArrayLike) -> Linspace:
     return linspace(start=float(_array[0]), stop=float(_array[-1]), num=len(_array))
 
 
-def axis[AT: Array | Linspace](ax: AT, /) -> Axis[AT]:
+def axis[AT: AnyArray | Linspace](ax: AT, /) -> Axis[AT]:
     """Create an :class:`~types.Axis` instance."""
     if isinstance(ax, Linspace):
         return Axis[AT](ax, xp=np)
@@ -332,7 +376,7 @@ def axis[AT: Array | Linspace](ax: AT, /) -> Axis[AT]:
 class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:  # noqa: PLW1641
     """Class for a sparse 2D grid."""
 
-    indices: Array
+    indices: AnyArray
     """
     The indices of the non-empty points in the grid, represented as an array of shape
     ``(n_sparse_points, 2)`` where each row is a pair of indices corresponding to the
@@ -349,7 +393,7 @@ class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:  # noqa: PLW1641
         """The second axis of the grid."""
         return cast("Axis1", self._axis1)
 
-    def __init__(self, axis0: AnyAxis, axis1: AnyAxis, *, sparse_indices: Array):
+    def __init__(self, axis0: AnyAxis, axis1: AnyAxis, *, sparse_indices: AnyArray):
         self._axis0: AnyAxis = axis0
         self._axis1: AnyAxis = axis1
         self.indices = sparse_indices
@@ -393,7 +437,8 @@ class Grid2DSparse[Axis0: AnyAxis, Axis1: AnyAxis]:  # noqa: PLW1641
             return False
         if self.axis1 != other.axis1:
             return False
-        return bool((self.indices == other.indices).all())
+        xp = xpc.get_namespace(self.indices)
+        return bool(xp.all(self.indices == other.indices))
 
 
 type Grid1D[AxisT: "AnyAxis"] = tuple[AxisT]
@@ -435,7 +480,7 @@ def build_grid2d[Axis0: AnyAxis, Axis1: AnyAxis](
     axis1: Axis1,
     /,
     *,
-    sparse_indices: Array,
+    sparse_indices: AnyArray,
 ) -> Grid2DSparse[Axis0, Axis1]: ...
 
 
@@ -465,7 +510,7 @@ def build_grid2d[A0: AxLike, A1: AxLike](
     axis1: A1,
     /,
     *,
-    sparse_indices: Array,
+    sparse_indices: AnyArray,
 ) -> Grid2DSparse[Axis[A0], Axis[A1]]: ...
 
 
@@ -475,7 +520,7 @@ def build_grid2d[Axis0: AnyAxis, A1: AxLike](
     axis1: A1,
     /,
     *,
-    sparse_indices: Array,
+    sparse_indices: AnyArray,
 ) -> Grid2DSparse[Axis0, Axis[A1]]: ...
 
 
@@ -484,7 +529,7 @@ def build_grid2d(
     axis1: AxLike | AnyAxis,
     /,
     *,
-    sparse_indices: Array | None = None,
+    sparse_indices: AnyArray | None = None,
 ):
     """Build a :class:`~typed_lisa_toolkit.types.misc.Grid2D`, either :class:`dense <typed_lisa_toolkit.types.misc.Grid2DCartesian>` or :class:`sparse <typed_lisa_toolkit.types.misc.Grid2DSparse>`."""  # noqa: E501
     _axis0 = axis(axis0) if not isinstance(axis0, Axis) else axis0

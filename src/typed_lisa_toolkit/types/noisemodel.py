@@ -18,7 +18,7 @@ from .. import utils
 from . import _mixins, waveforms
 from . import data as dm
 from . import representations as reps
-from .misc import AnyAxis, Array, Axis, Domain, Grid2D, Linspace, axis
+from .misc import AnyArray, AnyAxis, Axis, Domain, Grid2D, Linspace, axis
 
 
 def _import_quadax() -> ModuleType:
@@ -72,9 +72,9 @@ class IntegrationPolicy(Protocol):
 
     def integrate(
         self,
-        __y: "Array",  # noqa: PYI063
+        __y: "AnyArray",  # noqa: PYI063
         *,
-        x: Union["Array", None] = None,
+        x: Union["AnyArray", None] = None,
         **kwargs: Any,
     ) -> Any:
         """Integrate the given dm."""
@@ -82,9 +82,9 @@ class IntegrationPolicy(Protocol):
 
     def cumulative(
         self,
-        __y: "Array",  # noqa: PYI063
+        __y: "AnyArray",  # noqa: PYI063
         *,
-        x: Union["Array", None] = None,
+        x: Union["AnyArray", None] = None,
         **kwargs: Any,
     ) -> Any:
         """Integrate the given data cumulatively."""
@@ -102,9 +102,9 @@ class _IntegrationPolicy(IntegrationPolicy):
 
     def integrate(
         self,
-        __y: "Array",  # noqa: PYI063
+        __y: "AnyArray",  # noqa: PYI063
         *,
-        x: Union["Array", None] = None,
+        x: Union["AnyArray", None] = None,
         **kwargs: Any,
     ) -> Any:
         scipy_integrate = _import_scipy_integrate()
@@ -114,9 +114,9 @@ class _IntegrationPolicy(IntegrationPolicy):
 
     def cumulative(
         self,
-        __y: "Array",  # noqa: PYI063
+        __y: "AnyArray",  # noqa: PYI063
         *,
-        x: Union["Array", None] = None,
+        x: Union["AnyArray", None] = None,
         **kwargs: Any,
     ) -> Any:
         scipy_integrate = _import_scipy_integrate()
@@ -136,9 +136,9 @@ class _JaxIntegrationPolicy(IntegrationPolicy):
 
     def integrate(
         self,
-        __y: "Array",  # noqa: PYI063
+        __y: "AnyArray",  # noqa: PYI063
         *,
-        x: Union["Array", None] = None,
+        x: Union["AnyArray", None] = None,
         **kwargs: Any,
     ) -> Any:
         quadax = _import_quadax()
@@ -146,9 +146,9 @@ class _JaxIntegrationPolicy(IntegrationPolicy):
 
     def cumulative(
         self,
-        __y: "Array",  # noqa: PYI063
+        __y: "AnyArray",  # noqa: PYI063
         *,
-        x: Union["Array", None] = None,
+        x: Union["AnyArray", None] = None,
         **kwargs: Any,
     ) -> Any:
         quadax = _import_quadax()
@@ -174,7 +174,7 @@ def _make_integration_policy(
 class _StationaryFDNoise(Protocol):
     """Protocol for frequency domain stationary noise PSD models."""
 
-    def psd(self, _frequencies: "Array", _chname: ChnName) -> "Array":
+    def psd(self, _frequencies: "AnyArray", _chname: ChnName) -> "AnyArray":
         """Return the power spectral density (PSD) values on the given frequency grid for the specified channel."""  # noqa: E501
         ...
 
@@ -198,13 +198,13 @@ class SpectralDensity:
 
     def __init__(
         self,
-        frequencies: "Array",
-        inverse_sdm: "Array",
+        frequencies: "AnyArray",
+        inverse_sdm: "AnyArray",
         channel_order: Sequence[ChnName],
     ):
         # kernel shape: (n_freqs, n_channels, n_channels)
-        self._frequencies: Array = frequencies
-        self._inverse_sdm: Array = inverse_sdm
+        self._frequencies: AnyArray = frequencies
+        self._inverse_sdm: AnyArray = inverse_sdm
         self.channel_order: tuple[ChnName, ...] = tuple(channel_order)
 
     def to_subband(self, f_interval: tuple[float, float]) -> Self:
@@ -217,7 +217,7 @@ class SpectralDensity:
             self.channel_order,
         )
 
-    def get_kernel(self, backend: str | None = None) -> "Array":
+    def get_kernel(self, backend: str | None = None) -> "AnyArray":
         """Return the inverse of the spectral density matrix.
 
         The inverse SDM is returned as an array of shape
@@ -233,7 +233,7 @@ class SpectralDensity:
     def get_whitening_matrix(
         self,
         kind: Literal["cholesky"] | None = "cholesky",
-    ) -> "Array":
+    ) -> "AnyArray":
         r"""Return whitening matrix :math:`W` with shape ``(n_freqs, n_channels, n_channels)``.
 
         The whitening matrix represents a linear transformation that
@@ -274,7 +274,7 @@ class DiagonalSpectralDensity(SpectralDensity):
     def from_fd_noise(
         cls,
         fd_noise: _StationaryFDNoise,
-        frequencies: "Array",
+        frequencies: "AnyArray",
         channel_names: tuple[ChnName, ...],
     ):
         """Create a SpectralDensity instance from a frequency domain noise model and a frequency grid."""  # noqa: E501
@@ -292,7 +292,9 @@ class DiagonalSpectralDensity(SpectralDensity):
         )  # (n_freqs, n_channels, n_channels)
         return cls(frequencies, kernel, channel_names)
 
-    def get_whitening_matrix(self, kind: Literal["cholesky"] | None = None) -> "Array":
+    def get_whitening_matrix(
+        self, kind: Literal["cholesky"] | None = None
+    ) -> "AnyArray":
         r"""Return whitening matrix :math:`W` with shape ``(n_freqs, n_channels, n_channels)``.
 
         The whitening matrix represents a linear transformation that
@@ -318,12 +320,15 @@ class _EntryInDomain[DomainT: Domain](Protocol):
         """Return the domain of the entry."""
         ...
 
-    def get_kernel(self) -> "Array":
+    def get_kernel(self) -> "AnyArray":
         """Return the kernel array of the entry."""
         ...
 
 
-class NoiseModelLike[EntryT1: _EntryInDomain[Domain], EntryT2: _EntryInDomain[Domain]](
+class NoiseModelLike[
+    EntryT1: _EntryInDomain[Domain],
+    EntryT2: _EntryInDomain[Domain],
+](
     Protocol,
 ):
     """Protocol for noise models."""
@@ -332,7 +337,7 @@ class NoiseModelLike[EntryT1: _EntryInDomain[Domain], EntryT2: _EntryInDomain[Do
         self,
         left: EntryT1 | EntryT2,
         right: EntryT1 | EntryT2,
-    ) -> "Array":
+    ) -> AnyArray:
         """Return the scalar product."""
         ...
 
@@ -383,7 +388,7 @@ class FDNoiseModel(
         self.sdm = self._sdm_orig_.to_subband(f_interval)
         return self
 
-    def _get_whitened_entries(self, _data: FDEntry) -> "Array":
+    def _get_whitened_entries(self, _data: FDEntry) -> "AnyArray":
         """Return the whitened kernel entries of the given dm."""
         kernel = _data.get_kernel()  # (n_batches, n_ch, 1, 1, n_freqs)
         xp = xpc.array_namespace(kernel)
@@ -395,7 +400,7 @@ class FDNoiseModel(
         self,
         left: FDEntry,
         right: FDEntry,
-    ) -> "Array":
+    ) -> "AnyArray":
         r"""Return the frequency-domain inner-product integrand.
 
         Computes :math:`4\, d^*(f)\, S_n^{-1}(f)\, h(f)` at each frequency bin,
@@ -411,12 +416,12 @@ class FDNoiseModel(
                 diag = xp.linalg.diagonal(
                     self.sdm.get_kernel(),
                 )  # shape (n_freqs, n_channels)
-                return (4 * _left.conj() * _right) * diag.T[None, :, None, None, :]
+                return (4 * xp.conj(_left) * _right) * diag.T[None, :, None, None, :]
         except AttributeError:
             pass
         return 4 * xp.einsum(
             "...fi,fij,...fj->...f",
-            xp.moveaxis(_left.conj(), 1, -1),
+            xp.moveaxis(xp.conj(_left), 1, -1),
             xp.astype(self.sdm.get_kernel(), _left.dtype),
             xp.moveaxis(_right, 1, -1),
         )
@@ -425,7 +430,7 @@ class FDNoiseModel(
         self,
         left: FDEntry,
         right: FDEntry,
-    ) -> "Array":
+    ) -> "AnyArray":
         r"""Return the complex scalar product.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`,
@@ -448,7 +453,7 @@ class FDNoiseModel(
         self,
         left: FDEntry,
         right: FDEntry,
-    ) -> "Array":
+    ) -> "AnyArray":
         r"""Return the cumulative complex scalar product.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`,
@@ -474,7 +479,7 @@ class FDNoiseModel(
         self,
         left: FDEntry,
         right: FDEntry,
-    ) -> "Array":
+    ) -> "AnyArray":
         r"""Return the scalar product.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`,
@@ -486,16 +491,17 @@ class FDNoiseModel(
             \left( d \middle| h \right) = 4 \Re \int_{f_\text{min}}^{f_\text{max}}
             \frac{d^*(f) h(f)}{S_n(f)} \, \mathrm{d} f.
         """
-        return self.get_complex_scalar_product(left, right).real
+        xp = xpc.array_namespace(_first_entries(left))
+        return xp.real(self.get_complex_scalar_product(left, right))
 
-    inner: Callable[..., "Array"] = get_scalar_product
+    inner: Callable[..., "AnyArray"] = get_scalar_product
     """Alias for :meth:`get_scalar_product`."""
 
     def get_cumulative_scalar_product(
         self,
         left: FDEntry,
         right: FDEntry,
-    ) -> "Array":
+    ) -> "AnyArray":
         r"""Return the cumulative scalar product.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`,
@@ -509,7 +515,8 @@ class FDNoiseModel(
             F \mapsto 4\Re \int_{f_\text{min}}^{F} \frac{d^*(f)
             h(f)}{S_n(f)} \, \mathrm{d} f.
         """
-        return self.get_cumulative_complex_scalar_product(left, right).real
+        xp = xpc.array_namespace(_first_entries(left))
+        return xp.real(self.get_cumulative_complex_scalar_product(left, right))
 
     def get_cross_correlation(
         self,
@@ -583,7 +590,7 @@ class FDNoiseModel(
         whitened_k = xp.moveaxis(whitened_e, -1, 1)[:, :, None, None, :]
         return _data.create_like(whitened_k)
 
-    def get_overlap(self, left: FDEntry, right: FDEntry) -> "Array":
+    def get_overlap(self, left: FDEntry, right: FDEntry) -> "AnyArray":
         r"""Return the overlap.
 
         Assuming `left` is :math:`d`, `right` is :math:`h`,
@@ -610,9 +617,9 @@ class EvolutionarySpectralDensity:
 
     def __init__(
         self,
-        frequencies: "Array",
-        times: "Array",
-        inverse_esdm: "Array",
+        frequencies: "AnyArray",
+        times: "AnyArray",
+        inverse_esdm: "AnyArray",
         channel_order: Sequence[ChnName],
     ):
         _ = self.is_valid_sdm(
@@ -621,12 +628,12 @@ class EvolutionarySpectralDensity:
             channel_order=channel_order,
         )
         # kernel shape: (n_freqs, n_times, n_channels, n_channels)
-        self._frequencies: Array = frequencies
-        self._times: Array = times
-        self._inverse_esdm: Array = inverse_esdm
+        self._frequencies: AnyArray = frequencies
+        self._times: AnyArray = times
+        self._inverse_esdm: AnyArray = inverse_esdm
         self.channel_order: tuple[ChnName, ...] = tuple(channel_order)
 
-    def get_kernel(self, backend: str | None = None) -> "Array":
+    def get_kernel(self, backend: str | None = None) -> "AnyArray":
         """Return the inverse of the evolutionary spectral density matrix.
 
         The returned array has shape ``(n_freqs, n_times, n_channels, n_channels)``.
@@ -638,7 +645,7 @@ class EvolutionarySpectralDensity:
 
     @staticmethod
     def is_valid_sdm(
-        _evsdm_or_invevsdm: "Array",
+        _evsdm_or_invevsdm: "AnyArray",
         /,
         *,
         channel_order: Sequence[ChnName],
@@ -671,7 +678,9 @@ class EvolutionarySpectralDensity:
             return False
         return True
 
-    def get_whitening_matrix(self, kind: Literal["cholesky"] = "cholesky") -> "Array":
+    def get_whitening_matrix(
+        self, kind: Literal["cholesky"] = "cholesky"
+    ) -> "AnyArray":
         r"""Return whitening matrix :math:`W` with shape ``(n_freqs, n_times, n_channels, n_channels)``.
 
         .. note::
@@ -723,7 +732,7 @@ class TFNoiseModel:
     ):
         self.esd: EvolutionarySpectralDensity = esd
 
-    def _get_whitened_entries(self, _data: TFEntry) -> "Array":
+    def _get_whitened_entries(self, _data: TFEntry) -> "AnyArray":
         """Return the whitened kernel entries of the given dm."""
         kernel = _data.get_kernel()  # (n_batches, n_ch, 1, 1, n_freqs, n_times)
         xp = xpc.array_namespace(kernel)
@@ -737,23 +746,21 @@ class TFNoiseModel:
         self,
         left: TFEntry,
         right: TFEntry,
-    ) -> "Array":
+    ) -> "AnyArray":
         """Return the scalar product."""
         _left = left.get_kernel()  # shape (n_batches, n_channels, 1, 1, n_freq, n_time)
         _right = right.get_kernel()  # same shape as _left
         xp = xpc.array_namespace(_left)
-        return (
+        return xp.real(
             xp.einsum(
                 "...fti,ftij,...ftj->...ft",
-                xp.moveaxis(_left.conj(), 1, -1),
+                xp.moveaxis(xp.conj(_left), 1, -1),
                 self.esd.get_kernel(),
                 xp.moveaxis(_right, 1, -1),
-            )
-            .sum()
-            .real
+            ).sum()
         )
 
-    inner: Callable[..., "Array"] = get_scalar_product
+    inner: Callable[..., "AnyArray"] = get_scalar_product
     """Alias for :meth:`get_scalar_product`."""
 
     def whiten(self, _data: TFEntry) -> TFEntry:
@@ -762,7 +769,7 @@ class TFNoiseModel:
         return _data.create_like(whitened_array)
 
 
-def _validate_shape(entries: "Array", expected_shape: tuple[int, ...]) -> None:
+def _validate_shape(entries: "AnyArray", expected_shape: tuple[int, ...]) -> None:
     if entries.shape != expected_shape:
         msg = (
             "Invalid shape for `inverse_sdm`. "
@@ -773,60 +780,60 @@ def _validate_shape(entries: "Array", expected_shape: tuple[int, ...]) -> None:
 
 @overload
 def make_sdm(
-    inverse_sdm: "Array",
+    inverse_sdm: "AnyArray",
     /,
     *,
-    frequencies: Array | AnyAxis,
+    frequencies: AnyArray | AnyAxis,
     channel_names: Sequence[ChnName],
     times: None = None,
     is_diagonal: Literal[False] = False,
 ) -> SpectralDensity: ...
 @overload
 def make_sdm(
-    inverse_sdm: "Array",
+    inverse_sdm: "AnyArray",
     /,
     *,
-    frequencies: Array | AnyAxis,
+    frequencies: AnyArray | AnyAxis,
     channel_names: Sequence[ChnName],
     is_diagonal: Literal[True],
     times: None = None,
 ) -> DiagonalSpectralDensity: ...
 @overload
 def make_sdm(
-    inverse_sdm: "Array",
+    inverse_sdm: "AnyArray",
     /,
     *,
-    frequencies: Array | AnyAxis,
-    times: Array | AnyAxis,
+    frequencies: AnyArray | AnyAxis,
+    times: AnyArray | AnyAxis,
     channel_names: Sequence[ChnName],
 ) -> EvolutionarySpectralDensity: ...
 def make_sdm(
-    inverse_sdm: Array,
+    inverse_sdm: AnyArray,
     /,
     *,
-    frequencies: Array | AnyAxis,
+    frequencies: AnyArray | AnyAxis,
     channel_names: Sequence[ChnName],
-    times: Array | AnyAxis | None = None,
+    times: AnyArray | AnyAxis | None = None,
     is_diagonal: bool = False,
 ):
     """Make a :class:`~types.SpectralDensity`, a :class:`~types.DiagonalSpectralDensity` or an :class:`~types.EvolutionarySpectralDensity`.
 
     Parameters
     ----------
-    inverse_sdm: :class:`~types.misc.Array`
+    inverse_sdm: :class:`~types.misc.AnyArray`
         The inverse spectral density matrix (SDM) or inverse evolutionary spectral density matrix (ESDM).
         If `is_diagonal` is False, it must have shape (n_freqs, n_channels, n_channels) for SDM or
         (n_freqs, n_times, n_channels, n_channels) for ESDM.
         If `is_diagonal` is True, it must have shape (n_freqs, n_channels) and represent the diagonal elements of the inverse SDM
         (currently only supported for SDM, not ESDM).
 
-    frequencies: :class:`~types.misc.Array`
+    frequencies: :class:`~types.misc.AnyArray`
         An array of shape (n_freqs,) representing the frequency grid.
 
     channel_names: Sequence[str]
         A sequence of channel names corresponding to the channels in the SDM/ESDM.
 
-    times: :class:`~types.misc.Array`, optional
+    times: :class:`~types.misc.AnyArray`, optional
         An array of shape (n_times,) representing the time grid. If None, a :class:`~types.SpectralDensity`
         will be constructed. If provided, an :class:`~types.EvolutionarySpectralDensity` will be constructed.
 

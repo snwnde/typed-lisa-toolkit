@@ -87,9 +87,9 @@ def test_xyz2aet_keyword_components_path():
     a, e, t = shop.xyz2aet(X=x, Y=y, Z=z)
     recovered_x, recovered_y, recovered_z = shop.aet2xyz(A=a, E=e, T=t)
 
-    npt.assert_allclose(recovered_x, x, atol=1e-12)
-    npt.assert_allclose(recovered_y, y, atol=1e-12)
-    npt.assert_allclose(recovered_z, z, atol=1e-12)
+    npt.assert_allclose(np.asarray(recovered_x), x, atol=1e-12)
+    npt.assert_allclose(np.asarray(recovered_y), y, atol=1e-12)
+    npt.assert_allclose(np.asarray(recovered_z), z, atol=1e-12)
 
 
 def test_mapping_not_channel_mapping_raises_type_error():

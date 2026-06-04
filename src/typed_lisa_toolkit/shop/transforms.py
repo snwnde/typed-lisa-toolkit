@@ -3,13 +3,13 @@
 import os
 import warnings
 from types import ModuleType
-from typing import Literal, overload
+from typing import Literal, cast, overload
 
 from .. import (
     _constructors,  # pyright: ignore[reportPrivateUsage]
     utils,
 )
-from ..types import AnyAxis, Array, Axis, AxLike, Grid2DCartesian, Linspace, data
+from ..types import AnyArray, AnyAxis, Axis, AxLike, Grid2DCartesian, Linspace, data
 from ..types import representations as reps
 
 
@@ -28,7 +28,7 @@ def _import_wdm_transform() -> ModuleType:
         return wdm_transform
 
 
-def _conventionaize(ary: "Array") -> "Array":
+def _conventionaize(ary: "AnyArray") -> "AnyArray":
     return ary[:, None, None, None, ...]
 
 
@@ -44,8 +44,6 @@ def time2freq(
     *,
     keep_time: Literal[True] = True,
 ) -> data.TimedFSData: ...
-
-
 @overload
 def time2freq(
     tsd: data.TSData,
@@ -53,8 +51,6 @@ def time2freq(
     *,
     keep_time: Literal[False],
 ) -> data.FSData: ...
-
-
 @overload
 def time2freq(
     ts: reps.TimeSeries[Axis[Linspace]],
@@ -62,8 +58,6 @@ def time2freq(
     *,
     keep_time: bool = True,
 ) -> reps.UniformFrequencySeries: ...
-
-
 def time2freq(
     td: reps.TimeSeries[Axis[Linspace]] | data.TSData,
     /,
@@ -89,7 +83,7 @@ def time2freq(
     last_freq = (n_times // 2) / n_times / td.times.ax.step
     n_freq = n_times // 2 + 1
     freqs = _constructors.axis(_constructors.linspace(0.0, last_freq, n_freq))
-    signal = fft.rfft(td.get_kernel() * td.times.ax.step, axis=-1)
+    signal = cast("AnyArray", fft.rfft(td.get_kernel() * td.times.ax.step, axis=-1))
     if isinstance(td, reps.TimeSeries):
         return _constructors.frequency_series(
             frequencies=freqs,
@@ -150,7 +144,9 @@ def freq2time(
     ):
         warnings.warn("The time grid is denser than the Nyquist limit.", stacklevel=2)
 
-    signal = fft.irfft(fd.get_kernel() / _times.step, n=len(_times), axis=-1)
+    signal = cast(
+        "AnyArray", fft.irfft(fd.get_kernel() / _times.step, n=len(_times), axis=-1)
+    )
     if isinstance(fd, reps.FrequencySeries):
         return _constructors.time_series(times=_times, entries=signal)
     return _constructors.tsdata(
@@ -329,7 +325,8 @@ def wdm2time(
     if wdm.entries.shape[1:4] != (1, 1, 1):
         msg = "Currently only single-channel WDMs are supported by wdm2time."
         raise ValueError(msg)
-    _coeffs = wdm.entries[:, 0, 0, 0].swapaxes(-2, -1)
+    # swapaxes are not specified in array-api so we have to ignore the type checks here
+    _coeffs = wdm.entries[:, 0, 0, 0].swapaxes(-2, -1)  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType,reportAttributeAccessIssue]
     entries = _inverse_wdm(
         coeffs=_coeffs,
         dt=wdm.dt,
@@ -447,7 +444,8 @@ def wdm2freq(
     if wdm.entries.shape[1:4] != (1, 1, 1):
         msg = "Currently only single-channel WDMs are supported by wdm2freq."
         raise ValueError(msg)
-    _coeffs = wdm.entries[:, 0, 0, 0].swapaxes(-2, -1)
+    # swapaxes are not specified in array-api so we have to ignore the type checks here
+    _coeffs = wdm.entries[:, 0, 0, 0].swapaxes(-2, -1)  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType,reportAttributeAccessIssue]
     with utils.set_env(**_wdm_backend_env(wdm.xp)):
         wtfs = _frequency_wdm(
             _coeffs, dt=wdm.dt, a=DEFAULT_WINDOW_A, d=DEFAULT_WINDOW_D
