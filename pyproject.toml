@@ -25,6 +25,7 @@ quadax = ["quadax"]
 mojito = [
     "mojito-processor @ git+https://github.com/OllieBurke/MojitoProcessor.git",
 ]
+pytorch = ["torch"]
 
 [dependency-groups]
 jax = ["jax"]

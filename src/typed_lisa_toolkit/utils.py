@@ -8,27 +8,31 @@ Functions
 .. autofunction:: get_subset_slice
 .. autofunction:: get_subset_mask
 .. autofunction:: get_support_slice
+.. autofunction:: promote_slice
 .. autofunction:: extend_to
 
 Decorators
 ----------
 
-.. autofunction:: trim_interp
+.. autofunction:: warn_external
+.. autofunction:: deprecated
 
 """
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import inspect
 import logging
+import os
 import warnings
 from collections.abc import Callable
 from typing import Any
 
 import array_api_compat as xpc
 
-from .types.misc import Array, ArrayFunc, Interpolator
+from .types.misc import AnyAxis, Array
 
 log = logging.getLogger(__name__)
 
@@ -133,14 +137,21 @@ def get_support_slice(array: Array):
     slice(2, 4, None)
     """
     xp = xpc.get_namespace(array)
-    non_zero_indices = xp.flatnonzero(array)
-    if non_zero_indices.size == 0:
+    non_zero_indices = xp.nonzero(xp.ravel(array))[0]
+    if len(non_zero_indices) == 0:
         return slice(0, 0)
     return slice(non_zero_indices[0], non_zero_indices[-1] + 1)
 
 
-def extend_to(
-    target_grid: tuple[Array, ...] | Array,
+def promote_slice(_slice: slice | tuple[slice, ...], /):
+    """Promote a slice or tuple of slices to a full indexing tuple for canonical shape."""  # noqa: E501
+    if not isinstance(_slice, tuple):
+        _slice = (_slice,)
+    return (slice(None),) * 4 + _slice
+
+
+def extend_to[AT: AnyAxis](
+    target_grid: tuple[AT, ...] | AT,
     *,
     known_slices: tuple[slice, ...] | None = None,
 ):
@@ -150,7 +161,7 @@ def extend_to(
 
     .. code-block:: python
 
-            def get_extension(grid: tuple[Array, ...], entries: Array) -> Array:
+            def get_extension(grid: tuple[AnyAxis, ...], entries: Array) -> Array:
                 ...
 
     The function extends the entries to the target grid by setting the entries
@@ -189,7 +200,7 @@ def extend_to(
     _target_grid = target_grid if isinstance(target_grid, tuple) else (target_grid,)
 
     def get_extension(
-        grid: tuple[Array, ...] | Array,
+        grid: tuple[AnyAxis, ...] | AnyAxis,
         entries: Array,
     ) -> Array:
         _grid = grid if isinstance(grid, tuple) else (grid,)
@@ -203,11 +214,11 @@ def extend_to(
             support_slices = known_slices
         else:
             support_slices = tuple(
-                get_subset_slice(target_g, float(g[0]), float(g[-1]))
+                get_subset_slice(xp.asarray(target_g), g[0], g[-1])
                 for target_g, g in zip(_target_grid, _grid, strict=True)
             )
         # Build full indexing tuple for canonical shape
-        index = (slice(None),) * 4 + support_slices
+        index = promote_slice(support_slices)
 
         try:
             extended_entries[index] = entries
@@ -220,37 +231,58 @@ def extend_to(
     return get_extension
 
 
-def trim_interp(interpolator: Interpolator):
-    """Return decorated interpolator.
+@contextlib.contextmanager
+def set_env(**environ: Any):
+    """Temporarily set the process environment variables.
 
-    The decorated interpolate function will first trim the input
-    array to its support before calling the original interpolator.
-    Outside the support, the interpolated values are set to zero.
+    Examples
+    --------
+    >>> with set_env(TEST_VAR="123"):
+    ...     print(os.environ.get("TEST_VAR"))
+    123
+    >>> print(os.environ.get("TEST_VAR"))  # Should be None or not set again
+    None
     """
+    old_environ = dict(os.environ)
+    os.environ.update(environ)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environ)
 
-    @functools.wraps(interpolator)
-    def _interpolator(
-        grid: Array,
-        entries: Array,
-    ) -> ArrayFunc:
-        support_slice = get_support_slice(entries)
-        xp = xpc.get_namespace(entries)
-        trimmed_grid = grid[support_slice]
-        if trimmed_grid.size == 0:
-            log.warning("Empty array. Returning a zero interpolator.")
-            return xp.zeros_like
-        min = float(trimmed_grid[0])
-        max = float(trimmed_grid[-1])
 
-        def _interpolated(target_grid: Array) -> Array:
-            """Return the interpolated entries at the target grid, zero outside support."""  # noqa: E501
-            target_support_slice = get_subset_slice(target_grid, min, max)
-            interp_grid = target_grid[target_support_slice]
-            interpolated = interpolator(grid[support_slice], entries[support_slice])(
-                interp_grid,
-            )
-            return extend_to(target_grid)(interp_grid, interpolated)
+# def trim_interp(interpolator: Interpolator):
+#     """Return decorated interpolator.
 
-        return _interpolated
+#     The decorated interpolate function will first trim the input
+#     array to its support before calling the original interpolator.
+#     Outside the support, the interpolated values are set to zero.
+#     """
 
-    return _interpolator
+#     @functools.wraps(interpolator)
+#     def _interpolator(
+#         grid: Array,
+#         entries: Array,
+#     ) -> ArrayFunc:
+#         support_slice = get_support_slice(entries)
+#         xp = xpc.get_namespace(entries)
+#         trimmed_grid = grid[support_slice]
+#         if trimmed_grid.size == 0:
+#             log.warning("Empty array. Returning a zero interpolator.")
+#             return xp.zeros_like
+#         min = float(trimmed_grid[0])
+#         max = float(trimmed_grid[-1])
+
+#         def _interpolated(target_grid: Array) -> Array:
+#             """Return the interpolated entries at the target grid, zero outside support."""  # noqa: E501
+#             target_support_slice = get_subset_slice(target_grid, min, max)
+#             interp_grid = target_grid[target_support_slice]
+#             interpolated = interpolator(grid[support_slice], entries[support_slice])(
+#                 interp_grid,
+#             )
+#             return extend_to(target_grid)(interp_grid, interpolated)
+
+#         return _interpolated
+
+#     return _interpolator

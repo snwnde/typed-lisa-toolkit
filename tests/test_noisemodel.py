@@ -1,6 +1,7 @@
 from types import ModuleType
 from typing import Any
 
+import array_api_compat as xpc
 import numpy as np
 import numpy.testing as npt
 import pytest
@@ -56,7 +57,7 @@ def test_sdm_whitening_matrix_reconstructs_inverse_sdm(
     xp: ModuleType, sdm: SpectralDensity
 ):
     w = xp.asarray(sdm.get_whitening_matrix())
-    reconstructed = np.einsum("fji,fjk->fik", np.conj(w), w)
+    reconstructed = xp.einsum("fji,fjk->fik", xp.conj(w), w)
 
     npt.assert_allclose(
         reconstructed,
@@ -84,7 +85,7 @@ def test_fd_model_integrand_diagonal_shape_and_value(fsdata: FSData, xp: ModuleT
     kernel = _diagonal_kernel_3ch(xp)
     model = noise_model(
         make_sdm(
-            xp.diagonal(xp.asarray(kernel), axis1=-2, axis2=-1),
+            xp.linalg.diagonal(xp.asarray(kernel)),
             frequencies=fsdata.frequencies,
             channel_names=("X", "Y", "Z"),
             is_diagonal=True,
@@ -94,7 +95,7 @@ def test_fd_model_integrand_diagonal_shape_and_value(fsdata: FSData, xp: ModuleT
     integrand = xp.asarray(model.get_integrand(left, right))
     left_k = xp.asarray(left.get_kernel())
     right_k = xp.asarray(right.get_kernel())
-    diag = xp.diagonal(xp.asarray(kernel), axis1=-1, axis2=-2)
+    diag = xp.linalg.diagonal(xp.asarray(kernel))
     expected = (4.0 * left_k.conj() * right_k) * diag.T[None, :, None, None, :]
 
     npt.assert_allclose(integrand, expected)
@@ -111,10 +112,10 @@ def test_fd_model_scalar_product_dense_matches_manual_contraction(
     got = xp.asarray(model.get_scalar_product(left, right))
     left_k = xp.asarray(left.get_kernel())
     right_k = xp.asarray(right.get_kernel())
-    integrand = 4.0 * np.einsum(
+    integrand = 4.0 * xp.einsum(
         "...fi,fij,...fj->...f",
         xp.moveaxis(left_k.conj(), 1, -1),
-        kernel,
+        xp.astype(kernel, left_k.dtype),
         xp.moveaxis(right_k, 1, -1),
     )
     expected = xp.trapezoid(integrand, x=xp.asarray(fsdata.frequencies), axis=-1)
@@ -144,7 +145,10 @@ def test_fd_model_whiten_dense_matches_manual_channel_mixing(
     left = xp.asarray(fsdata.get_kernel())
     left_e = xp.moveaxis(left[:, :, 0, 0, :], 1, -1)
     w = xp.asarray(sdm.get_whitening_matrix())
-    expected = xp.moveaxis(xp.einsum("fij,...fj->...fi", w, left_e), -1, 1)[
+    xp = xpc.array_namespace(w)
+    expected = xp.moveaxis(
+        xp.einsum("fij,...fj->...fi", xp.astype(w, left_e.dtype), left_e), -1, 1
+    )[
         :,
         :,
         None,
@@ -168,7 +172,7 @@ def test_esdm_is_valid_sdm_returns_false_without_raising(xp: ModuleType):
         xp.eye(2), channel_order=["X", "Y", "Z"]
     )
     assert not EvolutionarySpectralDensity.is_valid_sdm(
-        xp.broadcast_to(xp.eye(2), (2, 2, 2, 2)).copy(), channel_order=["X", "X"]
+        xp.broadcast_to(xp.eye(2), (2, 2, 2, 2)), channel_order=["X", "X"]
     )
 
 
@@ -185,7 +189,7 @@ def test_esdm_invalid_shape_raises(xp: ModuleType):
 def test_esdm_duplicate_channel_names_raise(xp: ModuleType):
     with pytest.raises(ValueError, match=r".+"):
         make_sdm(
-            xp.broadcast_to(xp.eye(2), (2, 2, 2, 2)).copy(),
+            xp.broadcast_to(xp.eye(2), (2, 2, 2, 2)),
             frequencies=xp.asarray([0.1, 0.2]),
             times=xp.asarray([0.0, 1.0]),
             channel_names=("X", "X"),
@@ -227,7 +231,7 @@ def test_tf_model_scalar_product_with_identity_esdm(
     kernel = xp.broadcast_to(
         xp.eye(3, dtype=float),
         (len(frequencies), len(times), 3, 3),
-    ).copy()
+    )
 
     model = noise_model(
         make_sdm(
@@ -253,7 +257,7 @@ def test_tf_model_whiten_identity_keeps_entries(
     kernel = xp.broadcast_to(
         xp.eye(3, dtype=float),
         (len(frequencies), len(times), 3, 3),
-    ).copy()
+    )
     model = noise_model(
         make_sdm(
             kernel,
@@ -274,12 +278,12 @@ def test_make_sdm_builds_dense_diagonal_and_evolutionary_variants(
     xp: ModuleType, lin_freq_axis: Axis[Linspace], short_time_axis: Axis[Linspace]
 ):
 
-    dense_kernel = xp.broadcast_to(xp.eye(3), (len(lin_freq_axis), 3, 3)).copy()
+    dense_kernel = xp.broadcast_to(xp.eye(3), (len(lin_freq_axis), 3, 3))
     diag_kernel = xp.ones((len(lin_freq_axis), 3), dtype=float)
     evo_kernel = xp.broadcast_to(
         xp.eye(3),
         (len(lin_freq_axis), len(short_time_axis), 3, 3),
-    ).copy()
+    )
 
     dense_sdm = make_sdm(
         dense_kernel,

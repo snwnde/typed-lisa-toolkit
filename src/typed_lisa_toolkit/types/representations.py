@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+import copy as _copy
 import logging
 from types import ModuleType
 from typing import (
@@ -20,7 +21,6 @@ import array_api_compat as xpc
 from l2d_interface import contract
 
 from ..utils import deprecated, warn_external
-from ._mixins import to_array
 from .misc import (
     AnyAxis,
     AnyGrid,
@@ -228,7 +228,7 @@ class _Subset1DMixin[GridT: "Grid1D[AnyAxis]"](_InitMixin[GridT], abc.ABC):
         """Return the subset as a new instance."""
         _slice = _get_subset_slice(self.grid[0], interval=interval, slice=slice)
         grid, entries = _take_subset(self.grid, self.entries, (_slice,))
-        entries = entries.copy() if copy else entries
+        entries = _copy.copy(entries) if copy else entries
         return type(self)(grid=grid, entries=entries)
 
     def __getitem__(self, slice: _slice) -> Self:
@@ -257,9 +257,9 @@ def _embed_entries_to_grid_2d_sparse[Axis0: "AnyAxis", Axis1: "AnyAxis"](
     else:
         support_slices = tuple(
             utils.get_subset_slice(
-                to_array(eg),
-                min=float(to_array(sg)[0]),
-                max=float(to_array(sg)[-1]),
+                eg.asarray(),
+                min=float(sg.asarray()[0]),
+                max=float(sg.asarray()[-1]),
             )
             for sg, eg in zip(source_grid, embedding_grid, strict=True)
         )
@@ -350,7 +350,7 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
         """
         if inplace:
             return self.iadd(other, slice)
-        self_copy = self.create_like(self.entries.copy())
+        self_copy = self.create_like(_copy.copy(self.entries))
         self_copy.iadd(other, slice)
         return self_copy
 
@@ -391,7 +391,7 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
         if isinstance(other, type(self)):
             _slices = tuple(
                 utils.get_subset_slice(
-                    to_array(self.grid[idx]), _axis.start, _axis.stop
+                    self.grid[idx].asarray(), _axis.start, _axis.stop
                 )
                 for idx, _axis in enumerate(other.grid)
             )
@@ -1051,7 +1051,7 @@ class FrequencySeries[AxisT: "AnyAxis"](_Series1D[AxisT]):
     def get_time_shifted(self, shift: float) -> Self:
         """Shift the series in time."""
         return self * self.xp.exp(
-            -2j * self.xp.pi * self.xp.array(self.frequencies) * shift,
+            -2j * self.xp.pi * self.xp.asarray(self.frequencies) * shift,
         )
 
     def get_embedded[AT: "AnyAxis"](
@@ -1118,7 +1118,7 @@ class UniformFrequencySeries(FrequencySeries[Axis[Linspace]], _Uniform1DMixin):
             )
             warn_external(_msg1, DeprecationWarning)
             tapering = args[0]
-        self_frequencies = to_array(self.frequencies)
+        self_frequencies = self.frequencies.asarray(self.xp)
         tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
         _times = Linspace.make(time_grid)
         return transforms.freq2time(self * tapering_window, times=_times)
@@ -1231,7 +1231,7 @@ class UniformTimeSeries(TimeSeries[Axis[Linspace]], _Uniform1DMixin):
             )
             warn_external(_msg1, DeprecationWarning)
             tapering = args[0]
-        self_times = self.xp.array(self.times)
+        self_times = self.xp.asarray(self.times)
         tapering_window = (
             tapering(self_times)
             if tapering is not None
@@ -1346,7 +1346,7 @@ class _BasePhasor[AxisT: "AnyAxis"](
         xp = xpc.get_namespace(self.amplitudes, self.phases)
         _axis_array = axis_.asarray(xp) if isinstance(axis_, Axis) else axis_
         _axis_obj = axis_ if isinstance(axis_, Axis) else axis(axis_)
-        self_axis = to_array(self.axis, xp=xp)
+        self_axis = self.axis.asarray(xp)
         if self.entries.shape != (1, 1, 1, 2, len(self_axis)):
             _msg = (
                 f"Only 1D phasors with shape (1, 1, 1, 2, {len(self_axis)}) "
@@ -1640,7 +1640,7 @@ class _TFRep[  # pyright: ignore[reportUnsafeMultipleInheritance]
             self.entries,
             (_freq_slice, _time_slice),
         )
-        entries = entries.copy() if copy else entries
+        entries = _copy.copy(entries) if copy else entries
         return type(self)(grid=grid, entries=entries)
 
 

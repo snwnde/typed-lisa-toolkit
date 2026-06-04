@@ -1,4 +1,4 @@
-import numpy as np
+from types import ModuleType
 
 from typed_lisa_toolkit.types import (
     STFT,
@@ -231,7 +231,6 @@ def test_ary_ary_sparse(ary_ary_sparse: Grid2DSparse[Axis[Array], Axis[Array]]):
 def test_lin_freq_series(lin_freq_series: UniformFrequencySeries):
     assert lin_freq_series.domain == "frequency"
     assert lin_freq_series.kind is None
-    assert isinstance(lin_freq_series.entries, lin_freq_series.xp.ndarray)
     assert isinstance(lin_freq_series.grid, tuple)
     assert lin_freq_series.entries.shape == (
         1,
@@ -247,7 +246,6 @@ def test_uni_ary_freq_series(
 ):
     assert uni_ary_freq_series.domain == "frequency"
     assert uni_ary_freq_series.kind is None
-    assert isinstance(uni_ary_freq_series.entries, uni_ary_freq_series.xp.ndarray)
     assert isinstance(uni_ary_freq_series.grid, tuple)
     assert uni_ary_freq_series.entries.shape == (
         1,
@@ -263,7 +261,6 @@ def test_ary_freq_series(
 ):
     assert ary_freq_series.domain == "frequency"
     assert ary_freq_series.kind is None
-    assert isinstance(ary_freq_series.entries, ary_freq_series.xp.ndarray)
     assert isinstance(ary_freq_series.grid, tuple)
     assert ary_freq_series.entries.shape == (
         1,
@@ -277,7 +274,6 @@ def test_ary_freq_series(
 def test_lin_time_series(lin_time_series: UniformTimeSeries):
     assert lin_time_series.domain == "time"
     assert lin_time_series.kind is None
-    assert isinstance(lin_time_series.entries, lin_time_series.xp.ndarray)
     assert isinstance(lin_time_series.grid, tuple)
     assert lin_time_series.entries.shape == (
         1,
@@ -293,7 +289,6 @@ def test_uni_ary_time_series(
 ):
     assert uni_ary_time_series.domain == "time"
     assert uni_ary_time_series.kind is None
-    assert isinstance(uni_ary_time_series.entries, uni_ary_time_series.xp.ndarray)
     assert isinstance(uni_ary_time_series.grid, tuple)
     assert uni_ary_time_series.entries.shape == (
         1,
@@ -309,7 +304,6 @@ def test_ary_time_series(
 ):
     assert ary_time_series.domain == "time"
     assert ary_time_series.kind is None
-    assert isinstance(ary_time_series.entries, ary_time_series.xp.ndarray)
     assert isinstance(ary_time_series.grid, tuple)
     assert ary_time_series.entries.shape == (
         1,
@@ -320,12 +314,11 @@ def test_ary_time_series(
     )
 
 
-def test_lin_phasor(lin_freq_phasor: Phasor[Axis[Linspace]]):
+def test_lin_phasor(xp: ModuleType, lin_freq_phasor: Phasor[Axis[Linspace]]):
     assert lin_freq_phasor.domain == "frequency"
     assert lin_freq_phasor.kind == "phasor"
-    assert isinstance(lin_freq_phasor.entries, lin_freq_phasor.xp.ndarray)
-    assert not np.isreal(lin_freq_phasor.amplitudes).any()
-    assert np.isreal(lin_freq_phasor.phases).all()
+    assert not xp.isreal(lin_freq_phasor.amplitudes).any()
+    assert xp.isreal(lin_freq_phasor.phases).all()
     assert isinstance(lin_freq_phasor.grid, tuple)
     assert lin_freq_phasor.entries.shape == (
         1,
@@ -336,12 +329,11 @@ def test_lin_phasor(lin_freq_phasor: Phasor[Axis[Linspace]]):
     )
 
 
-def test_uni_ary_phasor(uni_ary_phasor: Phasor[Axis[Array]]):
+def test_uni_ary_phasor(xp: ModuleType, uni_ary_phasor: Phasor[Axis[Array]]):
     assert uni_ary_phasor.domain == "frequency"
     assert uni_ary_phasor.kind == "phasor"
-    assert isinstance(uni_ary_phasor.entries, uni_ary_phasor.xp.ndarray)
-    assert not np.isreal(uni_ary_phasor.amplitudes).any()
-    assert np.isreal(uni_ary_phasor.phases).all()
+    assert not xp.isreal(uni_ary_phasor.amplitudes).any()
+    assert xp.isreal(uni_ary_phasor.phases).all()
     assert isinstance(uni_ary_phasor.grid, tuple)
     assert uni_ary_phasor.entries.shape == (
         1,
@@ -352,12 +344,11 @@ def test_uni_ary_phasor(uni_ary_phasor: Phasor[Axis[Array]]):
     )
 
 
-def test_ary_phasor(ary_phasor: Phasor[Axis[Array]]):
+def test_ary_phasor(xp: ModuleType, ary_phasor: Phasor[Axis[Array]]):
     assert ary_phasor.domain == "frequency"
     assert ary_phasor.kind == "phasor"
-    assert isinstance(ary_phasor.entries, ary_phasor.xp.ndarray)
-    assert not np.isreal(ary_phasor.amplitudes).any()
-    assert np.isreal(ary_phasor.phases).all()
+    assert not xp.isreal(ary_phasor.amplitudes).any()
+    assert xp.isreal(ary_phasor.phases).all()
     assert isinstance(ary_phasor.grid, tuple)
     assert ary_phasor.entries.shape == (
         1,
@@ -373,7 +364,6 @@ def test_lin_lin_cartesian_stft(
 ):
     assert lin_lin_cartesian_stft.domain == "time-frequency"
     assert lin_lin_cartesian_stft.kind == "stft"
-    assert isinstance(lin_lin_cartesian_stft.entries, lin_lin_cartesian_stft.xp.ndarray)
     assert isinstance(lin_lin_cartesian_stft.grid, tuple)
     assert lin_lin_cartesian_stft.entries.shape == (
         1,
@@ -390,7 +380,6 @@ def test_lin_uni_cartesian_stft(
 ):
     assert lin_uni_cartesian_stft.domain == "time-frequency"
     assert lin_uni_cartesian_stft.kind == "stft"
-    assert isinstance(lin_uni_cartesian_stft.entries, lin_uni_cartesian_stft.xp.ndarray)
     assert isinstance(lin_uni_cartesian_stft.grid, tuple)
     assert lin_uni_cartesian_stft.entries.shape == (
         1,
@@ -407,7 +396,6 @@ def test_lin_ary_cartesian_stft(
 ):
     assert lin_ary_cartesian_stft.domain == "time-frequency"
     assert lin_ary_cartesian_stft.kind == "stft"
-    assert isinstance(lin_ary_cartesian_stft.entries, lin_ary_cartesian_stft.xp.ndarray)
     assert isinstance(lin_ary_cartesian_stft.grid, tuple)
     assert lin_ary_cartesian_stft.entries.shape == (
         1,
@@ -424,7 +412,6 @@ def test_ary_lin_cartesian_stft(
 ):
     assert ary_lin_cartesian_stft.domain == "time-frequency"
     assert ary_lin_cartesian_stft.kind == "stft"
-    assert isinstance(ary_lin_cartesian_stft.entries, ary_lin_cartesian_stft.xp.ndarray)
     assert isinstance(ary_lin_cartesian_stft.grid, tuple)
     assert ary_lin_cartesian_stft.entries.shape == (
         1,
@@ -441,7 +428,6 @@ def test_ary_uni_cartesian_stft(
 ):
     assert ary_uni_cartesian_stft.domain == "time-frequency"
     assert ary_uni_cartesian_stft.kind == "stft"
-    assert isinstance(ary_uni_cartesian_stft.entries, ary_uni_cartesian_stft.xp.ndarray)
     assert isinstance(ary_uni_cartesian_stft.grid, tuple)
     assert ary_uni_cartesian_stft.entries.shape == (
         1,
@@ -458,7 +444,6 @@ def test_uni_lin_cartesian_stft(
 ):
     assert uni_lin_cartesian_stft.domain == "time-frequency"
     assert uni_lin_cartesian_stft.kind == "stft"
-    assert isinstance(uni_lin_cartesian_stft.entries, uni_lin_cartesian_stft.xp.ndarray)
     assert isinstance(uni_lin_cartesian_stft.grid, tuple)
     assert uni_lin_cartesian_stft.entries.shape == (
         1,
@@ -475,7 +460,6 @@ def test_uni_uni_cartesian_stft(
 ):
     assert uni_uni_cartesian_stft.domain == "time-frequency"
     assert uni_uni_cartesian_stft.kind == "stft"
-    assert isinstance(uni_uni_cartesian_stft.entries, uni_uni_cartesian_stft.xp.ndarray)
     assert isinstance(uni_uni_cartesian_stft.grid, tuple)
     assert uni_uni_cartesian_stft.entries.shape == (
         1,
@@ -492,7 +476,6 @@ def test_uni_ary_cartesian_stft(
 ):
     assert uni_ary_cartesian_stft.domain == "time-frequency"
     assert uni_ary_cartesian_stft.kind == "stft"
-    assert isinstance(uni_ary_cartesian_stft.entries, uni_ary_cartesian_stft.xp.ndarray)
     assert isinstance(uni_ary_cartesian_stft.grid, tuple)
     assert uni_ary_cartesian_stft.entries.shape == (
         1,
@@ -509,7 +492,6 @@ def test_ary_ary_cartesian_stft(
 ):
     assert ary_ary_cartesian_stft.domain == "time-frequency"
     assert ary_ary_cartesian_stft.kind == "stft"
-    assert isinstance(ary_ary_cartesian_stft.entries, ary_ary_cartesian_stft.xp.ndarray)
     assert isinstance(ary_ary_cartesian_stft.grid, tuple)
     assert ary_ary_cartesian_stft.entries.shape == (
         1,
@@ -526,7 +508,6 @@ def test_lin_lin_sparse_stft(
 ):
     assert lin_lin_sparse_stft.domain == "time-frequency"
     assert lin_lin_sparse_stft.kind == "stft"
-    assert isinstance(lin_lin_sparse_stft.entries, lin_lin_sparse_stft.xp.ndarray)
     assert isinstance(lin_lin_sparse_stft.grid, Grid2DSparse)
     assert lin_lin_sparse_stft.entries.shape == (
         1,
@@ -542,7 +523,6 @@ def test_lin_uni_sparse_stft(
 ):
     assert lin_uni_sparse_stft.domain == "time-frequency"
     assert lin_uni_sparse_stft.kind == "stft"
-    assert isinstance(lin_uni_sparse_stft.entries, lin_uni_sparse_stft.xp.ndarray)
     assert isinstance(lin_uni_sparse_stft.grid, Grid2DSparse)
     assert lin_uni_sparse_stft.entries.shape == (
         1,
@@ -558,7 +538,6 @@ def test_lin_ary_sparse_stft(
 ):
     assert lin_ary_sparse_stft.domain == "time-frequency"
     assert lin_ary_sparse_stft.kind == "stft"
-    assert isinstance(lin_ary_sparse_stft.entries, lin_ary_sparse_stft.xp.ndarray)
     assert isinstance(lin_ary_sparse_stft.grid, Grid2DSparse)
     assert lin_ary_sparse_stft.entries.shape == (
         1,
@@ -574,7 +553,6 @@ def test_uni_lin_sparse_stft(
 ):
     assert uni_lin_sparse_stft.domain == "time-frequency"
     assert uni_lin_sparse_stft.kind == "stft"
-    assert isinstance(uni_lin_sparse_stft.entries, uni_lin_sparse_stft.xp.ndarray)
     assert isinstance(uni_lin_sparse_stft.grid, Grid2DSparse)
     assert uni_lin_sparse_stft.entries.shape == (
         1,
@@ -590,7 +568,6 @@ def test_uni_uni_sparse_stft(
 ):
     assert uni_uni_sparse_stft.domain == "time-frequency"
     assert uni_uni_sparse_stft.kind == "stft"
-    assert isinstance(uni_uni_sparse_stft.entries, uni_uni_sparse_stft.xp.ndarray)
     assert isinstance(uni_uni_sparse_stft.grid, Grid2DSparse)
     assert uni_uni_sparse_stft.entries.shape == (
         1,
@@ -606,7 +583,6 @@ def test_uni_ary_sparse_stft(
 ):
     assert uni_ary_sparse_stft.domain == "time-frequency"
     assert uni_ary_sparse_stft.kind == "stft"
-    assert isinstance(uni_ary_sparse_stft.entries, uni_ary_sparse_stft.xp.ndarray)
     assert isinstance(uni_ary_sparse_stft.grid, Grid2DSparse)
     assert uni_ary_sparse_stft.entries.shape == (
         1,
@@ -622,7 +598,6 @@ def test_ary_lin_sparse_stft(
 ):
     assert ary_lin_sparse_stft.domain == "time-frequency"
     assert ary_lin_sparse_stft.kind == "stft"
-    assert isinstance(ary_lin_sparse_stft.entries, ary_lin_sparse_stft.xp.ndarray)
     assert isinstance(ary_lin_sparse_stft.grid, Grid2DSparse)
     assert ary_lin_sparse_stft.entries.shape == (
         1,
@@ -638,7 +613,6 @@ def test_ary_uni_sparse_stft(
 ):
     assert ary_uni_sparse_stft.domain == "time-frequency"
     assert ary_uni_sparse_stft.kind == "stft"
-    assert isinstance(ary_uni_sparse_stft.entries, ary_uni_sparse_stft.xp.ndarray)
     assert isinstance(ary_uni_sparse_stft.grid, Grid2DSparse)
     assert ary_uni_sparse_stft.entries.shape == (
         1,
@@ -654,7 +628,6 @@ def test_ary_ary_sparse_stft(
 ):
     assert ary_ary_sparse_stft.domain == "time-frequency"
     assert ary_ary_sparse_stft.kind == "stft"
-    assert isinstance(ary_ary_sparse_stft.entries, ary_ary_sparse_stft.xp.ndarray)
     assert isinstance(ary_ary_sparse_stft.grid, Grid2DSparse)
     assert ary_ary_sparse_stft.entries.shape == (
         1,
@@ -670,7 +643,6 @@ def test_lin_lin_cartesian_wdm(
 ):
     assert lin_lin_cartesian_wdm.domain == "time-frequency"
     assert lin_lin_cartesian_wdm.kind == "wdm"
-    assert isinstance(lin_lin_cartesian_wdm.entries, lin_lin_cartesian_wdm.xp.ndarray)
     assert isinstance(lin_lin_cartesian_wdm.grid, tuple)
     assert lin_lin_cartesian_wdm.entries.shape == (
         1,
@@ -687,7 +659,6 @@ def test_lin_lin_sparse_wdm(
 ):
     assert lin_lin_sparse_wdm.domain == "time-frequency"
     assert lin_lin_sparse_wdm.kind == "wdm"
-    assert isinstance(lin_lin_sparse_wdm.entries, lin_lin_sparse_wdm.xp.ndarray)
     assert isinstance(lin_lin_sparse_wdm.grid, Grid2DSparse)
     assert lin_lin_sparse_wdm.entries.shape == (
         1,
@@ -704,7 +675,6 @@ def test_lin_lin_sparse_wdm(
 def test_tsdata(tsdata: TSData):
     assert tsdata.domain == "time"
     assert tsdata.kind is None
-    assert isinstance(tsdata.entries, tsdata.xp.ndarray)
     assert isinstance(tsdata.grid, tuple)
     assert tsdata.entries.shape == (
         1,
@@ -718,7 +688,6 @@ def test_tsdata(tsdata: TSData):
 def test_fsdata(fsdata: FSData):
     assert fsdata.domain == "frequency"
     assert fsdata.kind is None
-    assert isinstance(fsdata.entries, fsdata.xp.ndarray)
     assert isinstance(fsdata.grid, tuple)
     assert fsdata.entries.shape == (
         1,
@@ -734,7 +703,6 @@ def test_stftdata_cartesian(
 ):
     assert stftdata_cartesian.domain == "time-frequency"
     assert stftdata_cartesian.kind == "stft"
-    assert isinstance(stftdata_cartesian.entries, stftdata_cartesian.xp.ndarray)
     assert isinstance(stftdata_cartesian.grid, tuple)
     assert stftdata_cartesian.entries.shape == (
         1,
@@ -751,7 +719,6 @@ def test_stftdata_sparse(
 ):
     assert stftdata_sparse.domain == "time-frequency"
     assert stftdata_sparse.kind == "stft"
-    assert isinstance(stftdata_sparse.entries, stftdata_sparse.xp.ndarray)
     assert isinstance(stftdata_sparse.grid, Grid2DSparse)
     assert stftdata_sparse.entries.shape == (
         1,
@@ -767,7 +734,6 @@ def test_wdmdata_cartesian(
 ):
     assert wdmdata_cartesian.domain == "time-frequency"
     assert wdmdata_cartesian.kind == "wdm"
-    assert isinstance(wdmdata_cartesian.entries, wdmdata_cartesian.xp.ndarray)
     assert isinstance(wdmdata_cartesian.grid, tuple)
     assert wdmdata_cartesian.entries.shape == (
         1,
@@ -784,7 +750,6 @@ def test_wdmdata_sparse(
 ):
     assert wdmdata_sparse.domain == "time-frequency"
     assert wdmdata_sparse.kind == "wdm"
-    assert isinstance(wdmdata_sparse.entries, wdmdata_sparse.xp.ndarray)
     assert isinstance(wdmdata_sparse.grid, Grid2DSparse)
     assert wdmdata_sparse.entries.shape == (
         1,

@@ -84,7 +84,7 @@ def test_harmonic_projected_template_is_summed_before_evaluation(
 def test_template_is_restricted_to_its_frequency_band(xp: ModuleType, fsdata: FSData):
     freqs = fsdata.frequencies
     template = fsdata.get_subset(interval=(1.0, 3.0))
-    kernel = xp.broadcast_to(xp.eye(3), (len(freqs), 3, 3)).copy()
+    kernel = xp.broadcast_to(xp.eye(3), (len(freqs), 3, 3))
     model = noise_model(
         make_sdm(kernel, frequencies=freqs, channel_names=("X", "Y", "Z")),
     )
