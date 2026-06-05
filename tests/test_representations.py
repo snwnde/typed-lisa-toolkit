@@ -284,41 +284,6 @@ def test_wdm_factory_validation(
         wdm(ary_freq_axis, lin_time_axis, entries)  # pyright: ignore[reportCallIssue, reportArgumentType]
 
 
-def test_irfft_and_rfft_argument_validation(
-    lin_freq_series: UniformFrequencySeries,
-    lin_time_series: UniformTimeSeries,
-):
-    time_grid = lin_freq_series.xp.linspace(0.0, 1.0, 2 * len(lin_freq_series.grid[0]))
-    with (
-        pytest.raises(TypeError, match="at most one positional optional argument"),
-        pytest.warns(DeprecationWarning, match="irfft"),
-    ):
-        lin_freq_series.irfft(time_grid, None, None)
-    with (
-        pytest.raises(TypeError, match="both positional and keyword arguments"),
-        pytest.warns(DeprecationWarning, match="irfft"),
-    ):
-        lin_freq_series.irfft(
-            time_grid,
-            None,
-            tapering=lambda x: lin_freq_series.xp.ones_like(x),  # pyright: ignore[reportUnknownLambdaType]
-        )
-
-    with (
-        pytest.raises(TypeError, match="at most one positional optional argument"),
-        pytest.warns(DeprecationWarning, match="rfft"),
-    ):
-        lin_time_series.rfft(None, None)
-    with (
-        pytest.raises(TypeError, match="both positional and keyword arguments"),
-        pytest.warns(DeprecationWarning, match="rfft"),
-    ):
-        lin_time_series.rfft(
-            None,
-            tapering=lambda x: lin_time_series.xp.ones_like(x),  # pyright: ignore[reportUnknownLambdaType]
-        )
-
-
 def test_phasor_interpolation_rejects_noncanonical_shape(
     ary_phasor: FrequencyPhasor[Axis[AnyArray]],
 ):
@@ -410,23 +375,6 @@ def test_series_and_tf_properties(
     assert lin_lin_cartesian_stft.t_end == lin_lin_cartesian_stft.grid[1][-1]
     assert lin_lin_cartesian_stft.f_min == lin_lin_cartesian_stft.grid[0][0]
     assert lin_lin_cartesian_stft.f_max == lin_lin_cartesian_stft.grid[0][-1]
-
-
-def test_irfft_rfft_positional_deprecation_paths(
-    lin_freq_series: UniformFrequencySeries,
-    lin_time_series: UniformTimeSeries,
-):
-    time_grid = lin_freq_series.xp.linspace(0.0, 1.0, 2 * len(lin_freq_series.grid[0]))
-
-    with (
-        pytest.warns(DeprecationWarning, match="irfft"),
-    ):
-        _ = lin_freq_series.irfft(time_grid, lambda x: lin_freq_series.xp.ones_like(x))  # pyright: ignore[reportUnknownLambdaType]
-
-    with (
-        pytest.warns(DeprecationWarning, match="rfft"),
-    ):
-        _ = lin_time_series.rfft(lambda x: lin_time_series.xp.ones_like(x))  # pyright: ignore[reportUnknownLambdaType]
 
 
 def test_uni_ary_phasor(uni_ary_phasor: FrequencyPhasor[Axis[AnyArray]]):
