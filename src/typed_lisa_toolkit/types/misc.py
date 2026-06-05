@@ -22,8 +22,20 @@ ArrayLike = Any
 Array = l2d_interface.array.Array
 """An array from any array library supporting the Python Array API standard.
 
-Currently only NumPy and JAX arrays have been tested, but in principle any array
-library that implements the Python Array API standard should be compatible.
+Currently, Numpy, JAX, and PyTorch backends have been tested at runtime. In principle,
+any array library that implements the Python Array API standard should be compatible.
+
+The static type annotation for the arrays is for the moment limited due to
+the premature state of `data-array-typing`_. As a consequence, all output arrays are
+merged into a single type, `Array[Any, ModuleType]`, and a static type checker may
+not be able to infer the specific array type (e.g., `npt.NDArray[np.float64]`).
+If needed, you may help the type checker by
+`casting <https://docs.python.org/3/library/typing.html#typing.cast>`_
+or by using
+`xp.asarray <https://data-apis.org/array-api/latest/API_specification/generated/array_api.asarray.html#array_api.asarray>`_
+to ensure the correct type is inferred.
+
+.. _data-array-typing: https://github.com/data-apis/array-api-typing
 """
 AnyArray = Array[Any] | npt.NDArray[Any]
 
