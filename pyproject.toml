@@ -1,67 +1,65 @@
 [project]
-name = "typed-lisa-toolkit"
-dynamic = ["version"]
-authors = [{ name = "Sen-wen Deng", email = "deng@apc.in2p3.fr" }]
-description = "Fully typed interfaces for LISA data analysis"
-readme = "README.md"
-requires-python = ">=3.12"
+authors = [{name = "Sen-wen Deng", email = "deng@apc.in2p3.fr"}]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy >= 1.26.0",
-    "scipy >= 1.12.0",
-    "h5py",
-    "astropy",
-    "array-api-compat >= 1.13.0",
-    "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@45af85c779a410abc9aef9c7884fbb39eca3b12d",
+  "numpy >= 1.26.0",
+  "scipy >= 1.12.0",
+  "h5py",
+  "astropy",
+  "array-api-compat >= 1.13.0",
+  "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@e6fa486c8a06a48eb951c022e2f960ad42e07501",
 ]
+description = "Fully typed interfaces for LISA data analysis"
+dynamic = ["version"]
+name = "typed-lisa-toolkit"
+readme = "README.md"
+requires-python = ">=3.13"
 
 [project.optional-dependencies]
-wdm = ["wdm-transform>=0.2"]
-jax = ["jax"]
-quadax = ["quadax"]
+jax = ["jax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 mojito = [
-    "mojito-processor @ git+https://github.com/OllieBurke/MojitoProcessor.git",
+  "mojito-processor @ git+https://github.com/OllieBurke/MojitoProcessor.git",
 ]
-pytorch = ["torch"]
+pytorch = ["torch; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
+quadax = ["quadax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
+wdm = ["wdm-transform>=0.2"]
 
 [dependency-groups]
-jax = ["jax"]
-quadax = [{ include-group = "jax" }, "quadax"]
-doc = [
-    "sphinx",
-    "sphinx-autodoc-typehints",
-    "sphinx-copybutton",
-    "sphinxcontrib-bibtex",
-    "sphinxcontrib-mermaid",
-    "sphinx-inline-tabs",
-    "furo",
-    "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git",
-    "anybadge",
-    "ipywidgets",
-    "lovelyplots",
-    "phentax @ git+https://github.com/asantini29/phentax.git; sys_platform != 'darwin' or platform_machine != 'x86_64'",
-    "mojito",
-]
 dev = [
-    { include-group = "doc" },
-    "ruff",
-    "h5py-stubs>=0.1.2",
-    # "isort>=7.0.0", # `ruff check --select I --fix .` does the trick
-    # "mypy>=1.19.1", # `basedpyright` is used instead of `mypy` for type checking
-    "myst-nb>=1.3.0",
-    "nb-clean>=4.0.1",
-    "pre-commit>=4.5.1",
-    "pylint>=4.0.4",
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-mock>=3.15.1",
-    "uv-dynamic-versioning>=0.12.0",
-    { include-group = "quadax" },
-    "basedpyright",
+  {include-group = "doc"},
+  "ruff",
+  "h5py-stubs>=0.1.2", # "isort>=7.0.0", # `ruff check --select I --fix .` does the trick  # "mypy>=1.19.1", # `basedpyright` is used instead of `mypy` for type checking
+  "myst-nb>=1.3.0",
+  "nb-clean>=4.0.1",
+  "pre-commit>=4.5.1",
+  "pylint>=4.0.4",
+  "pytest>=9.0.2",
+  "pytest-cov>=7.0.0",
+  "pytest-mock>=3.15.1",
+  "uv-dynamic-versioning>=0.12.0",
+  {include-group = "quadax"},
+  "basedpyright",
 ]
+doc = [
+  "sphinx",
+  "sphinx-autodoc-typehints",
+  "sphinx-copybutton",
+  "sphinxcontrib-bibtex",
+  "sphinxcontrib-mermaid",
+  "sphinx-inline-tabs",
+  "furo",
+  "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git",
+  "anybadge",
+  "ipywidgets",
+  "lovelyplots",
+  "phentax @ git+https://github.com/asantini29/phentax.git; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+  "mojito",
+]
+jax = ["jax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
+quadax = [{include-group = "jax"}, "quadax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -74,9 +72,9 @@ packages = ["src/typed_lisa_toolkit"]
 
 [tool.uv-dynamic-versioning]
 enable = true
+pattern = "default-unprefixed"
 style = "semver"
 vcs = "git"
-pattern = "default-unprefixed"
 
 # [tool.uv]
 # required-environments = [
@@ -87,79 +85,78 @@ pattern = "default-unprefixed"
 # ]
 
 [build-system]
-requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
-
+requires = ["hatchling", "uv-dynamic-versioning"]
 
 [tool.ruff.lint]
-select = [
-    "D",
-    "PL",
-    "F",
-    "S",
-    "FBT",
-    "B",
-    "COM",
-    "DTZ",
-    "T10",
-    "ISC",
-    "EM",
-    "ICN",
-    "LOG",
-    "G",
-    "INP",
-    "PIE",
-    "PYI",
-    "PT",
-    "Q",
-    "RSE",
-    "RET",
-    "SIM",
-    "SLOT",
-    "TID",
-    "TD",
-    "TC",
-    "ARG",
-    "PTH",
-    "FLY",
-    "I",
-    "C90",
-    "NPY",
-    "PD",
-    "N",
-    "PERF",
-    "E",
-    "W",
-    "PGH",
-    "UP",
-    "FURB",
-    "RUF",
-    "TRY",
-]
 ignore = [
-    "D104",
-    "PLC0415",
-    "PLR0913",
-    "COM812",
-    "SLF001",
-    "TID252",
-    "TC001",
-    "TC002",
-    "TC003",
-    "TC004",
+  "D104",
+  "PLC0415",
+  "PLR0913",
+  "COM812",
+  "SLF001",
+  "TID252",
+  "TC001",
+  "TC002",
+  "TC003",
+  "TC004",
+]
+select = [
+  "D",
+  "PL",
+  "F",
+  "S",
+  "FBT",
+  "B",
+  "COM",
+  "DTZ",
+  "T10",
+  "ISC",
+  "EM",
+  "ICN",
+  "LOG",
+  "G",
+  "INP",
+  "PIE",
+  "PYI",
+  "PT",
+  "Q",
+  "RSE",
+  "RET",
+  "SIM",
+  "SLOT",
+  "TID",
+  "TD",
+  "TC",
+  "ARG",
+  "PTH",
+  "FLY",
+  "I",
+  "C90",
+  "NPY",
+  "PD",
+  "N",
+  "PERF",
+  "E",
+  "W",
+  "PGH",
+  "UP",
+  "FURB",
+  "RUF",
+  "TRY",
 ]
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D", "PL", "DOC", "INP", "S101", "N802", "F821"]
 "docs/**" = ["D", "PL", "DOC", "INP", "RET504", "C901", "N806", "PERF", "E402"]
+"tests/**" = ["D", "PL", "DOC", "INP", "S101", "N802", "F821"]
 
 [tool.coverage.report]
 omit = [
-    "*/typed_lisa_toolkit/containers/modes.py",
-    "*/typed_lisa_toolkit/_viz/*",
+  "*/typed_lisa_toolkit/containers/modes.py",
+  "*/typed_lisa_toolkit/_viz/*",
 ]
 
 [tool.pytest.ini_options]
@@ -169,21 +166,21 @@ addopts = "--import-mode=importlib"
 "src/typed_lisa_toolkit/py.typed" = "typed_lisa_toolkit/py.typed"
 
 [tool.basedpyright]
-include = ["src"]
-exclude = ["**/__pycache__"]
-ignore = ["docs"]
-defineConstant = { DEBUG = true }
+defineConstant = {DEBUG = true}
 enableTypeIgnoreComments = true
+exclude = ["**/__pycache__"]
+executionEnvironments = [
+  {root = "tests", reportPrivateUsage = false},
+  {root = "src"},
+]
+ignore = ["docs"]
+include = ["src"]
+reportAny = "none"
+reportDeprecated = false
+reportExplicitAny = "none"
 reportIgnoreCommentWithoutRule = "none"
+reportImplicitOverride = "none"
+reportImportCycles = false
 reportMissingImports = "error"
 reportMissingTypeStubs = false
-reportImplicitOverride = "none"
-reportAny = "none"
-reportExplicitAny = "none"
 reportUnusedCallResult = "none"
-reportDeprecated = false
-reportImportCycles = false
-executionEnvironments = [
-    { root = "tests", reportPrivateUsage = false },
-    { root = "src" },
-]

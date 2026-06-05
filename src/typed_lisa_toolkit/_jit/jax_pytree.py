@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..types import (
+        AnyArray,
         AnyGrid,
-        Array,
         Axis,
         AxLike,
         EvolutionarySpectralDensity,
@@ -51,7 +51,7 @@ def _flatten_representation(rep: "AnyReps"):
 
 def _unflatten_representation(
     aux: "tuple[type[AnyReps]]",
-    leaves: "tuple[Array, AnyGrid]",
+    leaves: "tuple[AnyArray, AnyGrid]",
 ) -> Any:
     (rep_type,) = aux
     (entries, grid) = leaves

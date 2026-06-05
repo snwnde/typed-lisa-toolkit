@@ -222,6 +222,7 @@ from .data import (
 )
 from .likelihood import FDWhittleLikelihood, Likelihood, WhittleLikelihood
 from .misc import (
+    AnyArray,
     AnyAxis,
     AnyGrid,
     Array,
@@ -283,6 +284,7 @@ __all__ = [
     "QNM",
     "STFT",
     "WDM",
+    "AnyArray",
     "AnyAxis",
     "AnyGrid",
     "Array",

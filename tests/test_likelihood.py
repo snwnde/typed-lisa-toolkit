@@ -21,8 +21,8 @@ from typed_lisa_toolkit.types import (
 
 
 def test_fd_whittle_classmethod_formulas():
-    assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0  # pyright: ignore[reportArgumentType]
-    assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0  # pyright: ignore[reportArgumentType]
+    assert FDWhittleLikelihood.log_likelihood_ratio(5.0, 2.0) == 4.0
+    assert FDWhittleLikelihood.log_likelihood(4.0, 2.0) == 3.0
 
 
 def test_cross_product_and_template_square_match_noise_model(

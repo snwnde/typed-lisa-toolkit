@@ -30,7 +30,7 @@ from typed_lisa_toolkit import (
 from typed_lisa_toolkit.types import (
     STFT,
     WDM,
-    Array,
+    AnyArray,
     Axis,
     FrequencySeries,
     FSData,
@@ -90,12 +90,12 @@ def lin_time_axis_fixture(xp: ModuleType) -> Axis[Linspace]:
 
 
 @pytest.fixture(scope="session", name="uni_ary_time_axis")
-def uni_ary_time_axis_fixture(xp: ModuleType) -> Axis[Array]:
+def uni_ary_time_axis_fixture(xp: ModuleType) -> Axis[AnyArray]:
     return axis(xp.asarray([0.0, 1.0, 2.0, 3.0, 4.0, 5.0], dtype=xp.float64))
 
 
 @pytest.fixture(scope="session", name="ary_time_axis")
-def ary_time_axis_fixture(xp: ModuleType) -> Axis[Array]:
+def ary_time_axis_fixture(xp: ModuleType) -> Axis[AnyArray]:
     return axis(xp.asarray([0.0, 1.0, 2.0, 4.0, 7.0, 11.0], dtype=xp.float64))
 
 
@@ -109,7 +109,7 @@ def long_time_axis_fixture(xp: ModuleType) -> Axis[Linspace]:
 
 
 @pytest.fixture(scope="session", name="short_time_axis")
-def short_time_axis_fixture(xp: ModuleType) -> Axis[Array]:
+def short_time_axis_fixture(xp: ModuleType) -> Axis[AnyArray]:
     return axis(xp.asarray([0.0, 1.0], dtype=xp.float64))
 
 
@@ -119,22 +119,22 @@ def lin_freq_axis_fixture(xp: ModuleType) -> Axis[Linspace]:
 
 
 @pytest.fixture(scope="session", name="uni_ary_freq_axis")
-def uni_ary_freq_axis_fixture(xp: ModuleType) -> Axis[Array]:
+def uni_ary_freq_axis_fixture(xp: ModuleType) -> Axis[AnyArray]:
     return axis(xp.asarray([1.0, 2.0, 3.0], dtype=xp.float64))
 
 
 @pytest.fixture(scope="session", name="dense_ary_freq_axis")
-def dense_ary_freq_axis_fixture(xp: ModuleType) -> Axis[Array]:
+def dense_ary_freq_axis_fixture(xp: ModuleType) -> Axis[AnyArray]:
     return axis(xp.linspace(1.0, 3.0, 10))
 
 
 @pytest.fixture(scope="session", name="ary_freq_axis")
-def ary_freq_axis_fixture(xp: ModuleType) -> Axis[Array]:
+def ary_freq_axis_fixture(xp: ModuleType) -> Axis[AnyArray]:
     return axis(xp.asarray([1.0, 2.0, 4.0], dtype=xp.float64))
 
 
 @pytest.fixture(scope="session", name="long_freq_axis")
-def long_freq_axis_fixture(xp: ModuleType) -> Axis[Array]:
+def long_freq_axis_fixture(xp: ModuleType) -> Axis[AnyArray]:
     return axis(xp.asarray([1.0, 2.0, 3.0, 4.0, 5.0], dtype=xp.float64))
 
 
@@ -147,17 +147,17 @@ def lin_time_grid1d_fixture(lin_time_axis: Axis[Linspace]):
 
 
 @pytest.fixture(scope="session", name="uni_ary_time_grid1d")
-def uni_ary_time_grid1d_fixture(uni_ary_time_axis: Axis[Array]):
+def uni_ary_time_grid1d_fixture(uni_ary_time_axis: Axis[AnyArray]):
     return (uni_ary_time_axis,)
 
 
 @pytest.fixture(scope="session", name="ary_time_grid1d")
-def ary_time_grid1d_fixture(ary_time_axis: Axis[Array]):
+def ary_time_grid1d_fixture(ary_time_axis: Axis[AnyArray]):
     return (ary_time_axis,)
 
 
 @pytest.fixture(scope="session", name="long_time_grid1d")
-def long_time_grid1d_fixture(long_time_axis: Axis[Array]):
+def long_time_grid1d_fixture(long_time_axis: Axis[AnyArray]):
     return (long_time_axis,)
 
 
@@ -167,17 +167,17 @@ def lin_freq_grid1d_fixture(lin_freq_axis: Axis[Linspace]):
 
 
 @pytest.fixture(scope="session", name="long_freq_grid1d")
-def long_freq_grid1d_fixture(long_freq_axis: Axis[Array]):
+def long_freq_grid1d_fixture(long_freq_axis: Axis[AnyArray]):
     return (long_freq_axis,)
 
 
 @pytest.fixture(scope="session", name="uni_ary_freq_grid1d")
-def uni_ary_freq_grid1d_fixture(uni_ary_freq_axis: Axis[Array]):
+def uni_ary_freq_grid1d_fixture(uni_ary_freq_axis: Axis[AnyArray]):
     return (uni_ary_freq_axis,)
 
 
 @pytest.fixture(scope="session", name="ary_freq_grid1d")
-def ary_freq_grid1d_fixture(ary_freq_axis: Axis[Array]):
+def ary_freq_grid1d_fixture(ary_freq_axis: Axis[AnyArray]):
     return (ary_freq_axis,)
 
 
@@ -190,55 +190,57 @@ def lin_lin_cartesian_fixture(
 
 @pytest.fixture(scope="session", name="lin_uni_cartesian")
 def lin_uni_cartesian_fixture(
-    lin_freq_axis: Axis[Linspace], uni_ary_time_axis: Axis[Array]
+    lin_freq_axis: Axis[Linspace], uni_ary_time_axis: Axis[AnyArray]
 ):
     return build_grid2d(lin_freq_axis, uni_ary_time_axis)
 
 
 @pytest.fixture(scope="session", name="lin_ary_cartesian")
 def lin_ary_cartesian_fixture(
-    lin_freq_axis: Axis[Linspace], ary_time_axis: Axis[Array]
+    lin_freq_axis: Axis[Linspace], ary_time_axis: Axis[AnyArray]
 ):
     return build_grid2d(lin_freq_axis, ary_time_axis)
 
 
 @pytest.fixture(scope="session", name="uni_lin_cartesian")
 def uni_lin_cartesian_fixture(
-    uni_ary_freq_axis: Axis[Array], lin_time_axis: Axis[Linspace]
+    uni_ary_freq_axis: Axis[AnyArray], lin_time_axis: Axis[Linspace]
 ):
     return build_grid2d(uni_ary_freq_axis, lin_time_axis)
 
 
 @pytest.fixture(scope="session", name="uni_uni_cartesian")
 def uni_uni_cartesian_fixture(
-    uni_ary_freq_axis: Axis[Array], uni_ary_time_axis: Axis[Array]
+    uni_ary_freq_axis: Axis[AnyArray], uni_ary_time_axis: Axis[AnyArray]
 ):
     return build_grid2d(uni_ary_freq_axis, uni_ary_time_axis)
 
 
 @pytest.fixture(scope="session", name="uni_ary_cartesian")
 def uni_ary_cartesian_fixture(
-    uni_ary_freq_axis: Axis[Array], ary_time_axis: Axis[Array]
+    uni_ary_freq_axis: Axis[AnyArray], ary_time_axis: Axis[AnyArray]
 ):
     return build_grid2d(uni_ary_freq_axis, ary_time_axis)
 
 
 @pytest.fixture(scope="session", name="ary_lin_cartesian")
 def ary_lin_cartesian_fixture(
-    ary_freq_axis: Axis[Array], lin_time_axis: Axis[Linspace]
+    ary_freq_axis: Axis[AnyArray], lin_time_axis: Axis[Linspace]
 ):
     return build_grid2d(ary_freq_axis, lin_time_axis)
 
 
 @pytest.fixture(scope="session", name="ary_uni_cartesian")
 def ary_uni_cartesian_fixture(
-    ary_freq_axis: Axis[Array], uni_ary_time_axis: Axis[Array]
+    ary_freq_axis: Axis[AnyArray], uni_ary_time_axis: Axis[AnyArray]
 ):
     return build_grid2d(ary_freq_axis, uni_ary_time_axis)
 
 
 @pytest.fixture(scope="session", name="ary_ary_cartesian")
-def ary_ary_cartesian_fixture(ary_freq_axis: Axis[Array], ary_time_axis: Axis[Array]):
+def ary_ary_cartesian_fixture(
+    ary_freq_axis: Axis[AnyArray], ary_time_axis: Axis[AnyArray]
+):
     return build_grid2d(ary_freq_axis, ary_time_axis)
 
 
@@ -246,7 +248,7 @@ def ary_ary_cartesian_fixture(ary_freq_axis: Axis[Array], ary_time_axis: Axis[Ar
 def lin_lin_sparse_fixture(
     xp: ModuleType, lin_freq_axis: Axis[Linspace], lin_time_axis: Axis[Linspace]
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
@@ -254,9 +256,9 @@ def lin_lin_sparse_fixture(
 def lin_uni_sparse_fixture(
     xp: ModuleType,
     lin_freq_axis: Axis[Linspace],
-    uni_ary_time_axis: Axis[Array],
+    uni_ary_time_axis: Axis[AnyArray],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, uni_ary_time_axis, sparse_indices=sparse_indices)
 
 
@@ -264,29 +266,29 @@ def lin_uni_sparse_fixture(
 def lin_ary_sparse_fixture(
     xp: ModuleType,
     lin_freq_axis: Axis[Linspace],
-    ary_time_axis: Axis[Array],
+    ary_time_axis: Axis[AnyArray],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, ary_time_axis, sparse_indices=sparse_indices)
 
 
 @pytest.fixture(scope="session", name="uni_lin_sparse")
 def uni_lin_sparse_fixture(
     xp: ModuleType,
-    uni_ary_freq_axis: Axis[Array],
+    uni_ary_freq_axis: Axis[AnyArray],
     lin_time_axis: Axis[Linspace],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(uni_ary_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
 @pytest.fixture(scope="session", name="uni_uni_sparse")
 def uni_uni_sparse_fixture(
     xp: ModuleType,
-    uni_ary_freq_axis: Axis[Array],
-    uni_ary_time_axis: Axis[Array],
+    uni_ary_freq_axis: Axis[AnyArray],
+    uni_ary_time_axis: Axis[AnyArray],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(
         uni_ary_freq_axis, uni_ary_time_axis, sparse_indices=sparse_indices
     )
@@ -295,40 +297,40 @@ def uni_uni_sparse_fixture(
 @pytest.fixture(scope="session", name="uni_ary_sparse")
 def uni_ary_sparse_fixture(
     xp: ModuleType,
-    uni_ary_freq_axis: Axis[Array],
-    ary_time_axis: Axis[Array],
+    uni_ary_freq_axis: Axis[AnyArray],
+    ary_time_axis: Axis[AnyArray],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(uni_ary_freq_axis, ary_time_axis, sparse_indices=sparse_indices)
 
 
 @pytest.fixture(scope="session", name="ary_lin_sparse")
 def ary_lin_sparse_fixture(
     xp: ModuleType,
-    ary_freq_axis: Axis[Array],
+    ary_freq_axis: Axis[AnyArray],
     lin_time_axis: Axis[Linspace],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(ary_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
 @pytest.fixture(scope="session", name="ary_uni_sparse")
 def ary_uni_sparse_fixture(
     xp: ModuleType,
-    ary_freq_axis: Axis[Array],
-    uni_ary_time_axis: Axis[Array],
+    ary_freq_axis: Axis[AnyArray],
+    uni_ary_time_axis: Axis[AnyArray],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(ary_freq_axis, uni_ary_time_axis, sparse_indices=sparse_indices)
 
 
 @pytest.fixture(scope="session", name="ary_ary_sparse")
 def ary_ary_sparse_fixture(
     xp: ModuleType,
-    ary_freq_axis: Axis[Array],
-    ary_time_axis: Axis[Array],
+    ary_freq_axis: Axis[AnyArray],
+    ary_time_axis: Axis[AnyArray],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(ary_freq_axis, ary_time_axis, sparse_indices=sparse_indices)
 
 
@@ -338,7 +340,7 @@ def lin_lin_sparse_cartesian_fixture(
     lin_freq_axis: Axis[Linspace],
     lin_time_axis: Axis[Linspace],
 ):
-    sparse_indices = cast("Array", xp.asarray([[0, 0], [1, 2], [2, 4]]))
+    sparse_indices = cast("AnyArray", xp.asarray([[0, 0], [1, 2], [2, 4]]))
     return build_grid2d(lin_freq_axis, lin_time_axis, sparse_indices=sparse_indices)
 
 
@@ -356,16 +358,16 @@ def lin_freq_series_fixture(
 @pytest.fixture(scope="session", name="uni_ary_freq_series")
 def uni_ary_freq_series_fixture(
     xp: ModuleType,
-    uni_ary_freq_axis: Axis[Array],
-) -> FrequencySeries[Axis[Array]]:
+    uni_ary_freq_axis: Axis[AnyArray],
+) -> FrequencySeries[Axis[AnyArray]]:
     entries = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64)
     return frequency_series(uni_ary_freq_axis, entries[None, None, None, None, :])
 
 
 @pytest.fixture(scope="session", name="ary_freq_series")
 def ary_freq_series_fixture(
-    xp: ModuleType, ary_freq_axis: Axis[Array]
-) -> FrequencySeries[Axis[Array]]:
+    xp: ModuleType, ary_freq_axis: Axis[AnyArray]
+) -> FrequencySeries[Axis[AnyArray]]:
     entries = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64)
     return frequency_series(ary_freq_axis, entries[None, None, None, None, :])
 
@@ -391,16 +393,16 @@ def long_time_series_fixture(
 @pytest.fixture(scope="session", name="uni_ary_time_series")
 def uni_ary_time_series_fixture(
     xp: ModuleType,
-    uni_ary_time_axis: Axis[Array],
-) -> TimeSeries[Axis[Array]]:
+    uni_ary_time_axis: Axis[AnyArray],
+) -> TimeSeries[Axis[AnyArray]]:
     entries = xp.asarray([0.0, 1.0, 0.5, -0.5, -1.0, -0.25], dtype=xp.float64)
     return time_series(uni_ary_time_axis, entries[None, None, None, None, :])
 
 
 @pytest.fixture(scope="session", name="ary_time_series")
 def ary_time_series_fixture(
-    xp: ModuleType, ary_time_axis: Axis[Array]
-) -> TimeSeries[Axis[Array]]:
+    xp: ModuleType, ary_time_axis: Axis[AnyArray]
+) -> TimeSeries[Axis[AnyArray]]:
     entries = xp.asarray([0.0, 1.0, 0.5, -0.5, -1.0, -0.25], dtype=xp.float64)
     return time_series(ary_time_axis, entries[None, None, None, None, :])
 
@@ -430,7 +432,7 @@ def lin_time_phasor_fixture(xp: ModuleType, lin_time_axis: Axis[Linspace]):
 
 
 @pytest.fixture(scope="session", name="uni_ary_phasor")
-def uni_ary_phasor_fixture(xp: ModuleType, uni_ary_freq_axis: Axis[Array]):
+def uni_ary_phasor_fixture(xp: ModuleType, uni_ary_freq_axis: Axis[AnyArray]):
     amplitudes = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j)
     phases = xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * np.pi
     return frequency_phasor(
@@ -441,7 +443,7 @@ def uni_ary_phasor_fixture(xp: ModuleType, uni_ary_freq_axis: Axis[Array]):
 
 
 @pytest.fixture(scope="session", name="ary_phasor")
-def ary_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
+def ary_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[AnyArray]):
     amplitudes = xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j)
     phases = xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * np.pi
     return frequency_phasor(
@@ -468,8 +470,8 @@ def lin_lin_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="lin_uni_cartesian_stft")
 def lin_uni_cartesian_stft_fixture(
     xp: ModuleType,
-    lin_uni_cartesian: Grid2DCartesian[Axis[Linspace], Axis[Array]],
-) -> STFT[Grid2DCartesian[Axis[Linspace], Axis[Array]]]:
+    lin_uni_cartesian: Grid2DCartesian[Axis[Linspace], Axis[AnyArray]],
+) -> STFT[Grid2DCartesian[Axis[Linspace], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(lin_uni_cartesian[0]), len(lin_uni_cartesian[1]))
@@ -482,8 +484,8 @@ def lin_uni_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="lin_ary_cartesian_stft")
 def lin_ary_cartesian_stft_fixture(
     xp: ModuleType,
-    lin_ary_cartesian: Grid2DCartesian[Axis[Linspace], Axis[Array]],
-) -> STFT[Grid2DCartesian[Axis[Linspace], Axis[Array]]]:
+    lin_ary_cartesian: Grid2DCartesian[Axis[Linspace], Axis[AnyArray]],
+) -> STFT[Grid2DCartesian[Axis[Linspace], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(lin_ary_cartesian[0]), len(lin_ary_cartesian[1]))
@@ -496,8 +498,8 @@ def lin_ary_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="uni_lin_cartesian_stft")
 def uni_lin_cartesian_stft_fixture(
     xp: ModuleType,
-    uni_lin_cartesian: Grid2DCartesian[Axis[Array], Axis[Linspace]],
-) -> STFT[Grid2DCartesian[Axis[Array], Axis[Linspace]]]:
+    uni_lin_cartesian: Grid2DCartesian[Axis[AnyArray], Axis[Linspace]],
+) -> STFT[Grid2DCartesian[Axis[AnyArray], Axis[Linspace]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(uni_lin_cartesian[0]), len(uni_lin_cartesian[1]))
@@ -510,8 +512,8 @@ def uni_lin_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="uni_uni_cartesian_stft")
 def uni_uni_cartesian_stft_fixture(
     xp: ModuleType,
-    uni_uni_cartesian: Grid2DCartesian[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DCartesian[Axis[Array], Axis[Array]]]:
+    uni_uni_cartesian: Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(uni_uni_cartesian[0]), len(uni_uni_cartesian[1]))
@@ -524,8 +526,8 @@ def uni_uni_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="uni_ary_cartesian_stft")
 def uni_ary_cartesian_stft_fixture(
     xp: ModuleType,
-    uni_ary_cartesian: Grid2DCartesian[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DCartesian[Axis[Array], Axis[Array]]]:
+    uni_ary_cartesian: Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(uni_ary_cartesian[0]), len(uni_ary_cartesian[1]))
@@ -538,8 +540,8 @@ def uni_ary_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="ary_lin_cartesian_stft")
 def ary_lin_cartesian_stft_fixture(
     xp: ModuleType,
-    ary_lin_cartesian: Grid2DCartesian[Axis[Array], Axis[Linspace]],
-) -> STFT[Grid2DCartesian[Axis[Array], Axis[Linspace]]]:
+    ary_lin_cartesian: Grid2DCartesian[Axis[AnyArray], Axis[Linspace]],
+) -> STFT[Grid2DCartesian[Axis[AnyArray], Axis[Linspace]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(ary_lin_cartesian[0]), len(ary_lin_cartesian[1]))
@@ -552,8 +554,8 @@ def ary_lin_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="ary_uni_cartesian_stft")
 def ary_uni_cartesian_stft_fixture(
     xp: ModuleType,
-    ary_uni_cartesian: Grid2DCartesian[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DCartesian[Axis[Array], Axis[Array]]]:
+    ary_uni_cartesian: Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(ary_uni_cartesian[0]), len(ary_uni_cartesian[1]))
@@ -566,8 +568,8 @@ def ary_uni_cartesian_stft_fixture(
 @pytest.fixture(scope="session", name="ary_ary_cartesian_stft")
 def ary_ary_cartesian_stft_fixture(
     xp: ModuleType,
-    ary_ary_cartesian: Grid2DCartesian[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DCartesian[Axis[Array], Axis[Array]]]:
+    ary_ary_cartesian: Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DCartesian[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal(
             (1, 1, 1, 1, len(ary_ary_cartesian[0]), len(ary_ary_cartesian[1]))
@@ -597,8 +599,8 @@ def lin_lin_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="lin_uni_sparse_stft")
 def lin_uni_sparse_stft_fixture(
     xp: ModuleType,
-    lin_uni_sparse: Grid2DSparse[Axis[Linspace], Axis[Array]],
-) -> STFT[Grid2DSparse[Axis[Linspace], Axis[Array]]]:
+    lin_uni_sparse: Grid2DSparse[Axis[Linspace], Axis[AnyArray]],
+) -> STFT[Grid2DSparse[Axis[Linspace], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -614,8 +616,8 @@ def lin_uni_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="lin_ary_sparse_stft")
 def lin_ary_sparse_stft_fixture(
     xp: ModuleType,
-    lin_ary_sparse: Grid2DSparse[Axis[Linspace], Axis[Array]],
-) -> STFT[Grid2DSparse[Axis[Linspace], Axis[Array]]]:
+    lin_ary_sparse: Grid2DSparse[Axis[Linspace], Axis[AnyArray]],
+) -> STFT[Grid2DSparse[Axis[Linspace], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -631,8 +633,8 @@ def lin_ary_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="uni_lin_sparse_stft")
 def uni_lin_sparse_stft_fixture(
     xp: ModuleType,
-    uni_lin_sparse: Grid2DSparse[Axis[Array], Axis[Linspace]],
-) -> STFT[Grid2DSparse[Axis[Array], Axis[Linspace]]]:
+    uni_lin_sparse: Grid2DSparse[Axis[AnyArray], Axis[Linspace]],
+) -> STFT[Grid2DSparse[Axis[AnyArray], Axis[Linspace]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -648,8 +650,8 @@ def uni_lin_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="uni_uni_sparse_stft")
 def uni_uni_sparse_stft_fixture(
     xp: ModuleType,
-    uni_uni_sparse: Grid2DSparse[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DSparse[Axis[Array], Axis[Array]]]:
+    uni_uni_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -665,8 +667,8 @@ def uni_uni_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="uni_ary_sparse_stft")
 def uni_ary_sparse_stft_fixture(
     xp: ModuleType,
-    uni_ary_sparse: Grid2DSparse[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DSparse[Axis[Array], Axis[Array]]]:
+    uni_ary_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -682,8 +684,8 @@ def uni_ary_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="ary_lin_sparse_stft")
 def ary_lin_sparse_stft_fixture(
     xp: ModuleType,
-    ary_lin_sparse: Grid2DSparse[Axis[Array], Axis[Linspace]],
-) -> STFT[Grid2DSparse[Axis[Array], Axis[Linspace]]]:
+    ary_lin_sparse: Grid2DSparse[Axis[AnyArray], Axis[Linspace]],
+) -> STFT[Grid2DSparse[Axis[AnyArray], Axis[Linspace]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -699,8 +701,8 @@ def ary_lin_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="ary_uni_sparse_stft")
 def ary_uni_sparse_stft_fixture(
     xp: ModuleType,
-    ary_uni_sparse: Grid2DSparse[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DSparse[Axis[Array], Axis[Array]]]:
+    ary_uni_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -716,8 +718,8 @@ def ary_uni_sparse_stft_fixture(
 @pytest.fixture(scope="session", name="ary_ary_sparse_stft")
 def ary_ary_sparse_stft_fixture(
     xp: ModuleType,
-    ary_ary_sparse: Grid2DSparse[Axis[Array], Axis[Array]],
-) -> STFT[Grid2DSparse[Axis[Array], Axis[Array]]]:
+    ary_ary_sparse: Grid2DSparse[Axis[AnyArray], Axis[AnyArray]],
+) -> STFT[Grid2DSparse[Axis[AnyArray], Axis[AnyArray]]]:
     entries = xp.asarray(
         np.random.default_rng(SEED).standard_normal((1, 1, 1, 1, 3)),
         dtype=xp.float64,
@@ -985,20 +987,20 @@ def harmonic_waveform_fixture(xp: ModuleType, lin_freq_axis: Axis[Linspace]):
 
 
 @pytest.fixture(scope="session", name="hw_phasor")
-def hw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
+def hw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[AnyArray]):
     mode_22 = cast_mode((2, 2))
     mode_33 = cast_mode((3, 3))
 
     wf_22 = frequency_phasor(
         frequencies=ary_freq_axis,
         amplitudes=cast(
-            "Array",
+            "AnyArray",
             (xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j))[
                 None, None, None, None, :
             ],
         ),
         phases=cast(
-            "Array",
+            "AnyArray",
             (xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * xp.pi)[
                 None, None, None, None, :
             ],
@@ -1007,13 +1009,13 @@ def hw_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
     wf_33 = frequency_phasor(
         frequencies=ary_freq_axis,
         amplitudes=cast(
-            "Array",
+            "AnyArray",
             (xp.asarray([0.5, 0.25, 0.75], dtype=xp.float64) * (1 + 1j))[
                 None, None, None, None, :
             ],
         ),
         phases=cast(
-            "Array",
+            "AnyArray",
             (xp.asarray([0.25, 0.75, 0.5], dtype=xp.float64) * xp.pi)[
                 None, None, None, None, :
             ],
@@ -1101,7 +1103,7 @@ def harmonic_projected_waveform_fixture(xp: ModuleType, lin_freq_axis: Axis[Lins
 
 
 @pytest.fixture(scope="session", name="hpw_freq_phasor")
-def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
+def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[AnyArray]):
     mode_22 = cast_mode((2, 2))
     mode_33 = cast_mode((3, 3))
 
@@ -1110,13 +1112,13 @@ def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "X": frequency_phasor(
                 frequencies=ary_freq_axis,
                 amplitudes=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 phases=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1125,13 +1127,13 @@ def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "Y": frequency_phasor(
                 frequencies=ary_freq_axis,
                 amplitudes=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.5, 0.25, 0.75], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 phases=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.25, 0.75, 0.5], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1140,13 +1142,13 @@ def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "Z": frequency_phasor(
                 frequencies=ary_freq_axis,
                 amplitudes=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.3, 0.8, -0.2], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 phases=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([-0.1, 0.4, -0.9], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1159,13 +1161,13 @@ def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "X": frequency_phasor(
                 frequencies=ary_freq_axis,
                 amplitudes=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.2, -0.5, 0.1], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 phases=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.0, 1.0, -0.2], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1174,13 +1176,13 @@ def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "Y": frequency_phasor(
                 frequencies=ary_freq_axis,
                 amplitudes=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([1.0, 1.5, 2.0], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 phases=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.0, 0.0, 0.0], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1189,13 +1191,13 @@ def hpw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "Z": frequency_phasor(
                 frequencies=ary_freq_axis,
                 amplitudes=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.4, -0.7, 1.1], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 phases=cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.2, -0.1, -0.3], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1221,19 +1223,19 @@ def homogeneous_harmonic_projected_waveform_fixture(
 
 
 @pytest.fixture(scope="session", name="pw_freq_phasor")
-def pw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
+def pw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[AnyArray]):
     resp = projected_waveform(
         {
             "X": frequency_phasor(
                 ary_freq_axis,
                 cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([1.0, 0.5, 0.25], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.0, 0.5, 1.0], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1242,13 +1244,13 @@ def pw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "Y": frequency_phasor(
                 ary_freq_axis,
                 cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.5, 0.25, 0.75], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.25, 0.75, 0.5], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1257,13 +1259,13 @@ def pw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
             "Z": frequency_phasor(
                 ary_freq_axis,
                 cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([0.3, 0.8, -0.2], dtype=xp.float64) * (1 + 1j))[
                         None, None, None, None, :
                     ],
                 ),
                 cast(
-                    "Array",
+                    "AnyArray",
                     (xp.asarray([-0.1, 0.4, -0.9], dtype=xp.float64) * xp.pi)[
                         None, None, None, None, :
                     ],
@@ -1276,7 +1278,7 @@ def pw_freq_phasor_fixture(xp: ModuleType, ary_freq_axis: Axis[Array]):
 
 @pytest.fixture(scope="session", name="hhpw_freq_phasor")
 def hhpw_freq_phasor_fixture(
-    hpw_freq_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[Array]]],
+    hpw_freq_phasor: HarmonicProjectedWaveform[Harmonic, Phasor[Axis[AnyArray]]],
 ):
     return homogeneous_harmonic_projected_waveform(
         {

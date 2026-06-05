@@ -29,21 +29,15 @@ Tapering Functions
 """
 
 import logging
-from typing import TYPE_CHECKING, ParamSpec, Protocol, final
+from typing import Any, ParamSpec, Protocol, final
 
 import numpy as np
-import numpy.typing as npt
 import scipy.special
 from scipy.signal.windows import _windows  # type: ignore[import]
 
-if TYPE_CHECKING:
-    import jax
-    import jax.typing as jpt
-    import numpy as np
-    import numpy.typing as npt
+from .misc import AnyArray
 
-    ArrayLike = jpt.ArrayLike | npt.ArrayLike
-    Array = jax.Array | npt.NDArray[np.number]
+ArrayLike = Any
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +48,7 @@ P = ParamSpec("P")
 class Tapering(Protocol):
     """Protocol for tapering functions."""
 
-    def __call__(self, __array: "Array") -> "Array":  # noqa: PYI063
+    def __call__(self, __array: "AnyArray") -> "AnyArray":  # noqa: PYI063
         """Return the tapering window to apply on the array."""
         ...
 
@@ -67,7 +61,7 @@ class LenWindow[**P](Protocol):
         __len: int,  # noqa: PYI063
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> "Array": ...
+    ) -> "AnyArray": ...
 
 
 # class _ScipyWindow(Protocol, Generic[P]):
@@ -110,12 +104,13 @@ class ldc_window(Tapering):  # noqa: N801
         self.margin = margin
         self.kap = kap
 
-    def __call__(self, grid: "Array") -> npt.NDArray[np.floating]:
+    def __call__(self, grid: "AnyArray") -> AnyArray:
         """Return the tapering window to apply on the array."""
-        xr = grid[-1] - self.margin
-        xl = grid[0] + self.margin
-        winl = 0.5 * (1.0 + np.tanh(self.kap * (grid - xl)))
-        winr = 0.5 * (1.0 - np.tanh(self.kap * (grid - xr)))
+        _grid = np.asarray(grid)
+        xr = _grid[-1] - self.margin
+        xl = _grid[0] + self.margin
+        winl = 0.5 * (1.0 + np.tanh(self.kap * (_grid - xl)))
+        winr = 0.5 * (1.0 - np.tanh(self.kap * (_grid - xr)))
         return winl * winr
 
 
@@ -145,15 +140,16 @@ class planck_window(Tapering):  # noqa: N801
         self.xl = left_margin
         self.xr = right_margin
 
-    def __call__(self, grid: "Array"):
+    def __call__(self, grid: "AnyArray") -> AnyArray:
         """Return the tapering window to apply on the array."""
         # https://arxiv.org/abs/1003.2939
         win = np.ones_like(grid)
         win[0] = 0
         win[-1] = 0
-        g_min, g_max = grid[0], grid[-1]
-        lgrid = grid[grid <= g_min + self.xl]
-        rgrid = grid[grid >= g_max - self.xr]
+        _grid = np.asarray(grid)
+        g_min, g_max = _grid[0], _grid[-1]
+        lgrid = _grid[_grid <= g_min + self.xl]
+        rgrid = _grid[_grid >= g_max - self.xr]
         zl = self.xl * (1 / (lgrid[1:] - g_min) + 1 / (lgrid[1:] - g_min - self.xl))
         zr = -self.xr * (1 / (rgrid[:-1] - g_max) + 1 / (rgrid[:-1] - g_max + self.xr))
         # pylint: disable=no-member

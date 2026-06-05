@@ -17,9 +17,9 @@ from ..utils import deprecated, extend_to, warn_external
 from . import _mixins, tapering
 from . import representations as reps
 from .misc import (
+    AnyArray,
     AnyAxis,
     AnyGrid,
-    Array,
     Axis,
     AxLike,
     Domain,
@@ -389,7 +389,7 @@ class TSData(_SeriesData[reps.UniformTimeSeries]):
         cls,
         *,
         times: AnyAxis,
-        entries: Array,
+        entries: AnyArray,
         channels: tuple[str, ...],
         name: str | None = None,
     ) -> Self:
@@ -518,7 +518,7 @@ class FSData(_SeriesData[reps.UniformFrequencySeries]):
         cls,
         *,
         frequencies: AnyAxis,
-        entries: Array,
+        entries: AnyArray,
         channels: tuple[str, ...],
         name: str | None = None,
     ) -> Self:
@@ -609,7 +609,7 @@ class TimedFSData(FSData):
         """Semantic kind of the data."""
         return "timed"
 
-    def create_like(self, entries: Array) -> Self:  # noqa: D102
+    def create_like(self, entries: AnyArray) -> Self:  # noqa: D102
         return super().create_like(entries).set_times(self.times)
 
     def get_subset(  # noqa: D102
@@ -712,9 +712,9 @@ class _Grid2DData[  # pyright: ignore[reportUnsafeMultipleInheritance]
         *,
         frequencies: AnyAxis,
         times: AnyAxis,
-        entries: Array,
+        entries: AnyArray,
         channels: tuple[str, ...],
-        sparse_indices: Array | None = None,
+        sparse_indices: AnyArray | None = None,
         name: str | None = None,
     ) -> Self:
         """Construct from raw time-frequency entries and explicit channel names."""
@@ -829,7 +829,7 @@ def tsdata(
 def tsdata(
     *,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> TSData: ...
@@ -840,7 +840,7 @@ def tsdata(
     /,
     *,
     times: AnyAxis | AxLike | None = None,
-    entries: Array | None = None,
+    entries: AnyArray | None = None,
     channels: tuple[str, ...] | None = None,
     name: str | None = None,
 ) -> TSData:
@@ -868,7 +868,7 @@ def tsdata(
         A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the time grid of the data.
 
-    entries: :class:`~types.misc.Array`
+    entries: :class:`~types.misc.AnyArray`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)``
         where ``Nt`` is the size of ``times``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -930,7 +930,7 @@ def fsdata(
 def fsdata(
     *,
     frequencies: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     times: None = None,
     name: str | None = None,
@@ -941,7 +941,7 @@ def fsdata(
 def fsdata(
     *,
     frequencies: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     times: AnyAxis | AxLike,
     name: str | None = None,
@@ -953,7 +953,7 @@ def fsdata(
     /,
     *,
     frequencies: AnyAxis | AxLike | None = None,
-    entries: Array | None = None,
+    entries: AnyArray | None = None,
     channels: tuple[str, ...] | None = None,
     times: AnyAxis | AxLike | None = None,
     name: str | None = None,
@@ -988,7 +988,7 @@ def fsdata(
             A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
             object representing the frequency grid of the data.
 
-        entries: :class:`~types.misc.Array`
+        entries: :class:`~types.misc.AnyArray`
             A array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)``
             where ``Nf`` is the size of ``frequencies``.
             See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1076,7 +1076,7 @@ def stftdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
@@ -1088,9 +1088,9 @@ def stftdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
-    sparse_indices: Array,
+    sparse_indices: AnyArray,
     name: str | None = None,
 ) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
@@ -1101,9 +1101,9 @@ def stftdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     *,
     frequencies: AnyAxis | AxLike | None = None,
     times: AnyAxis | AxLike | None = None,
-    entries: Array | None = None,
+    entries: AnyArray | None = None,
     channels: tuple[str, ...] | None = None,
-    sparse_indices: Array | None = None,
+    sparse_indices: AnyArray | None = None,
     name: str | None = None,
 ):
     """Construct :class:`~types.STFTData`.
@@ -1135,7 +1135,7 @@ def stftdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
             A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
             object representing the time grid of the data.
 
-        entries: :class:`~types.misc.Array`
+        entries: :class:`~types.misc.AnyArray`
             An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
             ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
             :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1144,7 +1144,7 @@ def stftdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
         channels:
             A tuple of channel names in the data.
 
-        sparse_indices: :class:`~types.misc.Array`, optional
+        sparse_indices: :class:`~types.misc.AnyArray`, optional
             An array of shape ``(n_sparse, 2)`` containing the indices of the
             non-zero entries in the sparse grid.
             See :attr:`~types.misc.Grid2DSparse.indices` for more details.
@@ -1206,7 +1206,7 @@ def wdmdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
@@ -1218,9 +1218,9 @@ def wdmdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
-    sparse_indices: Array,
+    sparse_indices: AnyArray,
     name: str | None = None,
 ) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
@@ -1231,9 +1231,9 @@ def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     *,
     frequencies: AnyAxis | AxLike | None = None,
     times: AnyAxis | AxLike | None = None,
-    entries: Array | None = None,
+    entries: AnyArray | None = None,
     channels: tuple[str, ...] | None = None,
-    sparse_indices: Array | None = None,
+    sparse_indices: AnyArray | None = None,
     name: str | None = None,
 ):
     """Construct :class:`~types.WDMData`.
@@ -1265,7 +1265,7 @@ def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
             A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
             object representing the time grid of the data.
 
-        entries: :class:`~types.misc.Array`
+        entries: :class:`~types.misc.AnyArray`
             An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
             ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
             :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1274,7 +1274,7 @@ def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
         channels:
             A tuple of channel names in the data.
 
-        sparse_indices: :class:`~types.misc.Array`, optional
+        sparse_indices: :class:`~types.misc.AnyArray`, optional
             An array of shape ``(n_sparse, 2)`` containing the indices of
             the non-zero entries in the sparse grid.
             See :attr:`~types.misc.Grid2DSparse.indices` for more details.
@@ -1326,7 +1326,7 @@ def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
 def construct_tsdata(
     *,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> TSData:
@@ -1338,7 +1338,7 @@ def construct_tsdata(
         A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the time grid of the data.
 
-    entries: :class:`~types.misc.Array`
+    entries: :class:`~types.misc.AnyArray`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nt)``
         where ``Nt`` is the size of ``times``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1363,7 +1363,7 @@ def construct_tsdata(
 def construct_fsdata(
     *,
     frequencies: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     times: AnyAxis | AxLike,
     name: str | None = None,
@@ -1374,7 +1374,7 @@ def construct_fsdata(
 def construct_fsdata(
     *,
     frequencies: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> FSData: ...
@@ -1384,7 +1384,7 @@ def construct_fsdata(
 def construct_fsdata(
     *,
     frequencies: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     name: str | None = None,
     times: AnyAxis | AxLike | None = None,
@@ -1397,7 +1397,7 @@ def construct_fsdata(
         A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
         object representing the frequency grid of the data.
 
-    entries: :class:`~types.misc.Array`
+    entries: :class:`~types.misc.AnyArray`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)``
         where ``Nf`` is the size of ``frequencies``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1427,7 +1427,7 @@ def construct_fsdata(
 def construct_timed_fsdata(
     *,
     frequencies: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     times: AnyAxis | AxLike,
     name: str | None = None,
@@ -1440,7 +1440,7 @@ def construct_timed_fsdata(
         A uniform array of shape ``(n_freqs,)`` or a :class:`~types.Linspace`
         object representing the frequency grid of the data.
 
-    entries: :class:`~types.misc.Array`
+    entries: :class:`~types.misc.AnyArray`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, Nf)``
         where ``Nf`` is the size of ``frequencies``.
         See the :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1481,7 +1481,7 @@ def construct_stftdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
@@ -1493,9 +1493,9 @@ def construct_stftdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
-    sparse_indices: Array,
+    sparse_indices: AnyArray,
     name: str | None = None,
 ) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
@@ -1505,9 +1505,9 @@ def construct_stftdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
-    sparse_indices: Array | None = None,
+    sparse_indices: AnyArray | None = None,
     name: str | None = None,
 ):
     """Construct an :class:`~types.data.STFTData` (*Deprecated*).
@@ -1522,7 +1522,7 @@ def construct_stftdata(
         A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the time grid of the data.
 
-    entries: :class:`~types.misc.Array`
+    entries: :class:`~types.misc.AnyArray`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
         ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
         :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1531,7 +1531,7 @@ def construct_stftdata(
     channels: tuple[str, ...]
         Names of the channels in the data.
 
-    sparse_indices: :class:`~types.misc.Array`, optional
+    sparse_indices: :class:`~types.misc.AnyArray`, optional
         An array of shape ``(n_sparse, 2)`` containing the indices of
         the non-zero entries in the sparse grid.
         See :attr:`~types.misc.Grid2DSparse.indices` for more details.
@@ -1560,7 +1560,7 @@ def construct_wdmdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
     sparse_indices: None = None,
     name: str | None = None,
@@ -1572,9 +1572,9 @@ def construct_wdmdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
-    sparse_indices: Array,
+    sparse_indices: AnyArray,
     name: str | None = None,
 ) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
 
@@ -1584,9 +1584,9 @@ def construct_wdmdata(
     *,
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
-    entries: Array,
+    entries: AnyArray,
     channels: tuple[str, ...],
-    sparse_indices: Array | None = None,
+    sparse_indices: AnyArray | None = None,
     name: str | None = None,
 ):
     """Construct a :class:`~types.data.WDMData` (*Deprecated*).
@@ -1601,7 +1601,7 @@ def construct_wdmdata(
         A uniform array of shape ``(n_times,)`` or a :class:`~types.Linspace`
         object representing the time grid of the data.
 
-    entries: :class:`~types.misc.Array`
+    entries: :class:`~types.misc.AnyArray`
         An array of shape ``(n_batch, n_channels, n_harmonics, n_features, n_freqs, n_times)`` or
         ``(n_batch, n_channels, n_harmonics, n_features, n_sparse)``. See the
         :external+l2d-interface:attr:`convention <l2d_interface.contract.Representation.entries>`
@@ -1610,7 +1610,7 @@ def construct_wdmdata(
     channels:
         Names of the channels in the data.
 
-    sparse_indices: :class:`~types.misc.Array`, optional
+    sparse_indices: :class:`~types.misc.AnyArray`, optional
         An array of shape ``(n_sparse, 2)`` containing the indices of
         the non-zero entries in the sparse grid.
         See :attr:`~types.misc.Grid2DSparse.indices` for more details.
@@ -1863,7 +1863,7 @@ def load_ldc_data(file_path: str | pathlib.Path, **kwargs: Any) -> TSData:
 def load_mojito(processed_data: SignalProcessor):
     """Load the data from a preprocessed Mojito data object."""
     channel_names = tuple(processed_data.channels)
-    _data = cast("dict[str, Array]", processed_data.data)
+    _data = cast("dict[str, AnyArray]", processed_data.data)
     _mapping = {
         chnname: reps.time_series(
             _enforce_uniform(axis(processed_data.t)),

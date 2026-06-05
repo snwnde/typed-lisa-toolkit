@@ -347,7 +347,7 @@ def test_load_data_legacy_and_unsupported_combination(
         f.attrs["type"] = "TSData"
         f.create_group("X")
         f["X"].create_dataset("grid", data=tsdata.times.asarray())  # pyright: ignore[reportAttributeAccessIssue, reportArgumentType]
-        f["X"].create_dataset("entries", data=tsdata["X"].entries.squeeze())  # pyright: ignore[reportArgumentType, reportAttributeAccessIssue]
+        f["X"].create_dataset("entries", data=tsdata["X"].entries.squeeze())  # pyright: ignore[reportAttributeAccessIssue]
     with pytest.warns(DeprecationWarning, match="legacy"):
         loaded_legacy = load_data(legacy_path, legacy=True)
     assert isinstance(loaded_legacy, TSData)
