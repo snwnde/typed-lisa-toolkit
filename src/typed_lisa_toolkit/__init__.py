@@ -24,6 +24,8 @@ Functions that load data from disk or memory in common formats.
    load_data
    load_sangria
    load_mojito
+   load_mojito_orbits
+   load_preprocessed_mojito
    load_ldc_data
 
 
@@ -241,7 +243,14 @@ from ._constructors import (
     wdmdata,
     whittle,
 )
-from ._loaders import load_data, load_ldc_data, load_mojito, load_sangria
+from ._loaders import (
+    load_data,
+    load_ldc_data,
+    load_mojito,
+    load_mojito_orbits,
+    load_preprocessed_mojito,
+    load_sangria,
+)
 from ._viz.plotting import plot, plot_compare
 
 __all__ = [
@@ -275,6 +284,8 @@ __all__ = [
     "load_data",
     "load_ldc_data",
     "load_mojito",
+    "load_mojito_orbits",
+    "load_preprocessed_mojito",
     "load_sangria",
     "make_sdm",
     "noise_model",

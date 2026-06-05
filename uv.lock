@@ -1921,12 +1921,16 @@ wheels = [
 [[package]]
 name = "mojito-processor"
 version = "0.6.3"
-source = { git = "https://github.com/OllieBurke/MojitoProcessor.git#e67a2fee739f6bc226a9fb375b8d3af634088ebe" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "h5py" },
     { name = "mojito" },
     { name = "numpy" },
     { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/49/98762e2f5aadaa72d461666aad1cc30707e7207929bfed33635f1b8c94ce/mojito_processor-0.6.3.tar.gz", hash = "sha256:639895af90b78ad1958e4bbd4540418cb79d56314b7c4e31426777f5dd5ce2f4", size = 185825, upload-time = "2026-05-02T01:19:14.485Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/57/9ec7ac6f81463590b7bd9dacd06ae2445e5254d6d31df55c5ef2276e20be/mojito_processor-0.6.3-py3-none-any.whl", hash = "sha256:52727cf2532d74312ee59253c8d6846795b25ef052b298bac786a495b9e18403", size = 22929, upload-time = "2026-05-02T01:19:12.853Z" },
 ]
 
 [[package]]
@@ -3767,6 +3771,9 @@ jax = [
     { name = "jax", marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
 ]
 mojito = [
+    { name = "mojito" },
+]
+mojito-processor = [
     { name = "mojito-processor" },
 ]
 pytorch = [
@@ -3838,14 +3845,15 @@ requires-dist = [
     { name = "h5py" },
     { name = "jax", marker = "(platform_machine != 'x86_64' and extra == 'jax') or (sys_platform != 'darwin' and extra == 'jax')" },
     { name = "l2d-interface", git = "https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git?rev=e6fa486c8a06a48eb951c022e2f960ad42e07501" },
-    { name = "mojito-processor", marker = "extra == 'mojito'", git = "https://github.com/OllieBurke/MojitoProcessor.git" },
+    { name = "mojito", marker = "extra == 'mojito'" },
+    { name = "mojito-processor", marker = "extra == 'mojito-processor'" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "quadax", marker = "(platform_machine != 'x86_64' and extra == 'quadax') or (sys_platform != 'darwin' and extra == 'quadax')" },
     { name = "scipy", specifier = ">=1.12.0" },
     { name = "torch", marker = "(platform_machine != 'x86_64' and extra == 'pytorch') or (sys_platform != 'darwin' and extra == 'pytorch')" },
     { name = "wdm-transform", marker = "extra == 'wdm'", specifier = ">=0.2" },
 ]
-provides-extras = ["jax", "mojito", "pytorch", "quadax", "wdm"]
+provides-extras = ["jax", "mojito", "mojito-processor", "pytorch", "quadax", "wdm"]
 
 [package.metadata.requires-dev]
 dev = [

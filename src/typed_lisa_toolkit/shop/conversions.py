@@ -5,6 +5,7 @@ from types import ModuleType
 from typing import Any, Literal, cast, overload
 
 import array_api_compat as xpc
+import astropy.units as u
 
 from ..types import (
     AnyArray,
@@ -308,3 +309,72 @@ def aet2xyz(
         return _aet2xyz(A, E, T)
     msg = "Must specify either aet or all of A, E, T."
     raise ValueError(msg)
+
+
+def year2second(year: float) -> float:
+    """Convert years to seconds.
+
+    See `astropy.units <https://docs.astropy.org/en/stable/units/ref_api.html#module-astropy.units>`_
+    for more details on the conversion factor used.
+    """
+    return float(u.year.to(u.s)) * year  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+
+def week2second(week: float) -> float:
+    """Convert weeks to seconds.
+
+    See `astropy.units <https://docs.astropy.org/en/stable/units/ref_api.html#module-astropy.units>`_
+    for more details on the conversion factor used.
+    """
+    return float(u.week.to(u.s)) * week  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+
+def sday2second(sday: float) -> float:
+    """Convert sidereal days to seconds.
+
+    See `astropy.units <https://docs.astropy.org/en/stable/units/ref_api.html#module-astropy.units>`_
+    for more details on the conversion factor used.
+    """
+    return float(u.sday.to(u.s)) * sday  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+
+def jday2second(jday: float) -> float:
+    """Convert Julian days to seconds.
+
+    See `astropy.units <https://docs.astropy.org/en/stable/units/ref_api.html#module-astropy.units>`_
+    for more details on the conversion factor used.
+    """
+    return float(u.day.to(u.s)) * jday  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+
+day2second = jday2second
+"""Alias for :func:`jday2second`."""
+
+
+def hour2second(hour: float) -> float:
+    """Convert hours to seconds.
+
+    See `astropy.units <https://docs.astropy.org/en/stable/units/ref_api.html#module-astropy.units>`_
+    for more details on the conversion factor used.
+    """
+    return float(u.hour.to(u.s)) * hour  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+
+def minute2second(minute: float) -> float:
+    """Convert minutes to seconds.
+
+    See `astropy.units <https://docs.astropy.org/en/stable/units/ref_api.html#module-astropy.units>`_
+    for more details on the conversion factor used.
+    """
+    return float(u.minute.to(u.s)) * minute  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+
+def month2second(month: float) -> float:
+    """Convert months to seconds.
+
+    A month is defined as 30 Julian days.
+
+    See `astropy.units <https://docs.astropy.org/en/stable/units/ref_api.html#module-astropy.units>`_
+    for more details on the conversion factor used.
+    """
+    return day2second(30 * month)

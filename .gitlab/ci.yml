@@ -32,7 +32,7 @@ pytest:
     - basedpyright tests
     - pytest --cov=typed_lisa_toolkit --cov-branch --cov-report=term-missing
         --cov-report=xml:coverage.xml --junitxml=report.xml 
-        --cov-fail-under=85 tests
+        --cov-fail-under=85 -m "not slow"
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
     paths:

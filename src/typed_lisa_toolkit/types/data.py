@@ -5,7 +5,7 @@ from __future__ import annotations
 import abc
 import logging
 import pathlib
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, Protocol, Self, cast, overload
 
 import array_api_compat as xpc
@@ -1854,14 +1854,207 @@ def load_sangria(
     raise ValueError(msg)
 
 
-def load_ldc_data(file_path: str | pathlib.Path, **kwargs: Any) -> TSData:
+def load_ldc_data(file_path: str | pathlib.Path, *args: Any, **kwargs: Any) -> TSData:
     """Load the LDC dataset."""
     # Currently among LDC datasets only Sangria and Sangria HM are supported
-    return load_sangria(file_path, **kwargs)
+    return load_sangria(file_path, *args, **kwargs)
 
 
-def load_mojito(processed_data: SignalProcessor):
-    """Load the data from a preprocessed Mojito data object."""
+def load_mojito(
+    file_path: str | pathlib.Path | Sequence[str | pathlib.Path],
+    time_interval: tuple[float, float]
+    | tuple[float, None]
+    | tuple[None, float]
+    | tuple[None, None] = (None, None),
+):
+    """Load the Mojito data.
+
+    Note
+    ----
+    To use this loader, install TLT with the `mojito` extra.
+
+
+    The downloading and cache management of Mojito is handled
+    by `mojito <https://mojito-e66317.io.esa.int/>`_. Especially,
+    we recommend using `mojito` API to feed the file path
+    to this loader. If requested data is missing on the machine,
+    `mojito` will automatically download it from the server and cache it locally.
+    See `this page <https://mojito-e66317.io.esa.int/content/pouring/download.html>`_
+    for more details.
+
+    Parameters
+    ----------
+    file_path: str | pathlib.Path | Sequence[str | pathlib.Path]
+        The file path(s) to the Mojito data file(s). If a sequence of file
+        paths is provided, they are combined in a meaningful way (see
+        `this section <https://mojito-e66317.io.esa.int/content/drinking/reader.html#reading-multiple-files>`_
+        for more details).
+
+    time_interval: tuple[float|None, float|None], optional
+        A tuple specifying the start and end time (relative to the start of the data,
+        in seconds) of the data segment to load.
+
+        If the start time is ``None``,
+        it defaults to the start of the data. If the end time is ``None``, it defaults
+        to the end of the data. If both are ``None``, or if `time_interval`
+        is not provided, the entire data will be loaded.
+
+        We recommend using :func:`~shop.year2second`,
+        :func:`~shop.month2second`, etc. to convert time units to seconds.
+
+    Returns
+    -------
+    :class:`~types.TSData`
+        The loaded data segment, formatted as a :class:`~types.TSData` object.
+
+        There are four channels in the returned data: "X", "Y", "Z", and "flag",
+        where "X", "Y", and "Z" are the TDI observables in Doppler units,
+        and "flag" is the quality flag of the TDI observables.
+
+        The shape of the kernel is ``(1, 4, 1, 1, len(times))``.
+
+    Example
+    -------
+    >>> import mojito.download
+    >>> import typed_lisa_tools as tlt
+    >>>
+    >>> combined = tlt.load_mojito(mojito.download.download-brick("combined"))
+    """
+    import mojito.reader
+
+    _fp = file_path if isinstance(file_path, (str, pathlib.Path)) else list(file_path)
+
+    with mojito.reader.MojitoL1File(_fp) as f:
+        sampling = f.tdis.time_sampling
+        tmin = time_interval[0] + sampling.t0 if time_interval[0] is not None else None
+        tmax = time_interval[1] + sampling.t0 if time_interval[1] is not None else None
+        _slice = sampling.slice_between(tmin, tmax)
+        times = axis(
+            linspace_from_step(sampling.t0, sampling.dt, sampling.size)[_slice]
+        )
+        xyz = f.tdis.xyz_doppler[_slice, :]
+        xyz_flags = f.tdis.xyz_flags[_slice]
+        _xyz_data = tsdata(
+            times=times, entries=xyz.T[None, :, None, None, :], channels=("X", "Y", "Z")
+        )
+        _flag = tsdata(
+            times=times,
+            entries=xyz_flags.T[None, None, None, None, :],
+            channels=("flag",),
+        )
+        return type(_xyz_data).from_dict(dict(**_xyz_data, **_flag))
+
+
+def load_mojito_orbits(
+    file_path: str | pathlib.Path | Sequence[str | pathlib.Path],
+    time_interval: tuple[float, float]
+    | tuple[float, None]
+    | tuple[None, float]
+    | tuple[None, None] = (None, None),
+):
+    """Load the orbits from the Mojito data.
+
+    Note
+    ----
+    To use this loader, install TLT with the `mojito` extra.
+
+
+    The downloading and cache management of Mojito is handled
+    by `mojito <https://mojito-e66317.io.esa.int/>`_. Especially,
+    we recommend using `mojito` API to feed the file path
+    to this loader. If requested data is missing on the machine,
+    `mojito` will automatically download it from the server and cache it locally.
+    See `this page <https://mojito-e66317.io.esa.int/content/pouring/download.html>`_
+    for more details.
+
+    Parameters
+    ----------
+    file_path: str | pathlib.Path | Sequence[str | pathlib.Path]
+        The file path(s) to the Mojito data file(s). If a sequence of file
+        paths is provided, they are combined in a meaningful way (see
+        `this section <https://mojito-e66317.io.esa.int/content/drinking/reader.html#reading-multiple-files>`_
+        for more details).
+
+    time_interval: tuple[float|None, float|None], optional
+        A tuple specifying the start and end time (relative to the start of the data,
+        in seconds) of the data segment to load.
+
+        If the start time is ``None``,
+        it defaults to the start of the data. If the end time is ``None``, it defaults
+        to the end of the data. If both are ``None``, or if `time_interval`
+        is not provided, the entire data will be loaded.
+
+        We recommend using :func:`~shop.year2second`,
+        :func:`~shop.month2second`, etc. to convert time units to seconds.
+
+    Returns
+    -------
+    :class:`~types.TSData`
+        The loaded orbits, formatted as a :class:`~types.TSData` object.
+
+        There are 18 channels in the returned data, in the format of
+        "SAT{satellite_id}_POS{component_id}" and "SAT{satellite_id}_VEL{component_id}",
+        where {satellite_id} is 1, 2, or 3, and {component_id} is 1, 2, or 3,
+        representing the position and velocity components of the three satellites.
+
+         The shape of the kernel is ``(1, 18, 1, 1, len(times))``.
+
+    Example
+    -------
+    >>> import mojito.download
+    >>> import typed_lisa_tools as tlt
+    >>>
+    >>> orbits = tlt.load_mojito(mojito.download.download-brick("combined"))
+    """
+    import mojito.reader
+
+    _fp = file_path if isinstance(file_path, (str, pathlib.Path)) else list(file_path)
+
+    with mojito.reader.MojitoL1File(_fp) as f:
+        sampling = f.orbits.time_sampling
+        tmin = time_interval[0] + sampling.t0 if time_interval[0] is not None else None
+        tmax = time_interval[1] + sampling.t0 if time_interval[1] is not None else None
+        _slice = sampling.slice_between(tmin, tmax)
+        times = axis(
+            linspace_from_step(sampling.t0, sampling.dt, sampling.size)[_slice]
+        )
+        positions = f.orbits.positions[_slice, :, :]  # time, satellite, component
+        velocities = f.orbits.velocities[_slice, :, :]
+        # Channels will be satellite+component, e.g., "SAT1_POS1", "SAT1_POS2",
+        # "SAT1_POS3", "SAT2_POS1", etc.
+
+        def _get_entry(grp: AnyArray, sat: tuple[int, str], comp: tuple[int, str]):
+            sat_id, sat_name = sat
+            comp_id, comp_name = comp
+            key = f"{sat_name}_{comp_name}"
+            return {
+                key: reps.time_series(
+                    _enforce_uniform(times),
+                    entries=grp[:, sat_id, comp_id][None, None, None, None, :],
+                )
+            }
+
+        registry = [
+            _get_entry(positions, sat, comp)
+            for sat in enumerate(["SAT1", "SAT2", "SAT3"])
+            for comp in enumerate(["POS1", "POS2", "POS3"])
+        ] + [
+            _get_entry(velocities, sat, comp)
+            for sat in enumerate(["SAT1", "SAT2", "SAT3"])
+            for comp in enumerate(["VEL1", "VEL2", "VEL3"])
+        ]
+        mapping = {key: entry for d in registry for key, entry in d.items()}
+        return tsdata(mapping)
+
+
+def load_preprocessed_mojito(processed_data: SignalProcessor):
+    """Load the data from a preprocessed Mojito data segment.
+
+    This loader is intended for use with
+    `mojito-processor <https://github.com/OllieBurke/MojitoProcessor>`_.
+    It loads a preprocessed Mojito data segment and formats it into
+    a :class:`~types.TSData` object.
+    """
     channel_names = tuple(processed_data.channels)
     _data = cast("dict[str, AnyArray]", processed_data.data)
     _mapping = {
