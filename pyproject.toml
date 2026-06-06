@@ -1,5 +1,5 @@
 [project]
-authors = [{ name = "Sen-wen Deng", email = "deng@apc.in2p3.fr" }]
+authors = [{name = "Sen-wen Deng", email = "deng@apc.in2p3.fr"}]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
@@ -10,6 +10,7 @@ dependencies = [
   "h5py",
   "astropy",
   "array-api-compat >= 1.13.0",
+  "mojito>=0.5.0",
   "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@e6fa486c8a06a48eb951c022e2f960ad42e07501",
 ]
 description = "Fully typed interfaces for LISA data analysis"
@@ -20,17 +21,14 @@ requires-python = ">=3.13"
 
 [project.optional-dependencies]
 jax = ["jax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
-mojito = ["mojito"]
-mojito-processor = ["mojito-processor"]
-pytorch = ["torch; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
+torch = ["torch; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 quadax = ["quadax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 wdm = ["wdm-transform>=0.2"]
 
 [dependency-groups]
 dev = [
-  { include-group = "doc" },
   "ruff",
-  "h5py-stubs>=0.1.2",             # "isort>=7.0.0", # `ruff check --select I --fix .` does the trick  # "mypy>=1.19.1", # `basedpyright` is used instead of `mypy` for type checking
+  "h5py-stubs>=0.1.2",
   "myst-nb>=1.3.0",
   "nb-clean>=4.0.1",
   "pre-commit>=4.5.1",
@@ -39,8 +37,9 @@ dev = [
   "pytest-cov>=7.0.0",
   "pytest-mock>=3.15.1",
   "uv-dynamic-versioning>=0.12.0",
-  { include-group = "quadax" },
+  {include-group = "quadax"},
   "basedpyright",
+  "mojito-processor",
 ]
 doc = [
   "sphinx",
@@ -55,11 +54,10 @@ doc = [
   "ipywidgets",
   "lovelyplots",
   "phentax @ git+https://github.com/asantini29/phentax.git; sys_platform != 'darwin' or platform_machine != 'x86_64'",
-  "mojito",
 ]
 jax = ["jax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 quadax = [
-  { include-group = "jax" },
+  {include-group = "jax"},
   "quadax; sys_platform != 'darwin' or platform_machine != 'x86_64'",
 ]
 
@@ -77,14 +75,6 @@ enable = true
 pattern = "default-unprefixed"
 style = "semver"
 vcs = "git"
-
-# [tool.uv]
-# required-environments = [
-#     "sys_platform == 'linux' and platform_machine == 'x86_64'",
-#     "sys_platform == 'linux' and platform_machine == 'aarch64'",
-#     "sys_platform == 'darwin' and platform_machine == 'x86_64'",
-#     "sys_platform == 'darwin' and platform_machine == 'arm64'",
-# ]
 
 [build-system]
 build-backend = "hatchling.build"
@@ -168,12 +158,12 @@ markers = ["slow"]
 "src/typed_lisa_toolkit/py.typed" = "typed_lisa_toolkit/py.typed"
 
 [tool.basedpyright]
-defineConstant = { DEBUG = true }
+defineConstant = {DEBUG = true}
 enableTypeIgnoreComments = true
 exclude = ["**/__pycache__"]
 executionEnvironments = [
-  { root = "tests", reportPrivateUsage = false },
-  { root = "src" },
+  {root = "tests", reportPrivateUsage = false},
+  {root = "src"},
 ]
 ignore = ["docs"]
 include = ["src"]
