@@ -2,6 +2,31 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.0 - 2026-06-07
+#### Features
+- <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>direct mojito loader - (dd85682) - Senwen Deng
+- improve array typing - (a6634c6) - Senwen Deng
+#### Bug Fixes
+- pytorch compat - (23aef3a) - Senwen Deng
+- PSD protocol - (6a5dca4) - Senwen Deng
+- 2d image extent - (869512c) - Senwen Deng
+#### Revert
+- removed orbit loading - (83c8622) - Senwen Deng
+#### Documentation
+- prepare 0.7.0 - (3fc6bd3) - Senwen Deng
+#### Tests
+- pytorch - (de9e2c1) - Senwen Deng
+#### Continuous Integration
+- correct triggering - (5b887b3) - Senwen Deng
+- finalize pypi - (4bfb246) - Senwen Deng
+- pypi - (11dd970) - Senwen Deng
+#### Refactoring
+- removed deprecated EOL 0.7.0 - (eb6af04) - Senwen Deng
+#### Miscellaneous Chores
+- removed direct deps - (aa10582) - Senwen Deng
+
+- - -
+
 ## 0.6.6 - 2026-05-10
 #### Features
 - time phasor - (c8ece68) - Senwen Deng
