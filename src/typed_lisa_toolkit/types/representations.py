@@ -20,7 +20,7 @@ from typing import (
 import array_api_compat as xpc
 from l2d_interface import contract
 
-from ..utils import deprecated, warn_external
+from ..utils import deprecated
 from .misc import (
     AnyArray,
     AnyAxis,
@@ -1090,7 +1090,7 @@ class UniformFrequencySeries(FrequencySeries[Axis[Linspace]], _Uniform1DMixin):
     def irfft(
         self,
         time_grid: AnyArray,
-        *args: tapering.Tapering | None,
+        *,
         tapering: tapering.Tapering | None = None,
     ):
         """Inverse real FFT of the series (*Deprecated*).
@@ -1101,26 +1101,6 @@ class UniformFrequencySeries(FrequencySeries[Axis[Linspace]], _Uniform1DMixin):
         """
         from ..shop import transforms
 
-        if len(args) > 1:
-            msg = (
-                "irfft() accepts at most one positional optional argument, "
-                "which is `tapering`."
-            )
-            raise TypeError(msg)
-        if len(args) == 1:
-            if tapering is not None:
-                msg = (
-                    "irfft() received `tapering` as both positional "
-                    "and keyword arguments."
-                )
-                raise TypeError(msg)
-            _msg1 = (
-                "Passing `tapering` positionally to `irfft` is deprecated "
-                "and will be removed "
-                "in 0.7.0; pass it as a keyword argument instead."
-            )
-            warn_external(_msg1, DeprecationWarning)
-            tapering = args[0]
         self_frequencies = self.frequencies.asarray(self.xp)
         tapering_window = tapering(self_frequencies) if tapering is not None else 1.0
         _times = Linspace.make(time_grid)
@@ -1195,7 +1175,7 @@ class UniformTimeSeries(TimeSeries[Axis[Linspace]], _Uniform1DMixin):
     @deprecated("rfft", "method", "0.8.0", alternative="shop.time2freq")
     def rfft(
         self,
-        *args: tapering.Tapering | None,
+        *,
         tapering: tapering.Tapering | None = None,
     ):
         """Fast Fourier transform of the series (*Deprecated*).
@@ -1214,26 +1194,6 @@ class UniformTimeSeries(TimeSeries[Axis[Linspace]], _Uniform1DMixin):
         """
         from ..shop import transforms
 
-        if len(args) > 1:
-            msg = (
-                "rfft() accepts at most one positional optional argument, "
-                "which is `tapering`."
-            )
-            raise TypeError(msg)
-        if len(args) == 1:
-            if tapering is not None:
-                msg = (
-                    "rfft() received `tapering` as both positional "
-                    "and keyword arguments."
-                )
-                raise TypeError(msg)
-            _msg1 = (
-                "Passing `tapering` positionally to `rfft` is deprecated "
-                "and will be removed "
-                "in 0.7.0; pass it as a keyword argument instead."
-            )
-            warn_external(_msg1, DeprecationWarning)
-            tapering = args[0]
         self_times = self.xp.asarray(self.times)
         tapering_window = (
             tapering(self_times)
