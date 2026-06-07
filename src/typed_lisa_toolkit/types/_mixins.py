@@ -17,10 +17,10 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any, Protocol, Self, cast, overload, runtime_checkable
 
 import array_api_compat as xpc
-import l2d_interface.validators as l2dv
 import numpy as np
 
 from .. import utils
+from ..l2d_interface import validators as l2dv
 from . import modes
 from .misc import AnyArray, AnyAxis, AnyGrid, Domain, Linspace
 

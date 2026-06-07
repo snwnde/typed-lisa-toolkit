@@ -11,7 +11,6 @@ dependencies = [
   "astropy",
   "array-api-compat >= 1.13.0",
   "mojito>=0.5.0",
-  "l2d-interface @ git+https://gitlab.in2p3.fr/senwen.deng/l2d-interface.git@e6fa486c8a06a48eb951c022e2f960ad42e07501",
 ]
 description = "Fully typed interfaces for LISA data analysis"
 dynamic = ["version"]
@@ -49,11 +48,10 @@ doc = [
   "sphinxcontrib-mermaid",
   "sphinx-inline-tabs",
   "furo",
-  "fastgb @ git+https://gitlab.in2p3.fr/LISA/fastgb.git",
+  "fastgb",
   "anybadge",
   "ipywidgets",
   "lovelyplots",
-  "phentax @ git+https://github.com/asantini29/phentax.git; sys_platform != 'darwin' or platform_machine != 'x86_64'",
 ]
 jax = ["jax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 quadax = [
@@ -144,11 +142,13 @@ convention = "numpy"
 [tool.ruff.lint.per-file-ignores]
 "docs/**" = ["D", "PL", "DOC", "INP", "RET504", "C901", "N806", "PERF", "E402"]
 "tests/**" = ["D", "PL", "DOC", "INP", "S101", "N802", "F821"]
+"src/typed_lisa_toolkit/l2d_interface/**" = ["ALL"]
 
 [tool.coverage.report]
 omit = [
   "*/typed_lisa_toolkit/containers/modes.py",
   "*/typed_lisa_toolkit/_viz/*",
+  "*/typed_lisa_toolkit/l2d_interface/*",
 ]
 
 [tool.pytest]
@@ -160,7 +160,7 @@ markers = ["slow"]
 [tool.basedpyright]
 defineConstant = {DEBUG = true}
 enableTypeIgnoreComments = true
-exclude = ["**/__pycache__"]
+exclude = ["**/__pycache__", "src/typed_lisa_toolkit/l2d_interface/*"]
 executionEnvironments = [
   {root = "tests", reportPrivateUsage = false},
   {root = "src"},

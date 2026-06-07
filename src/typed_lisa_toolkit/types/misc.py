@@ -14,12 +14,13 @@ from typing import (
 )
 
 import array_api_compat as xpc
-import l2d_interface.array
 import numpy as np
 import numpy.typing as npt
 
+from ..l2d_interface import array as l2da
+
 ArrayLike = Any
-Array = l2d_interface.array.Array
+Array = l2da.Array
 """An array from any array library supporting the Python Array API standard.
 
 Currently, Numpy, JAX, and PyTorch backends have been tested at runtime. In principle,

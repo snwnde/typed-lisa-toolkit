@@ -18,8 +18,8 @@ from typing import (
 )
 
 import array_api_compat as xpc
-from l2d_interface import contract
 
+from ..l2d_interface import contract
 from ..utils import deprecated
 from .misc import (
     AnyArray,
