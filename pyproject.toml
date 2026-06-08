@@ -142,13 +142,13 @@ convention = "numpy"
 [tool.ruff.lint.per-file-ignores]
 "docs/**" = ["D", "PL", "DOC", "INP", "RET504", "C901", "N806", "PERF", "E402"]
 "tests/**" = ["D", "PL", "DOC", "INP", "S101", "N802", "F821"]
-"src/typed_lisa_toolkit/l2d_interface/**" = ["ALL"]
+"src/typed_lisa_toolkit/_l2d_interface/**" = ["ALL"]
 
 [tool.coverage.report]
 omit = [
   "*/typed_lisa_toolkit/containers/modes.py",
   "*/typed_lisa_toolkit/_viz/*",
-  "*/typed_lisa_toolkit/l2d_interface/*",
+  "*/typed_lisa_toolkit/_l2d_interface/*",
 ]
 
 [tool.pytest]
@@ -160,7 +160,7 @@ markers = ["slow"]
 [tool.basedpyright]
 defineConstant = {DEBUG = true}
 enableTypeIgnoreComments = true
-exclude = ["**/__pycache__", "src/typed_lisa_toolkit/l2d_interface/*"]
+exclude = ["**/__pycache__", "src/typed_lisa_toolkit/_l2d_interface/*"]
 executionEnvironments = [
   {root = "tests", reportPrivateUsage = false},
   {root = "src"},

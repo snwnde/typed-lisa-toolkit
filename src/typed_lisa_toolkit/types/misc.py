@@ -17,7 +17,7 @@ import array_api_compat as xpc
 import numpy as np
 import numpy.typing as npt
 
-from ..l2d_interface import array as l2da
+from .._l2d_interface import array as l2da
 
 ArrayLike = Any
 Array = l2da.Array
