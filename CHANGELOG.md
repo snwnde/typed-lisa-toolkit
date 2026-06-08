@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.1 - 2026-06-08
+#### Features
+- abs time - (c1b7182) - Senwen Deng
+
+- - -
+
 ## 0.7.0 - 2026-06-07
 #### Features
 - <span style="background-color: #d73a49; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 0.85em;">BREAKING</span>direct mojito loader - (dd85682) - Senwen Deng
