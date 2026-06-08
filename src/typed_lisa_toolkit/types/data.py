@@ -1928,7 +1928,7 @@ def load_mojito(
 
     with mojito.reader.MojitoL1File(_fp) as f:
         sampling = f.tdis.time_sampling
-        delta = 0 if relative_time else sampling.t0
+        delta = sampling.t0 if relative_time else 0
         tmin = time_interval[0] + delta if time_interval[0] is not None else None
         tmax = time_interval[1] + delta if time_interval[1] is not None else None
         _slice = sampling.slice_between(tmin, tmax)
