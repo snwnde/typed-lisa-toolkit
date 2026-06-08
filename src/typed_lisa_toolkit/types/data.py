@@ -1866,13 +1866,10 @@ def load_mojito(
     | tuple[float, None]
     | tuple[None, float]
     | tuple[None, None] = (None, None),
+    *,
+    relative_time: bool = True,
 ):
     """Load the Mojito data.
-
-    Note
-    ----
-    To use this loader, install TLT with the `mojito` extra.
-
 
     The downloading and cache management of Mojito is handled
     by `mojito <https://mojito-e66317.io.esa.int/>`_. Especially,
@@ -1891,8 +1888,8 @@ def load_mojito(
         for more details).
 
     time_interval: tuple[float|None, float|None], optional
-        A tuple specifying the start and end time (relative to the start of the data,
-        in seconds) of the data segment to load.
+        A tuple specifying the start and end time (in seconds) of the data segment to
+        load.
 
         If the start time is ``None``,
         it defaults to the start of the data. If the end time is ``None``, it defaults
@@ -1901,6 +1898,11 @@ def load_mojito(
 
         We recommend using :func:`~shop.year2second`,
         :func:`~shop.month2second`, etc. to convert time units to seconds.
+
+    relative_time: bool, optional
+        Whether the time in the returned data is relative to the start of the data.
+        Default is ``True``. If ``False``, the time will be absolute, i.e., directly
+        corresponding to the time in the Mojito data file.
 
     Returns
     -------
@@ -1926,8 +1928,9 @@ def load_mojito(
 
     with mojito.reader.MojitoL1File(_fp) as f:
         sampling = f.tdis.time_sampling
-        tmin = time_interval[0] + sampling.t0 if time_interval[0] is not None else None
-        tmax = time_interval[1] + sampling.t0 if time_interval[1] is not None else None
+        delta = 0 if relative_time else sampling.t0
+        tmin = time_interval[0] + delta if time_interval[0] is not None else None
+        tmax = time_interval[1] + delta if time_interval[1] is not None else None
         _slice = sampling.slice_between(tmin, tmax)
         times = axis(
             linspace_from_step(sampling.t0, sampling.dt, sampling.size)[_slice]

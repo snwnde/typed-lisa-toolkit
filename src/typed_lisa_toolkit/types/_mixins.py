@@ -20,7 +20,7 @@ import array_api_compat as xpc
 import numpy as np
 
 from .. import utils
-from ..l2d_interface import validators as l2dv
+from .._l2d_interface import validators as l2dv
 from . import modes
 from .misc import AnyArray, AnyAxis, AnyGrid, Domain, Linspace
 
