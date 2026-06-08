@@ -407,7 +407,7 @@ class PlotNode:
                 msg = "Expected a single Axes for a non-multirow node."
                 raise ValueError(msg)
             for child in self.children:
-                child(axs, plot_mode=plot_mode, **self.label_ctx(**kwargs))
+                child(axs, plot_mode=plot_mode, **kwargs)
             return axs
         if len(axs) != len(self.multirow):
             msg = (
@@ -416,7 +416,7 @@ class PlotNode:
             )
             raise ValueError(msg)
         for ax, child in zip(axs, self.children, strict=True):
-            child([ax], plot_mode=plot_mode, **self.label_ctx(**kwargs))
+            child([ax], plot_mode=plot_mode, **kwargs)
         return axs
 
 
@@ -517,12 +517,12 @@ def classify(
         ).normalize()
     if isinstance(obj, _mixins.ChannelMapping):
         children = [
-            classify(obj[chn], label_ctx=label_ctx) for chn in obj.channel_names
+            classify(obj[chn], label_ctx=LabelContext(prefix=obj.name or ""))
+            for chn in obj.channel_names
         ]
-        prefix = obj.name or ""
         return PlotNode(
             children=children,
-            label_ctx=LabelContext(prefix=prefix),
+            label_ctx=label_ctx,
             multirow=list(obj.channel_names),
         ).normalize()
     if not isinstance(obj, HarmonicProjectedWaveform):  # pyright: ignore[reportUnnecessaryIsInstance]
