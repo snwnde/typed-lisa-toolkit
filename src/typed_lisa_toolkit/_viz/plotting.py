@@ -407,7 +407,7 @@ class PlotNode:
                 msg = "Expected a single Axes for a non-multirow node."
                 raise ValueError(msg)
             for child in self.children:
-                child(axs, plot_mode=plot_mode, **kwargs)
+                child(axs, plot_mode=plot_mode, **self.label_ctx(**kwargs))
             return axs
         if len(axs) != len(self.multirow):
             msg = (
@@ -416,7 +416,7 @@ class PlotNode:
             )
             raise ValueError(msg)
         for ax, child in zip(axs, self.children, strict=True):
-            child([ax], plot_mode=plot_mode, **kwargs)
+            child([ax], plot_mode=plot_mode, **self.label_ctx(**kwargs))
         return axs
 
 
@@ -519,9 +519,10 @@ def classify(
         children = [
             classify(obj[chn], label_ctx=label_ctx) for chn in obj.channel_names
         ]
+        prefix = obj.name or ""
         return PlotNode(
             children=children,
-            label_ctx=label_ctx,
+            label_ctx=LabelContext(prefix=prefix),
             multirow=list(obj.channel_names),
         ).normalize()
     if not isinstance(obj, HarmonicProjectedWaveform):  # pyright: ignore[reportUnnecessaryIsInstance]
@@ -588,7 +589,6 @@ def _dispatch_compare[T: AxPlottable | MultChan](
     ncols = 2 if showdiff else 1
     fig, axs = _get_fig_ax(fig, ax, nrows=nrows, ncols=ncols, **kwargs)
     _axs = listify_axs(np.asarray(axs))
-    print(_axs)
     node1(_axs[0], plot_mode=plot_mode, **kwargs)
     node2(_axs[0], plot_mode=plot_mode, **kwargs)
     _axs[0][-1].set_xlabel(node1.xlabel)
