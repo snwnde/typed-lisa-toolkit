@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.2 - 2026-06-08
+#### Bug Fixes
+- relative time - (c4968e6) - Senwen Deng
+
+- - -
+
 ## 0.7.1 - 2026-06-08
 #### Features
 - abs time - (c1b7182) - Senwen Deng
