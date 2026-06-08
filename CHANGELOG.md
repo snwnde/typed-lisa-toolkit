@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.4-alpha.1 - 2026-06-08
+#### Bug Fixes
+- nested label - (9058075) - Senwen Deng
+
+- - -
+
 ## 0.7.3 - 2026-06-08
 #### Bug Fixes
 - label chnmap - (316e360) - Senwen Deng
