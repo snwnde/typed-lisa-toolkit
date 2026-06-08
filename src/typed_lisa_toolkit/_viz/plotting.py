@@ -587,7 +587,8 @@ def _dispatch_compare[T: AxPlottable | MultChan](
     nrows = len(multirow) if multirow else 1
     ncols = 2 if showdiff else 1
     fig, axs = _get_fig_ax(fig, ax, nrows=nrows, ncols=ncols, **kwargs)
-    _axs = listify_axs(np.asarray(axs).T)
+    _axs = listify_axs(np.asarray(axs))
+    print(_axs)
     node1(_axs[0], plot_mode=plot_mode, **kwargs)
     node2(_axs[0], plot_mode=plot_mode, **kwargs)
     _axs[0][-1].set_xlabel(node1.xlabel)
@@ -612,8 +613,9 @@ def _dispatch_compare[T: AxPlottable | MultChan](
         fig.supylabel(node1.ylabel)
     if set_legend:
         legend_kwargs = sieve_kwargs(LEGEND_KWARGS, kwargs)
-        for _ax in _axs[0] + _axs[1]:
-            _ax.legend(**legend_kwargs)
+        for idx in range(ncols):
+            for _ax in _axs[idx]:
+                _ax.legend(**legend_kwargs)
     return fig, axs
 
 
@@ -739,6 +741,7 @@ def plot_compare(
     ax: matplotlib.axes.Axes | None = None,
     *,
     plot_mode: LINE_PLOT_MODES | None = None,
+    set_legend: bool = True,
     showdiff: bool = False,
     **kwargs: Unpack[PlotKwargs],
 ):
@@ -810,6 +813,7 @@ def plot_compare(
         fig=fig,
         ax=ax,
         plot_mode=plot_mode,
+        set_legend=set_legend,
         showdiff=showdiff,
         **kwargs,
     )
