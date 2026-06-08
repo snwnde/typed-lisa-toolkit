@@ -588,7 +588,9 @@ def _dispatch_compare[T: AxPlottable | MultChan](
     nrows = len(multirow) if multirow else 1
     ncols = 2 if showdiff else 1
     fig, axs = _get_fig_ax(fig, ax, nrows=nrows, ncols=ncols, **kwargs)
-    _axs = listify_axs(np.asarray(axs))
+    _axs = (
+        listify_axs(np.asarray(axs)) if ncols == 1 else listify_axs(np.asarray(axs).T)
+    )
     node1(_axs[0], plot_mode=plot_mode, **kwargs)
     node2(_axs[0], plot_mode=plot_mode, **kwargs)
     _axs[0][-1].set_xlabel(node1.xlabel)
