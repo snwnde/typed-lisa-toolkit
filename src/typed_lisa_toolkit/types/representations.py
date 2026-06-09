@@ -5,7 +5,7 @@ from __future__ import annotations
 import abc
 import copy as _copy
 import logging
-from types import ModuleType
+from types import EllipsisType, ModuleType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -79,40 +79,56 @@ def _get_entry_grid_shape(entries: AnyArray):
     return entries.shape[4:]  # Remove batch, channels, harmonics, features dimensions
 
 
-def _check_entry_grid_compatibility(grid: AnyGrid, entries: AnyArray) -> None:
-    grid_shape = tuple(len(g) for g in grid)
-    entry_grid_shape = _get_entry_grid_shape(entries)
-    if grid_shape != entry_grid_shape:
-        msg = (
-            "Incompatible grid and entries shapes: "
-            f"expected {grid_shape}, got {entry_grid_shape}."
-        )
-        raise ValueError(msg)
-
-
-def _get_full_slice(grid_slices: tuple[slice, ...], /) -> tuple[slice, ...]:
+def _get_full_slice[T: (slice, AnyArray)](
+    grid_slices: tuple[T, ...], /
+) -> tuple[EllipsisType, *tuple[T, ...]]:
     """Return the slice tuple for the canonical entries array given the grid slices."""
-    return (
-        slice(None),
-    ) * 4 + grid_slices  # batch, channels, harmonics, features stay intact
+    return (..., *grid_slices)
+
+
+def _subset_grid_2d_sparse[Axis0: "AnyAxis", Axis1: "AnyAxis"](
+    grid: Grid2DSparse[Axis0, Axis1],
+    entries: AnyArray,
+    slices: tuple[slice, slice],
+) -> tuple[Grid2DSparse[Axis0, Axis1], AnyArray]:
+    _sparse_idx = grid.indices
+    xp = xpc.get_namespace(_sparse_idx)
+    # Only keep indices between the subset slices
+    mask = xp.ones(_sparse_idx.shape[0], dtype=bool)
+    for i, slc in enumerate(slices):
+        start, stop, _ = slc.indices(len(grid[i]))
+        mask = mask & (_sparse_idx[:, i] >= start) & (_sparse_idx[:, i] < stop)
+    _new_sparse_idx = _sparse_idx[mask]
+    _offsets = xp.asarray(
+        [slc.indices(len(grid[i]))[0] for i, slc in enumerate(slices)],
+        dtype=_new_sparse_idx.dtype,
+    )
+    _new_sparse_idx = _new_sparse_idx - _offsets
+    new_grid = Grid2DSparse[Axis0, Axis1](
+        grid.axis0[slices[0]],
+        grid.axis1[slices[1]],
+        sparse_indices=_new_sparse_idx,
+    )
+    new_entries = entries[..., mask]
+    return new_grid, new_entries
 
 
 def _take_subset[GridT: AnyGrid](
     grid: GridT,
     entries: AnyArray,
-    grid_slices: tuple[slice, ...],
+    slices: tuple[slice, ...],
 ) -> tuple[GridT, AnyArray]:
-    if len(grid) != len(grid_slices):
+    """Return the grid and entries subset given the slices on each grid dimension."""
+    if len(grid) != len(slices):
         msg = (
-            f"Number of slices {len(grid_slices)} "
+            f"Number of slices {len(slices)} "
             f"does not match number of grid dimensions {len(grid)}."
         )
         raise ValueError(msg)
-    _check_entry_grid_compatibility(grid, entries)
     # Slice each grid dimension
-    _grid = tuple(g[s] for g, s in zip(grid, grid_slices, strict=True))
-    entries_sliced = entries[_get_full_slice(grid_slices)]
-    return cast("GridT", _grid), entries_sliced
+    _grid = tuple(g[s] for g, s in zip(grid, slices, strict=True))
+    _entries = entries[_get_full_slice(slices)]
+    return cast("GridT", _grid), _entries
 
 
 def _get_subset_slice(
@@ -136,7 +152,9 @@ def _get_subset_slice(
     return slice
 
 
-def _set_value(entries: AnyArray, slice: tuple[_slice, ...], value: Any) -> None:
+def _set_value(
+    entries: AnyArray, slice: tuple[_slice | EllipsisType, ...], value: Any
+) -> None:
     try:
         entries[slice] = value
     except TypeError:
@@ -279,33 +297,6 @@ def _embed_entries_to_grid_2d_sparse[
     return new_grid, source_entries
 
 
-def _subset_grid_2d_sparse[Axis0: "AnyAxis", Axis1: "AnyAxis"](
-    source_grid: Grid2DSparse[Axis0, Axis1],
-    source_entries: AnyArray,
-    subset_slices: tuple[slice, slice],
-) -> tuple[Grid2DSparse[Axis0, Axis1], AnyArray]:
-    _sparse_idx = source_grid.indices
-    xp = xpc.get_namespace(_sparse_idx)
-    # Only keep indices between the subset slices
-    mask = xp.ones(_sparse_idx.shape[0], dtype=bool)
-    for i, slc in enumerate(subset_slices):
-        start, stop, _ = slc.indices(len(source_grid[i]))
-        mask = mask & (_sparse_idx[:, i] >= start) & (_sparse_idx[:, i] < stop)
-    _new_sparse_idx = _sparse_idx[mask]
-    _offsets = xp.asarray(
-        [slc.indices(len(source_grid[i]))[0] for i, slc in enumerate(subset_slices)],
-        dtype=_new_sparse_idx.dtype,
-    )
-    _new_sparse_idx = _new_sparse_idx - _offsets
-    new_grid = Grid2DSparse[Axis0, Axis1](
-        source_grid.axis0[subset_slices[0]],
-        source_grid.axis1[subset_slices[1]],
-        sparse_indices=_new_sparse_idx,
-    )
-    new_entries = source_entries[..., mask]
-    return new_grid, new_entries
-
-
 class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
     _mixins.BinaryUnaryOpMixin[AnyArray],
     _InitMixin[GridT],
@@ -357,7 +348,7 @@ class _ArithmeticReprOnGrid[GridT: "AnyGrid"](
         self_copy.iadd(other, slice)
         return self_copy
 
-    def iadd(self, other: Self, slice: tuple[_slice, ...]) -> Self:
+    def iadd(self, other: Self, slice: tuple[_slice | EllipsisType, ...]) -> Self:
         """Add another series on a sub-grid with known slice in place.
 
         See Also
@@ -435,29 +426,21 @@ def frequency_series(
     frequencies: Linspace,
     entries: AnyArray,
 ) -> UniformFrequencySeries: ...
-
-
 @overload
 def frequency_series(
     frequencies: Axis[Linspace],
     entries: AnyArray,
 ) -> UniformFrequencySeries: ...
-
-
 @overload
 def frequency_series[AxisT: "AnyAxis"](
     frequencies: AxisT,
     entries: AnyArray,
 ) -> FrequencySeries[AxisT]: ...
-
-
 @overload
 def frequency_series(
     frequencies: AnyArray,
     entries: AnyArray,
 ) -> FrequencySeries[Axis[AnyArray]]: ...
-
-
 def frequency_series[AxisT: "AnyAxis"](
     frequencies: AnyAxis | AxLike,
     entries: AnyArray,
@@ -509,29 +492,21 @@ def time_series(
     times: Linspace,
     entries: AnyArray,
 ) -> UniformTimeSeries: ...
-
-
 @overload
 def time_series(
     times: Axis[Linspace],
     entries: AnyArray,
 ) -> UniformTimeSeries: ...
-
-
 @overload
 def time_series(
     times: AnyArray,
     entries: AnyArray,
 ) -> TimeSeries[Axis[AnyArray]]: ...
-
-
 @overload
 def time_series[AxisT: "AnyAxis"](
     times: AxisT,
     entries: AnyArray,
 ) -> TimeSeries[AxisT]: ...
-
-
 def time_series[AxisT: "AnyAxis"](
     times: AnyAxis | AxLike,
     entries: AnyArray,
@@ -583,16 +558,12 @@ def frequency_phasor[AT: AxLike](
     amplitudes: AnyArray,
     phases: AnyArray,
 ) -> FrequencyPhasor[Axis[AT]]: ...
-
-
 @overload
 def frequency_phasor[AxisT: "AnyAxis"](
     frequencies: AxisT,
     amplitudes: AnyArray,
     phases: AnyArray,
 ) -> FrequencyPhasor[AxisT]: ...
-
-
 def frequency_phasor(
     frequencies: AnyAxis | AxLike,
     amplitudes: AnyArray,
@@ -666,16 +637,12 @@ def time_phasor[AT: AxLike](
     amplitudes: AnyArray,
     phases: AnyArray,
 ) -> TimePhasor[Axis[AT]]: ...
-
-
 @overload
 def time_phasor[AxisT: "AnyAxis"](
     times: AxisT,
     amplitudes: AnyArray,
     phases: AnyArray,
 ) -> TimePhasor[AxisT]: ...
-
-
 def time_phasor(
     times: AnyAxis | AxLike,
     amplitudes: AnyArray,
@@ -749,16 +716,12 @@ def phasor[AT: AxLike](
     amplitudes: AnyArray,
     phases: AnyArray,
 ) -> Phasor[Axis[AT]]: ...
-
-
 @overload
 def phasor[AxisT: "AnyAxis"](
     frequencies: AxisT,
     amplitudes: AnyArray,
     phases: AnyArray,
 ) -> Phasor[AxisT]: ...
-
-
 @deprecated("phasor", "function", "0.8.0", alternative="frequency_phasor")
 def phasor(
     frequencies: AnyAxis | AxLike,
@@ -786,8 +749,6 @@ def stft[FreqAxisT: "AnyAxis", TimeAxisT: "AnyAxis"](
     *,
     sparse_indices: None = None,
 ) -> STFT[Grid2DCartesian[FreqAxisT, TimeAxisT]]: ...
-
-
 @overload
 def stft[FAT: "AxLike", TAT: "AxLike"](
     frequencies: FAT,
@@ -796,8 +757,6 @@ def stft[FAT: "AxLike", TAT: "AxLike"](
     *,
     sparse_indices: None = None,
 ) -> STFT[Grid2DCartesian[Axis[FAT], Axis[TAT]]]: ...
-
-
 @overload
 def stft[FreqAxisT: "AnyAxis", TimeAxisT: "AnyAxis"](
     frequencies: FreqAxisT,
@@ -806,8 +765,6 @@ def stft[FreqAxisT: "AnyAxis", TimeAxisT: "AnyAxis"](
     *,
     sparse_indices: AnyArray,
 ) -> STFT[Grid2DSparse[FreqAxisT, TimeAxisT]]: ...
-
-
 @overload
 def stft[FAT: "AxLike", TAT: "AxLike"](
     frequencies: FAT,
@@ -816,8 +773,6 @@ def stft[FAT: "AxLike", TAT: "AxLike"](
     *,
     sparse_indices: AnyArray,
 ) -> STFT[Grid2DSparse[Axis[FAT], Axis[TAT]]]: ...
-
-
 def stft(
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
@@ -889,8 +844,6 @@ def wdm(
     *,
     sparse_indices: None = None,
 ) -> WDM[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def wdm[AxisT: "Axis[Linspace]"](
     frequencies: AxisT,
@@ -899,8 +852,6 @@ def wdm[AxisT: "Axis[Linspace]"](
     *,
     sparse_indices: None = None,
 ) -> WDM[Grid2DCartesian[AxisT, AxisT]]: ...
-
-
 @overload
 def wdm(
     frequencies: AxLike,
@@ -909,8 +860,6 @@ def wdm(
     *,
     sparse_indices: AnyArray,
 ) -> WDM[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def wdm[AxisT: "Axis[Linspace]"](
     frequencies: AxisT,
@@ -919,8 +868,6 @@ def wdm[AxisT: "Axis[Linspace]"](
     *,
     sparse_indices: AnyArray,
 ) -> WDM[Grid2DSparse[AxisT, AxisT]]: ...
-
-
 def wdm(
     frequencies: AnyAxis | AxLike,
     times: AnyAxis | AxLike,
@@ -1386,14 +1333,12 @@ class FrequencyPhasor[AxisT: "AnyAxis"](
         axis_: AT,
         interpolator: Interpolator,
     ) -> FrequencyPhasor[AT]: ...
-
     @overload
     def get_interpolated(
         self,
         axis_: AnyArray,
         interpolator: Interpolator,
     ) -> FrequencyPhasor[Axis[AnyArray]]: ...
-
     def get_interpolated(
         self,
         axis_: AnyAxis | AnyArray,
@@ -1473,14 +1418,12 @@ class TimePhasor[AxisT: "AnyAxis"](
         axis_: AT,
         interpolator: Interpolator,
     ) -> TimePhasor[AT]: ...
-
     @overload
     def get_interpolated(
         self,
         axis_: AnyArray,
         interpolator: Interpolator,
     ) -> TimePhasor[Axis[AnyArray]]: ...
-
     def get_interpolated(
         self,
         axis_: AnyAxis | AnyArray,
