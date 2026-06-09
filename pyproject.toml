@@ -1,5 +1,5 @@
 [project]
-authors = [{name = "Sen-wen Deng", email = "deng@apc.in2p3.fr"}]
+authors = [{ name = "Sen-wen Deng", email = "senwen.deng@l2it.in2p3.fr" }]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
@@ -36,7 +36,7 @@ dev = [
   "pytest-cov>=7.0.0",
   "pytest-mock>=3.15.1",
   "uv-dynamic-versioning>=0.12.0",
-  {include-group = "quadax"},
+  { include-group = "quadax" },
   "basedpyright",
   "mojito-processor",
 ]
@@ -55,7 +55,7 @@ doc = [
 ]
 jax = ["jax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 quadax = [
-  {include-group = "jax"},
+  { include-group = "jax" },
   "quadax; sys_platform != 'darwin' or platform_machine != 'x86_64'",
 ]
 
@@ -158,12 +158,12 @@ markers = ["slow"]
 "src/typed_lisa_toolkit/py.typed" = "typed_lisa_toolkit/py.typed"
 
 [tool.basedpyright]
-defineConstant = {DEBUG = true}
+defineConstant = { DEBUG = true }
 enableTypeIgnoreComments = true
 exclude = ["**/__pycache__", "src/typed_lisa_toolkit/_l2d_interface/*"]
 executionEnvironments = [
-  {root = "tests", reportPrivateUsage = false},
-  {root = "src"},
+  { root = "tests", reportPrivateUsage = false },
+  { root = "src" },
 ]
 ignore = ["docs"]
 include = ["src"]

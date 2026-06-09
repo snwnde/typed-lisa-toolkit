@@ -284,10 +284,10 @@ class Axis[T: AnyArray | Linspace, MT: ModuleType = ModuleType]:  # noqa: PLW164
 
     @overload
     def __getitem__(self, slice: _slice, /) -> Self: ...
-
+    @overload
+    def __getitem__(self, slice: AnyArray, /) -> "Axis[AnyArray, MT]": ...
     @overload
     def __getitem__(self, idx: int, /) -> float: ...
-
     def __getitem__(self, sli: Any, /):
         """Return a subset of the array."""
         if isinstance(sli, _slice):
@@ -296,8 +296,18 @@ class Axis[T: AnyArray | Linspace, MT: ModuleType = ModuleType]:  # noqa: PLW164
             if isinstance(self.ax, Linspace):
                 return self.ax[sli]
             return float(self.ax[sli])
-        msg = f"Invalid index {sli} for AnyAxis. Must be an integer or a slice."
-        raise TypeError(msg)
+        try:
+            _ = xpc.get_namespace(sli)
+        except TypeError:
+            msg = (
+                f"Invalid index {sli} for AnyAxis. "
+                "Must be an integer, a slice, or a mask."
+            )
+            raise TypeError(msg) from None
+        else:
+            # Now we know sli is a mask
+            ary = self.xp.asarray(self.ax)[sli]
+            return Axis[AnyArray, MT](ary, xp=self.xp)
 
     @property
     def start(self) -> float:
@@ -485,8 +495,6 @@ def build_grid2d[Axis0: AnyAxis, Axis1: AnyAxis](
     *,
     sparse_indices: None = None,
 ) -> Grid2DCartesian[Axis0, Axis1]: ...
-
-
 @overload
 def build_grid2d[Axis0: AnyAxis, Axis1: AnyAxis](
     axis0: Axis0,
@@ -495,8 +503,6 @@ def build_grid2d[Axis0: AnyAxis, Axis1: AnyAxis](
     *,
     sparse_indices: AnyArray,
 ) -> Grid2DSparse[Axis0, Axis1]: ...
-
-
 @overload
 def build_grid2d[A0: AxLike, A1: AxLike](
     axis0: A0,
@@ -505,8 +511,6 @@ def build_grid2d[A0: AxLike, A1: AxLike](
     *,
     sparse_indices: None = None,
 ) -> Grid2DCartesian[Axis[A0], Axis[A1]]: ...
-
-
 @overload
 def build_grid2d[A0: AxLike, Axis1: AnyAxis](
     axis0: A0,
@@ -515,8 +519,6 @@ def build_grid2d[A0: AxLike, Axis1: AnyAxis](
     *,
     sparse_indices: None = None,
 ) -> Grid2DCartesian[Axis[A0], Axis1]: ...
-
-
 @overload
 def build_grid2d[A0: AxLike, A1: AxLike](
     axis0: A0,
@@ -525,8 +527,6 @@ def build_grid2d[A0: AxLike, A1: AxLike](
     *,
     sparse_indices: AnyArray,
 ) -> Grid2DSparse[Axis[A0], Axis[A1]]: ...
-
-
 @overload
 def build_grid2d[Axis0: AnyAxis, A1: AxLike](
     axis0: Axis0,
@@ -535,8 +535,6 @@ def build_grid2d[Axis0: AnyAxis, A1: AxLike](
     *,
     sparse_indices: AnyArray,
 ) -> Grid2DSparse[Axis0, Axis[A1]]: ...
-
-
 def build_grid2d(
     axis0: AxLike | AnyAxis,
     axis1: AxLike | AnyAxis,
