@@ -2,6 +2,22 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.4-alpha.2 - 2026-06-09
+#### Features
+- axis taking mask - (82e48b4) - Senwen Deng
+#### Bug Fixes
+- plot compare showdiff - (8814ba2) - Senwen Deng
+
+- - -
+
+## 0.7.4-alpha.1 - 2026-06-08
+#### Bug Fixes
+- nested label - (9058075) - Senwen Deng
+#### Miscellaneous Chores
+- (**version**) 0.7.4-alpha.1 - (1afb2d3) - Senwen Deng
+
+- - -
+
 ## 0.7.4-alpha.1 - 2026-06-08
 #### Bug Fixes
 - nested label - (9058075) - Senwen Deng
