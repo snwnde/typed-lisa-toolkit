@@ -3,18 +3,18 @@ stages:
   - test
   - deploy
 
-# commitcheck:
-#   stage: test
-#   image: 
-#     name: ghcr.io/cocogitto/cog:7.0.0
-#     entrypoint: ["/bin/sh", "-c"]
-#   rules:
-#     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-#     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH' && $CI_COMMIT_MESSAGE =~ /Merge branch .+ into .+[\s\S]*?See merge request/'
-#       when: never  # Skip post-merge pipelines
-#     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-#   script:
-#     - cog check --ignore-merge-commits
+commitcheck:
+  stage: test
+  image: 
+    name: ghcr.io/cocogitto/cog:7.0.0
+    entrypoint: ["/bin/sh", "-c"]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_MESSAGE =~ /Merge branch .+ into .+[\s\S]*?See merge request/'
+      when: never  # Skip post-merge pipelines
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    - cog check --ignore-merge-commits
   
 pytest:
   stage: test
@@ -54,7 +54,7 @@ pages:
   image: python:3.13
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+(?:-[A-Za-z-]+\d+)?$/'
+    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+(?:-[A-Za-z-]+\.?\d+)?$/'
     - when: never
   script:
     - pip install -q --root-user-action=ignore uv
@@ -82,7 +82,7 @@ build:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+(?:-[A-Za-z-]+\d+)?$/'
+    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+(?:-[A-Za-z-]+\.?\d+)?$/'
     - when: never
 
 pypi:
@@ -96,10 +96,29 @@ pypi:
     - build
 
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+(?:-[A-Za-z-]+\d+)?$/'
+    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+(?:-(rc|preview|pre)\.?\d+)?$/'
     - when: never
   script:
     - pip install -q --root-user-action=ignore uv twine
     - uv sync --group dev
     - source .venv/bin/activate
     - twine upload --verbose dist/*
+
+
+gitlab-pypi:
+  stage: deploy
+  image: python:3.13
+  variables:
+    TWINE_USERNAME: gitlab-ci-token
+    TWINE_PASSWORD: $CI_JOB_TOKEN
+  dependencies:
+    - build
+
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^\d+\.\d+\.\d+(?:-[A-Za-z-]+\.?\d+)?$/'
+    - when: never
+  script:
+    - pip install -q --root-user-action=ignore uv twine
+    - uv sync --group dev
+    - source .venv/bin/activate
+    - twine upload --verbose --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
