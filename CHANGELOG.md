@@ -2,6 +2,35 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.4 - 2026-06-10
+#### Bug Fixes
+- subset copy - (9a4a5b9) - Senwen Deng
+#### Continuous Integration
+- cog check - (ee2b4c9) - Senwen Deng
+- gitlab pypi - (78de48d) - Senwen Deng
+#### Miscellaneous Chores
+- (**version**) 0.7.4-alpha.3 - (348ecac) - Senwen Deng
+
+- - -
+
+## 0.7.4-alpha.2 - 2026-06-09
+#### Features
+- axis taking mask - (82e48b4) - Senwen Deng
+#### Bug Fixes
+- plot compare showdiff - (8814ba2) - Senwen Deng
+#### Miscellaneous Chores
+- (**version**) 0.7.4-alpha.2 - (cc19231) - Senwen Deng
+
+- - -
+
+## 0.7.4-alpha.1 - 2026-06-08
+#### Bug Fixes
+- nested label - (9058075) - Senwen Deng
+#### Miscellaneous Chores
+- (**version**) 0.7.4-alpha.1 - (1afb2d3) - Senwen Deng
+
+- - -
+
 ## 0.7.4-alpha.3 - 2026-06-10
 #### Bug Fixes
 - subset copy - (9a4a5b9) - Senwen Deng
