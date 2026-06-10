@@ -14,7 +14,7 @@ commitcheck:
       when: never  # Skip post-merge pipelines
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
   script:
-    - cog check --ignore-merge-commits
+    - cog check -l --ignore-merge-commits
   
 pytest:
   stage: test
