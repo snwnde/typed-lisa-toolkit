@@ -47,6 +47,7 @@ if TYPE_CHECKING:
             *,
             interval: tuple[float, float] | None = None,
             slice: slice | None = None,
+            copy: bool = True,
         ) -> Self: ...
 
     class _SubsettableRep2D(AnyReps, Protocol):
@@ -181,39 +182,14 @@ class _SubsetMixin1D[RepT: _SubsettableRep1D](_mixins.ChannelMapping[RepT], abc.
         *,
         interval: tuple[float, float] | None = None,
         slice: slice | None = None,
+        copy: bool = True,
     ) -> Self:
         """Return the subset as a new instance."""
         subset_dict = {
-            chnname: chn.get_subset(interval=interval, slice=slice)
+            chnname: chn.get_subset(interval=interval, slice=slice, copy=copy)
             for chnname, chn in self.items()
         }
         return type(self).from_dict(subset_dict).set_name(self.name)
-
-    # def draw(
-    #     self,
-    #     compare_to: Self | None = None,
-    #     *,
-    #     interval: tuple[float, float] | None = None,
-    #     **kwargs: Any,
-    # ):
-    #     """Plot the data.
-
-    #     If `compare_to` is not `None`, the method draws both
-    #     the data and the data in `compare_to`.
-    #     """
-    #     plotter = self._get_plotter()
-
-    #     if compare_to is None:
-    #         return plotter(self.get_subset(interval=interval)).draw(**kwargs)
-    #     return plotter(self.get_subset(interval=interval)).compare(
-    #         plotter(compare_to.get_subset(interval=interval)),
-    #         **kwargs,
-    #     )
-
-    # def _get_plotter(self) -> type[Any]:
-    #     """Return the plotter class."""
-    #     msg = "The method _get_plotter() must be implemented in the subclass."
-    #     raise NotImplementedError(msg)
 
 
 class _SubsetMixin2D[RepT: _SubsettableRep2D](_mixins.ChannelMapping[RepT], abc.ABC):
@@ -236,45 +212,6 @@ class _SubsetMixin2D[RepT: _SubsettableRep2D](_mixins.ChannelMapping[RepT], abc.
             for chnname, chn in self.items()
         }
         return type(self).from_dict(subset_dict).set_name(self.name)
-
-    # def draw(
-    #     self,
-    #     compare_to: Self | None = None,
-    #     *,
-    #     time_interval: tuple[float, float] | None = None,
-    #     freq_interval: tuple[float, float] | None = None,
-    #     **kwargs: Any,
-    # ):
-    #     """Plot the data.
-
-    #     If `compare_to` is not `None`, the method draws both
-    #     the data and the data in `compare_to`.
-    #     """
-    #     plotter = self._get_plotter()
-
-    #     if compare_to is None:
-    #         return plotter(
-    #             self.get_subset(
-    #                 time_interval=time_interval,
-    #                 freq_interval=freq_interval,
-    #             ),
-    #         ).draw(**kwargs)
-    #     return plotter(
-    #         self.get_subset(time_interval=time_interval, freq_interval=freq_interval),
-    #     ).compare(
-    #         plotter(
-    #             compare_to.get_subset(
-    #                 time_interval=time_interval,
-    #                 freq_interval=freq_interval,
-    #             ),
-    #         ),
-    #         **kwargs,
-    #     )
-
-    def _get_plotter(self) -> type[Any]:
-        """Return the plotter class."""
-        msg = "The method _get_plotter() must be implemented in the subclass."
-        raise NotImplementedError(msg)
 
 
 class Data[RepT: "AnyReps"](_mixins.ChannelMapping[RepT], abc.ABC):
@@ -613,9 +550,17 @@ class TimedFSData(FSData):
         return super().create_like(entries).set_times(self.times)
 
     def get_subset(  # noqa: D102
-        self, *, interval: tuple[float, float] | None = None, slice: slice | None = None
+        self,
+        *,
+        interval: tuple[float, float] | None = None,
+        slice: slice | None = None,
+        copy: bool = True,
     ) -> Self:
-        return super().get_subset(interval=interval, slice=slice).set_times(self.times)
+        return (
+            super()
+            .get_subset(interval=interval, slice=slice, copy=copy)
+            .set_times(self.times)
+        )
 
     def get_embedded(  # noqa: D102
         self,
@@ -642,10 +587,8 @@ class TimedFSData(FSData):
 
     @overload
     def set_times(self, times: AxLike) -> Self: ...
-
     @overload
     def set_times(self, times: AnyAxis) -> Self: ...
-
     def set_times(self, times: AxLike | AnyAxis) -> Self:
         """Set the time grid.
 
@@ -823,8 +766,6 @@ def tsdata(
     *,
     name: str | None = None,
 ) -> TSData: ...
-
-
 @overload
 def tsdata(
     *,
@@ -833,8 +774,6 @@ def tsdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> TSData: ...
-
-
 def tsdata(
     mapping: Mapping[str, reps.TimeSeries[Axis[Linspace]]] | None = None,
     /,
@@ -915,8 +854,6 @@ def fsdata(
     times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData: ...
-
-
 @overload
 def fsdata(
     mapping: Mapping[str, reps.FrequencySeries[Axis[Linspace]]],
@@ -924,8 +861,6 @@ def fsdata(
     *,
     name: str | None = None,
 ) -> FSData: ...
-
-
 @overload
 def fsdata(
     *,
@@ -935,8 +870,6 @@ def fsdata(
     times: None = None,
     name: str | None = None,
 ) -> FSData: ...
-
-
 @overload
 def fsdata(
     *,
@@ -946,8 +879,6 @@ def fsdata(
     times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData: ...
-
-
 def fsdata(
     mapping: Mapping[str, reps.FrequencySeries[Axis[Linspace]]] | None = None,
     /,
@@ -1069,8 +1000,6 @@ def stftdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     *,
     name: str | None = None,
 ) -> STFTData[GridT]: ...
-
-
 @overload
 def stftdata(
     *,
@@ -1081,8 +1010,6 @@ def stftdata(
     sparse_indices: None = None,
     name: str | None = None,
 ) -> STFTData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def stftdata(
     *,
@@ -1093,8 +1020,6 @@ def stftdata(
     sparse_indices: AnyArray,
     name: str | None = None,
 ) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 def stftdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     mapping: Mapping[str, reps.STFT[GridT]] | None = None,
     /,
@@ -1199,8 +1124,6 @@ def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     *,
     name: str | None = None,
 ) -> WDMData[GridT]: ...
-
-
 @overload
 def wdmdata(
     *,
@@ -1211,8 +1134,6 @@ def wdmdata(
     sparse_indices: None = None,
     name: str | None = None,
 ) -> WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def wdmdata(
     *,
@@ -1223,8 +1144,6 @@ def wdmdata(
     sparse_indices: AnyArray,
     name: str | None = None,
 ) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 def wdmdata[GridT: Grid2D[Axis[Linspace], Axis[Linspace]]](
     mapping: Mapping[str, reps.WDM[GridT]] | None = None,
     /,
@@ -1368,8 +1287,6 @@ def construct_fsdata(
     times: AnyAxis | AxLike,
     name: str | None = None,
 ) -> TimedFSData: ...
-
-
 @overload
 def construct_fsdata(
     *,
@@ -1378,8 +1295,6 @@ def construct_fsdata(
     channels: tuple[str, ...],
     name: str | None = None,
 ) -> FSData: ...
-
-
 @deprecated("construct_fsdata", "function", "0.8.0", alternative="fsdata")
 def construct_fsdata(
     *,
@@ -1486,8 +1401,6 @@ def construct_stftdata(
     sparse_indices: None = None,
     name: str | None = None,
 ) -> STFTData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def construct_stftdata(
     *,
@@ -1498,8 +1411,6 @@ def construct_stftdata(
     sparse_indices: AnyArray,
     name: str | None = None,
 ) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @deprecated("construct_stftdata", "function", "0.8.0", alternative="stftdata")
 def construct_stftdata(
     *,
@@ -1565,8 +1476,6 @@ def construct_wdmdata(
     sparse_indices: None = None,
     name: str | None = None,
 ) -> WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def construct_wdmdata(
     *,
@@ -1577,8 +1486,6 @@ def construct_wdmdata(
     sparse_indices: AnyArray,
     name: str | None = None,
 ) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @deprecated("construct_wdmdata", "function", "0.8.0", alternative="wdmdata")
 def construct_wdmdata(
     *,
@@ -1643,8 +1550,6 @@ def load_data(
     sparse: bool = False,
     legacy: bool = False,
 ) -> TSData: ...
-
-
 @overload
 def load_data(
     file_path: str | pathlib.Path,
@@ -1654,8 +1559,6 @@ def load_data(
     sparse: bool = False,
     legacy: bool = False,
 ) -> FSData: ...
-
-
 @overload
 def load_data(
     file_path: str | pathlib.Path,
@@ -1665,8 +1568,6 @@ def load_data(
     sparse: bool = False,
     legacy: bool = False,
 ) -> TimedFSData: ...
-
-
 @overload
 def load_data(
     file_path: str | pathlib.Path,
@@ -1676,8 +1577,6 @@ def load_data(
     sparse: Literal[False] = False,
     legacy: bool = False,
 ) -> STFTData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def load_data(
     file_path: str | pathlib.Path,
@@ -1687,8 +1586,6 @@ def load_data(
     sparse: Literal[True],
     legacy: bool = False,
 ) -> STFTData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def load_data(
     file_path: str | pathlib.Path,
@@ -1698,8 +1595,6 @@ def load_data(
     sparse: Literal[False] = False,
     legacy: bool = False,
 ) -> WDMData[Grid2DCartesian[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 @overload
 def load_data(
     file_path: str | pathlib.Path,
@@ -1709,8 +1604,6 @@ def load_data(
     sparse: Literal[True],
     legacy: bool = False,
 ) -> WDMData[Grid2DSparse[Axis[Linspace], Axis[Linspace]]]: ...
-
-
 def load_data(
     file_path: str | pathlib.Path,
     *,

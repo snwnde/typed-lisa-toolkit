@@ -1591,7 +1591,6 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
         *,
         known_slices: tuple[slice, ...] | None = None,
     ) -> STFT[Grid2DSparse[A0, A1]]: ...
-
     @overload
     def get_embedded[A0: AnyAxis, A1: AnyAxis](
         self: STFT[Grid2DCartesian[AnyAxis, AnyAxis]],
@@ -1599,7 +1598,6 @@ class ShortTimeFourierTransform[GridT: Grid2D[AnyAxis, AnyAxis]](
         *,
         known_slices: tuple[slice, ...] | None = None,
     ) -> STFT[Grid2DCartesian[A0, A1]]: ...
-
     def get_embedded(
         self,
         embedding_grid: Grid2D[AnyAxis, AnyAxis],
