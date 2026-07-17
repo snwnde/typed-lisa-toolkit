@@ -11,6 +11,7 @@ dependencies = [
   "astropy",
   "array-api-compat >= 1.13.0",
   "mojito>=0.5.0",
+  "lisaorbits>=3.1.0",
 ]
 description = "Fully typed interfaces for LISA data analysis"
 dynamic = ["version"]
@@ -52,6 +53,8 @@ doc = [
   "anybadge",
   "ipywidgets",
   "lovelyplots",
+  "phentax",
+  "matplotlib<3.11",
 ]
 jax = ["jax; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 quadax = [
@@ -176,3 +179,6 @@ reportImportCycles = false
 reportMissingImports = "error"
 reportMissingTypeStubs = false
 reportUnusedCallResult = "none"
+
+[tool.uv.sources]
+phentax = { git = "https://github.com/asantini29/phentax.git" }

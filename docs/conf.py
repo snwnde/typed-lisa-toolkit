@@ -74,6 +74,7 @@ from _sphinx_handlers import (
 
 intersphinx_mapping = {
     "l2d-interface": ("https://l2d-interface-c43116.pages.in2p3.fr/", None),
+    "lisaorbits": ("https://lisa-simulation.pages.in2p3.fr/orbits/", None),
 }
 
 extlinks = {
