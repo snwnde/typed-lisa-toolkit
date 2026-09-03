@@ -1302,10 +1302,10 @@ def linear_interpolator_fixture(xp: ModuleType):  # pyright: ignore[reportUnknow
             try:
                 return xp.interp(xp.asarray(x_new, dtype=xp.float64), x_arr, y_arr)
             except AttributeError:
-                res = np.interp(
-                    np.asarray(x_new, dtype=np.float64),
-                    np.asarray(x_arr),
-                    np.asarray(y_arr),
+                res = np.interp(  # pyright: ignore[reportUnknownVariableType]
+                    np.asarray(x_new, dtype=np.float64),  # pyright: ignore[reportUnknownArgumentType]
+                    np.asarray(x_arr),  # pyright: ignore[reportUnknownArgumentType]
+                    np.asarray(y_arr),  # pyright: ignore[reportUnknownArgumentType]
                 )
                 return xp.asarray(res)
 
