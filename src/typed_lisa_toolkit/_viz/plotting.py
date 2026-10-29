@@ -191,6 +191,23 @@ def _get_freqs_axis(freqs: AnyAxis) -> tuple[AnyArray, Unit]:
     return xaxis, freq_unit
 
 
+def _sparse_abs_image(
+    grid: Grid2DSparse[AnyAxis, AnyAxis],
+    entries_abs: AnyArray,
+    /,
+) -> np.ndarray:
+    """Build a masked dense magnitude image from a sparse time-frequency grid."""
+    _n_freq = len(grid.axis0)
+    _n_time = len(grid.axis1)
+    _values = np.asarray(entries_abs)
+    _image = np.zeros((_n_freq, _n_time), dtype=_values.dtype)
+    _sparse_idx = np.asarray(grid.indices)
+    _image[_sparse_idx[:, 0], _sparse_idx[:, 1]] = _values
+    _in_support = np.zeros((_n_freq, _n_time), dtype=bool)
+    _in_support[_sparse_idx[:, 0], _sparse_idx[:, 1]] = True
+    return np.ma.masked_where(~_in_support, _image)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # Plotting classes
 # ═════════════════════════════════════════════════════════════════════════════
@@ -283,8 +300,17 @@ class SingleImage(XYLabel):
         image_kwargs["origin"] = image_kwargs.get("origin", "lower")
         image_kwargs["aspect"] = image_kwargs.get("aspect", "auto")
         image_kwargs["extent"] = image_kwargs.get("extent", self.extent)
+        _image = self.toshow
+        _cmap = image_kwargs.get("cmap")
+        if isinstance(_image, np.ma.MaskedArray):
+            _masked_cmap = matplotlib.colormaps[_cmap or "viridis"].copy()  # pyright: ignore[reportArgumentType]
+            # NOTE getitem of the registry can take either a string or a Colormap object
+            # The type annotation of matplotlib.colormaps does not seem correct
+            _masked_cmap.set_bad(color="white", alpha=0)  # Transparent outside support
+            image_kwargs["cmap"] = _masked_cmap
         ax.imshow(
             np.asarray(self.toshow),
+            # NOTE We could have used _image but this is not correctly typed
             **image_kwargs,
         )
         return ax
@@ -470,8 +496,8 @@ def classify(
         ).normalize()
     if isinstance(obj, (STFT, WDM)):
         _guard_shape(obj)
-        if isinstance(obj.grid, Grid2DSparse):
-            msg = "Not implemented yet for sparse grid."
+        if obj.entries.shape[0] != 1:
+            msg = "STFT and WDM with n_batches > 1 are not supported yet."
             raise NotImplementedError(msg)
         xaxis, xunit = _get_times_axis(obj.times)
         yaxis, yunit = _get_freqs_axis(obj.frequencies)
@@ -482,14 +508,18 @@ def classify(
             cast("float", yaxis[-1]),
         )
 
-        if obj.entries.shape[0] != 1:
-            msg = "STFT and WDM with n_channels > 1 are not supported yet."
-            raise NotImplementedError(msg)
+        def _get_toshow(i: int):
+            if isinstance(obj.grid, Grid2DSparse):
+                return _sparse_abs_image(
+                    obj.grid, np.asarray(obj.abs().entries[i]).squeeze()
+                )
+            # Dense grid case
+            return np.asarray(obj.abs().entries[i]).squeeze()
 
         children = [
             PlotNode(
                 payload=SingleImage(
-                    toshow=np.asarray(obj.abs().entries[i]).squeeze(),
+                    toshow=_get_toshow(i),
                     extent=extent,
                     xunit=xunit,
                     yunit=yunit,
