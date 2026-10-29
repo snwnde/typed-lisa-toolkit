@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.6 - 2026-10-29
+#### Features
+- plot grid sparse 2D - (56edc4e) - Senwen Deng
+#### Continuous Integration
+- added cache - (a585171) - Senwen Deng
+#### Miscellaneous Chores
+- updated uv.lock - (860f4c5) - Senwen Deng
+
+- - -
+
 ## 0.7.5 - 2026-07-17
 #### Features
 - load orbit - (ba73331) - Senwen Deng
