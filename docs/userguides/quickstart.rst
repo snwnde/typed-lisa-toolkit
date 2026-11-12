@@ -5,7 +5,7 @@ Install and add as a dependency to your project:
 
 .. code-block:: bash
 
-   uv add git+https://gitlab.in2p3.fr/lisa-apc/typed-lisa-toolkit
+   uv add typed-lisa-toolkit
 
 Import TLT from python:
 
