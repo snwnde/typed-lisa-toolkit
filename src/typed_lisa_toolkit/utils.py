@@ -1,22 +1,7 @@
-"""Module for utilities.
+"""Utilities.
 
-.. currentmodule:: typed_lisa_toolkit.utils
-
-Functions
----------
-
-.. autofunction:: get_subset_slice
-.. autofunction:: get_subset_mask
-.. autofunction:: get_support_slice
-.. autofunction:: promote_slice
-.. autofunction:: extend_to
-
-Decorators
-----------
-
-.. autofunction:: warn_external
-.. autofunction:: deprecated
-
+Note that some of these utilities are for internal use only
+and not part of the stable public API.
 """
 
 from __future__ import annotations
@@ -43,7 +28,7 @@ def warn_external(
     *,
     package_prefix: str = "typed_lisa_toolkit",
 ) -> None:
-    """Emit a warning pointing to the first caller outside this package."""
+    """Emit a warning pointing to the first caller outside a package."""
     frame = inspect.currentframe()
     if frame is None:
         warnings.warn(message, category, stacklevel=2)
@@ -288,3 +273,10 @@ def set_env(**environ: Any):
 #         return _interpolated
 
 #     return _interpolator
+
+
+def jaxjit[**P, R](fn: Callable[P, R], /, **jit_kwargs: Any) -> Callable[P, R]:
+    """Signature-preserving wrapper for jax.jit."""
+    import jax
+
+    return jax.jit(fn, **jit_kwargs)  # pyright: ignore[reportUnknownMemberType]

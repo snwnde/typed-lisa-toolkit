@@ -44,6 +44,7 @@ By basing your code on TLT objects, you get:
    api/toplevel
    api/types
    api/shop
+   api/utils
 
 .. toctree::
    :maxdepth: 2
