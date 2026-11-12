@@ -3,7 +3,15 @@ Internal Utilities
 
 .. warning::
 
-   This module is internal and not part of the stable public API.
+   The utilities listed below are for internal use and
+   not part of the stable public API.
 
-.. automodule:: typed_lisa_toolkit.utils
-   :no-members:
+.. currentmodule:: typed_lisa_toolkit.utils
+
+
+.. autofunction:: get_subset_slice
+.. autofunction:: get_subset_mask
+.. autofunction:: get_support_slice
+.. autofunction:: promote_slice
+.. autofunction:: extend_to
+.. autofunction:: deprecated

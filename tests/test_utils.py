@@ -1,4 +1,7 @@
+import inspect
 from types import ModuleType
+
+import pytest
 
 from typed_lisa_toolkit import utils
 
@@ -46,3 +49,24 @@ def test_extend_to_1d(xp: ModuleType):
     assert xp.all(extended[..., 3:8] == entries)
     assert xp.all(extended[..., :3] == 0)
     assert xp.all(extended[..., 8:] == 0)
+
+
+def test_jaxjit():
+    # Skip if jax is not available
+    pytest.importorskip("jax", reason="jax is not installed")
+
+    def fn(x: float, y: int, *, scale: float = 1.0) -> float:
+        return x * y * scale
+
+    f_jitted = utils.jaxjit(fn)
+
+    for f in [fn, f_jitted]:
+        sig = inspect.signature(f)
+
+        assert list(sig.parameters) == ["x", "y", "scale"]
+
+        assert sig.parameters["x"].annotation is float
+        assert sig.parameters["y"].annotation is int
+        assert sig.parameters["scale"].default == 1.0
+
+        assert sig.return_annotation is float
