@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.7 - 2026-11-12
+#### Features
+- added jit wrapper - (e164b5a) - Senwen Deng
+#### Documentation
+- default uv add - (c695541) - Senwen Deng
+
+- - -
+
 ## 0.7.6 - 2026-10-29
 #### Features
 - plot grid sparse 2D - (56edc4e) - Senwen Deng
